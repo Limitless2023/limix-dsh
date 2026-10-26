@@ -1,0 +1,53 @@
+{
+  "name": "dsh-limix-agent",
+  "version": "0.1.0",
+  "private": true,
+  "description": "LimiX Agent：limix 工具（LimiX 开放平台全流程）+ 工具结果卡片 + 「分析过程」视图",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": {
+      "default": "./lib/index.js"
+    },
+    "./client": {
+      "default": "./lib/client.js"
+    },
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./assets/icon.png",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib/index.js",
+    "lib/client.js",
+    "cordis.patch.yml",
+    "assets/limix.py",
+    "assets/icon.png",
+    "locale/*.json",
+    "src",
+    "tsdown.config.ts",
+    "tsconfig.json"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-tool",
+        "@deepseek-ai/dsh-client-ui-conversation"
+      ]
+    }
+  },
+  "scripts": {
+    "build": "tsdown"
+  },
+  "devDependencies": {
+    "@types/react": "~18.3.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "tsdown": "^0.15.7",
+    "typescript": "^5.9.3"
+  }
+}

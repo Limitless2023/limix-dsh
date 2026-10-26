@@ -1,0 +1,9 @@
+# dsh-limix-cover bundle patch
+#
+# Mounted by the profile boot when `dsh-limix-cover` is in
+# `dsh.profile.bundles`: a single insert of the plugin row. The row carries
+# both halves — the empty host half (`lib/index.js`) and the browser half
+# (`lib/client.js`, declared through `dsh.client`).
+- insert:
+    - id: limix-cover
+      name: 'dsh-limix-cover'

@@ -7,4 +7,4 @@
 - [ ] 工具卡视觉确认（子 agent 会话里已落卡，需进那层会话截图）
 - [x] brand 包并入仓库（packages/brand）
 - [x] README / INSTALL（同事 agent 安装说明）/ release.sh
-- [ ] Release tarball 实跑（需要先定 GitHub 仓库名）
+- [x] Release tarball 实跑：v0.1.0 已发布（3 个 tarball）

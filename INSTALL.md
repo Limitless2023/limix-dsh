@@ -6,8 +6,8 @@
 
 请在这个 DSH profile 里安装 LimiX 插件，用 `plugin_manager` 工具的 `install_bundle`：
 
-1. `target` = `https://github.com/<owner>/limix-dsh/releases/download/vX.Y.Z/dsh-limix-agent-X.Y.Z.tgz`
-2. `target` = `https://github.com/<owner>/limix-dsh/releases/download/vX.Y.Z/dsh-limix-cover-X.Y.Z.tgz`
+1. `target` = `https://github.com/Limitless2023/limix-dsh/releases/download/v0.1.0/dsh-limix-agent-X.Y.Z.tgz`
+2. `target` = `https://github.com/Limitless2023/limix-dsh/releases/download/v0.1.0/dsh-limix-cover-0.2.0.tgz`
 3. 三个动作都授权后，读返回里的 `application` 字段：`applied` 才算生效；`restart-required` 就提示我重启 DSH。
 
 装完请检查并告诉我：

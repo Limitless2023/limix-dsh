@@ -35,3 +35,18 @@
 
 → 先发 `limix-datasource` 这条路（设置页 + `datasource` 工具 + 三闸只读），
   data-agent 留给内部 fork（它本来就是跑在源码检出上的）。
+
+## 「分析过程」空白的原因（0.2.1，已定位到数据源层）
+
+`conversation.view` 的 standard props 里，旧版用 `useSession` 取对话节点，0.2.1 已经不对：
+
+| hook | 返回 |
+|---|---|
+| `useSession` | `sessionId, pendingSubmissions, running, subagent, removed, openState, openError, hasMore, loadingOlder, promptError, blank, lastAgentError, promptAttempted, awaitingFirstTurn`（无 nodes） |
+| `useChat` | `order, nodes, locations, navigation, timeline, legacy`（`nodes` 是 keyed 袋，`order` 是 id 序；直接 s.nodes 会 `nodes is not iterable`） |
+| `useConversation` | `views, activeTargets` |
+| **`useTrajectory`** | **`eventNodes, eventLocations, requests, callSchemas, partial, runningCalls`** ← 与旧版的 `nodes` + `runningCalls` 对位 |
+
+→ 正解：`nodes = useTrajectory(t => t).eventNodes`、`runningCalls = ...runningCalls`，
+   再按节点 `kind` 建轮次。最后一公里是 `eventNodes` 的元素结构（kind 词表），
+   需渲染一次 `keyof node` 确认。

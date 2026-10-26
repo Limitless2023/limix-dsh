@@ -1850,9 +1850,10 @@ const ui = {
 		marginTop: 6
 	}
 };
-function LimixPipelineView({ useSession }) {
-	const nodes = useSession((s) => s?.nodes ?? []);
-	const runningCalls = useSession((s) => s?.runningCalls ?? []);
+function LimixPipelineView({ useSession, useTrajectory }) {
+	const traj = useTrajectory((t) => t);
+	const nodes = (0, react.useMemo)(() => traj?.eventNodes ?? [], [traj]);
+	const runningCalls = traj?.runningCalls ?? [];
 	const rounds = (0, react.useMemo)(() => parseRounds(nodes, runningCalls), [nodes, runningCalls]);
 	window.__lxPipelineNodes = nodes;
 	const [openKey, setOpenKey] = (0, react.useState)(null);
@@ -1861,9 +1862,7 @@ function LimixPipelineView({ useSession }) {
 	if (!rounds.length) return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 		style: ui.empty,
 		children: [
-			"本会话还没有 LimiX 分析活动。",
-			/* @__PURE__ */ (0, react_jsx_runtime.jsx)("br", {}),
-			"发起一次预测（样例库选一个，或直接描述需求），这里会实时展开完整的调用管线：",
+			"本会话还没有 LimiX 分析活动。 发起一次预测（样例库选一个，或直接描述需求），这里会实时展开完整的调用管线：",
 			/* @__PURE__ */ (0, react_jsx_runtime.jsx)("br", {}),
 			"数据处理 → 上传 → 预测 → 评估 / 因果解释 → 取结果。"
 		]

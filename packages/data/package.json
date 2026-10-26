@@ -1,6 +1,6 @@
 {
   "name": "dsh-limix-data",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
   "type": "module",
   "description": "LimiX Data：datasource 工具（NL2SQL 三闸只读）+ 设置页数据源管理",

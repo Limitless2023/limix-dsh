@@ -50,3 +50,9 @@
 → 正解：`nodes = useTrajectory(t => t).eventNodes`、`runningCalls = ...runningCalls`，
    再按节点 `kind` 建轮次。最后一公里是 `eventNodes` 的元素结构（kind 词表），
    需渲染一次 `keyof node` 确认。
+
+## 修复（0.1.2）
+
+`useSession` → `useTrajectory`：`nodes = eventNodes`、`runningCalls = runningCalls`；
+解析层同时接受 `tool-call`（新）与 `assistant-step`（新名）。实测 `测试 Limix` 会话：
+第 1 轮 / LimiX ×23 / 34 阶段 / 2 分 21 秒，并行组与失败节点均正常。

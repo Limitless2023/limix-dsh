@@ -487,9 +487,10 @@ interface ViewProps {
   sessionId?: unknown
 }
 
-export function LimixPipelineView({ useSession }: ViewProps): JSX.Element {
-  const nodes = useSession(s => (s?.nodes ?? []) as ReadonlyArray<NodeLike>)
-  const runningCalls = useSession(s => (s?.runningCalls ?? []) as ReadonlyArray<RunningCallLike>)
+export function LimixPipelineView({ useSession, useTrajectory }: any): JSX.Element {
+  const traj = useTrajectory((t: any) => t)
+  const nodes = useMemo(() => (((traj as any)?.eventNodes ?? []) as ReadonlyArray<NodeLike>), [traj])
+  const runningCalls = ((traj as any)?.runningCalls ?? []) as ReadonlyArray<RunningCallLike>
   const rounds = useMemo(() => parseRounds(nodes, runningCalls), [nodes, runningCalls])
   // 调试探针：控制台可 window.__lxPipelineNodes 查看真实节点（诊断解析层用，无副作用）
   ;(window as any).__lxPipelineNodes = nodes
@@ -501,7 +502,7 @@ export function LimixPipelineView({ useSession }: ViewProps): JSX.Element {
   if (!rounds.length) {
     return (
       <div style={ui.empty}>
-        本会话还没有 LimiX 分析活动。<br />
+        本会话还没有 LimiX 分析活动。
         发起一次预测（样例库选一个，或直接描述需求），这里会实时展开完整的调用管线：<br />
         数据处理 → 上传 → 预测 → 评估 / 因果解释 → 取结果。
       </div>

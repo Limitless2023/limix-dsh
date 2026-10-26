@@ -20,7 +20,7 @@ const COMMANDS = [
 ]
 
 const DESCRIPTION = `调用 LimiX 开放平台 API 完成表格数据预测（免训练、零调参），覆盖 上传数据 → 分类/回归/时序预测 → 任务轮询 → 结果下载 全流程。
-子命令：health / check（连通性）；upload <文件>（上传得 data_version_id）；classify / regress / forecast（上传→提交→轮询→下载一条龙，需 --train --predict --target，时序另需 --date --context --horizon）；task <id> / tasks（查任务）；result <id> / download <id> -o 文件（取结果）；data files|versions（查数据）；api <METHOD> <path>（逃生舱裸调任意端点）。
+子命令：health / check（连通性）；upload <文件>（上传得 data_version_id）；classify / regress / forecast（上传→提交→轮询→下载一条龙，需 --train --predict --target，时序另需 --date --context --horizon；时序的 --predict 可选，不传则按 --horizon 自动外推）；task <id> / tasks（查任务）；result <id> / download <id> -o 文件（取结果）；data files|versions（查数据）；api <METHOD> <path>（逃生舱裸调任意端点）。
 终态口径：预测任务成功终态判据 is_ready=true（finished）；数据接入/治理/插补/因果任务成功终态 succeeded。凭据已配置于 ~/.limix/config.json，无需额外传参。文件路径用绝对路径，或相对调用时所在目录的相对路径。`
 
 /** Python CLI 入口的解析链：显式配置 > 环境变量 > 包内自带。 */

@@ -56,3 +56,9 @@
 `useSession` → `useTrajectory`：`nodes = eventNodes`、`runningCalls = runningCalls`；
 解析层同时接受 `tool-call`（新）与 `assistant-step`（新名）。实测 `测试 Limix` 会话：
 第 1 轮 / LimiX ×23 / 34 阶段 / 2 分 21 秒，并行组与失败节点均正常。
+
+## 0.1.3 打磨
+
+- 卡片字段中文名补全（task_type/engine_type/model_type/config_name/callback_url/priority/created_at/queued_at/…）
+- 卡片命令行里的绝对路径按会话 cwd 相对化（`/Users/.../train.csv` → `train.csv`）
+- 工具 description 补充：时序 `--predict` 可选，不传按 `--horizon` 自动外推

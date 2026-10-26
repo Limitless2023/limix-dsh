@@ -837,7 +837,23 @@ const KEY_LABELS = {
 	message: "消息",
 	file: "文件",
 	output: "输出文件",
-	rows: "行数"
+	rows: "行数",
+	task_type: "任务类型",
+	engine_type: "引擎",
+	model_type: "模型",
+	config_name: "配置",
+	callback_url: "回调地址",
+	priority: "优先级",
+	created_at: "创建时间",
+	queued_at: "入队时间",
+	started_at: "开始时间",
+	finished_at: "完成时间",
+	updated_at: "更新时间",
+	elapsed: "耗时",
+	file_id: "文件 ID",
+	filename: "文件名",
+	columns: "列数",
+	n_rows: "行数"
 };
 /**
 * 从 CLI 文本输出里尽力解析 JSON，失败返回 null 走原文展示。
@@ -918,7 +934,7 @@ const ui$1 = {
 		overflowY: "auto"
 	}
 };
-function LimixToolCard({ block, inspect }) {
+function LimixToolCard({ block, inspect, cwd }) {
 	const settled = !!block && "kind" in block;
 	const [showRaw, setShowRaw] = (0, react.useState)(false);
 	const rootRef = (0, react.useRef)(null);
@@ -961,10 +977,11 @@ function LimixToolCard({ block, inspect }) {
 		const raw = Array.isArray(args.args) ? args.args.filter((a) => typeof a === "string") : [];
 		return raw[0] === args.command ? raw.slice(1) : raw;
 	}, [args]);
+	const shorten = (v) => typeof v === "string" && cwd && v.startsWith(cwd + "/") ? v.slice(cwd.length + 1) : v;
 	const cmdLine = [
 		"limix",
 		typeof args.command === "string" ? args.command : "",
-		...argList
+		...argList.map(shorten)
 	].filter(Boolean).join(" ");
 	/** 取命令行某个 flag 的值；时序与分类/回归两条支路共用 */
 	const flagValue = (0, react.useMemo)(() => (flag) => {

@@ -28,6 +28,12 @@
                 For forecast, `--context` should cover at least one full season, and `--predict` is
                 optional (omit it and pass `--horizon` to extrapolate). Report metrics (R², MAPE,
                 accuracy) in business terms, not just raw numbers.
+
+                Metrics need ground truth: only pass a `--predict` file that still carries the
+                target column, otherwise there is nothing to compare. When the predict data has no
+                labels, say plainly that no accuracy can be reported instead of inventing a number.
+                Read the `metrics` object the `limix` tool returns — do not recompute metrics in a
+                separate script, and do not claim a number the tool did not produce.
           - id: agent-instructions
             name: '@deepseek-ai/dsh-agent-instructions'
             config:

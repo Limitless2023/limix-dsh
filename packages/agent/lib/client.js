@@ -934,6 +934,37 @@ const ui$1 = {
 		overflowY: "auto"
 	}
 };
+const FIELD_ORDER = {
+	forecast: [
+		"task_id",
+		"status",
+		"result_content"
+	],
+	regress: [
+		"task_id",
+		"status",
+		"result_content"
+	],
+	classify: [
+		"task_id",
+		"status",
+		"result_content"
+	],
+	health: ["status"],
+	check: [
+		"allowed",
+		"api_key_permission",
+		"route_permission"
+	]
+};
+/** 预测类任务优先露 任务ID/状态/结果，其余保持服务端顺序。 */
+function orderedEntries(obj, command) {
+	const all = Object.entries(obj);
+	const pref = FIELD_ORDER[String(command ?? "")];
+	if (!pref) return all;
+	const rank = (k) => pref.indexOf(k) >= 0 ? pref.indexOf(k) : 999;
+	return [...all].sort((a, b) => rank(a[0]) - rank(b[0]));
+}
 function LimixToolCard({ block, inspect, cwd }) {
 	const settled = !!block && "kind" in block;
 	const [showRaw, setShowRaw] = (0, react.useState)(false);
@@ -1144,7 +1175,7 @@ function LimixToolCard({ block, inspect, cwd }) {
 			evalView?.kind === "reg" && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(ScatterChart, { data: evalView.data }),
 			settled && parsed && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
 				style: ui$1.kv,
-				children: Object.entries(parsed).slice(0, kvExpanded ? 20 : 3).map(([k, v]) => /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
+				children: orderedEntries(parsed, args.command).slice(0, kvExpanded ? 20 : 3).map(([k, v]) => /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
 					style: { display: "contents" },
 					children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
 						style: ui$1.k,

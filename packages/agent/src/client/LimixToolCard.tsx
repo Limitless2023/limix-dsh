@@ -113,6 +113,23 @@ const ui = {
   },
 }
 
+const FIELD_ORDER: Record<string, string[]> = {
+  forecast: ['task_id', 'status', 'result_content'],
+  regress: ['task_id', 'status', 'result_content'],
+  classify: ['task_id', 'status', 'result_content'],
+  health: ['status'],
+  check: ['allowed', 'api_key_permission', 'route_permission'],
+}
+
+/** 预测类任务优先露 任务ID/状态/结果，其余保持服务端顺序。 */
+function orderedEntries(obj: Record<string, unknown>, command?: unknown): Array<[string, unknown]> {
+  const all = Object.entries(obj)
+  const pref = FIELD_ORDER[String(command ?? '')]
+  if (!pref) return all
+  const rank = (k: string) => (pref.indexOf(k) >= 0 ? pref.indexOf(k) : 999)
+  return [...all].sort((a, b) => rank(a[0]) - rank(b[0]))
+}
+
 export function LimixToolCard({ block, inspect, cwd }: Props): JSX.Element {
   const settled = !!block && 'kind' in block
   const [showRaw, setShowRaw] = useState(false)
@@ -290,7 +307,7 @@ export function LimixToolCard({ block, inspect, cwd }: Props): JSX.Element {
 
       {settled && parsed && (
         <div style={ui.kv}>
-          {Object.entries(parsed).slice(0, kvExpanded ? 20 : 3).map(([k, v]) => (
+          {orderedEntries(parsed, args.command).slice(0, kvExpanded ? 20 : 3).map(([k, v]) => (
             <span key={k} style={{ display: 'contents' }}>
               <span style={ui.k}>{KEY_LABELS[k] ?? k}</span>
               <span style={ui.v}>{typeof v === 'object' ? JSON.stringify(v) : String(v)}</span>

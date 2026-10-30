@@ -1,5 +1,3 @@
-# limix-datasource 插件自带补丁：`dsh plugin add` 的 reconcile 收编进 profile bundles 后应用，
-# 行进配置树被 Loader 加载（Node 半激活 + dsh.client 扫描进 boot 图）
-- insert:
-    - id: limix-data
-      name: 'dsh-limix-data'
+# 只在 LimiX Agent preset 下挂载（工具 + 设置页路由）。
+# profile 层不再挂行：与 dsh-limix-tool 同样的原因，避免同一包在两个层各注册一次。
+[]

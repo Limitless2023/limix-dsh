@@ -1,0 +1,121 @@
+# LimiX Agent preset：把标准模式的全套通用能力 + LimiX 预测工具组成一个独立的 agent 组合。
+# 只有选中「LimiX Agent」的新会话才有 limix 工具；标准模式等其它 preset 不受影响。
+- insert:
+    - id: preset-limix
+      name: '@deepseek-ai/dsh-agent-preset'
+      config:
+        id: limix
+        name: LimiX Agent
+        description: 产业预测智能体：LimiX 预测全流程 + 通用工具
+        order: 2
+        plugins:
+          - id: persona
+            name: '@deepseek-ai/dsh-persona'
+            config:
+              prefix: |
+                You are LimiX Agent, an agent built on DeepSeek Harness for industrial time-series
+                and tabular forecasting. LimiX is a pretrained structured-data foundation model:
+                zero training, zero tuning — upload data, run classification / regression / forecast,
+                poll the task, then download results.
+
+                For anything that touches LimiX — health check, data upload, task status, results —
+                call the `limix` tool instead of running a shell command. The tool renders a result
+                card in the conversation that the user needs to see; the same CLI through a shell
+                produces only terminal text and hides the result.
+
+                Work in this order: understand the business question; inspect the data (columns,
+                row count, target column, time column); then choose classify / regress / forecast.
+                For forecast, `--context` should cover at least one full season, and `--predict` is
+                optional (omit it and pass `--horizon` to extrapolate). Report metrics (R², MAPE,
+                accuracy) in business terms, not just raw numbers.
+          - id: agent-instructions
+            name: '@deepseek-ai/dsh-agent-instructions'
+            config:
+              maxBytes: 65536
+          - id: time-context
+            name: '@deepseek-ai/dsh-time-context'
+          - id: tool-bash
+            name: '@deepseek-ai/dsh-tool-bash'
+            disabled: !!js process.platform === 'win32'
+          - id: tool-pwsh
+            name: '@deepseek-ai/dsh-tool-pwsh'
+            disabled: !!js process.platform !== 'win32'
+          - id: tool-fs
+            name: '@deepseek-ai/dsh-tool-fs'
+          - id: tool-fs-search
+            name: '@deepseek-ai/dsh-tool-fs-search'
+            config:
+              sampleOverCapGlobResults: false
+          - id: tool-jobs
+            name: '@deepseek-ai/dsh-tool-jobs'
+          - id: tool-schedule
+            name: '@deepseek-ai/dsh-tool-schedule'
+          - id: skill-filesystem
+            name: '@deepseek-ai/dsh-skill-filesystem'
+          - id: tool-skill
+            name: '@deepseek-ai/dsh-tool-skill'
+          - id: command-goal
+            name: '@deepseek-ai/dsh-command-goal'
+          - id: tool-goal
+            name: '@deepseek-ai/dsh-tool-goal'
+          - id: compaction
+            name: cordis:group
+            group: true
+            isolate:
+              compaction: true
+              toolResultPruner: true
+            config:
+              - id: compaction-basic
+                name: '@deepseek-ai/dsh-compaction-basic'
+              - id: command-compact
+                name: '@deepseek-ai/dsh-command-compact'
+              - id: tool-result-pruner
+                name: '@deepseek-ai/dsh-compaction-tool-result-pruner'
+                config:
+                  thresholdChars: 8192
+                  headChars: 4096
+                  tailChars: 1024
+          - id: delegation
+            name: cordis:group
+            group: true
+            isolate:
+              workflowEngine: true
+            config:
+              - id: tool-subagent-control
+                name: '@deepseek-ai/dsh-tool-subagent-control'
+              - id: tool-subagent-list-agents
+                name: '@deepseek-ai/dsh-tool-subagent-control/list-agents'
+              - id: tool-subagent
+                name: '@deepseek-ai/dsh-tool-subagent'
+                config:
+                  provider: spawn
+                  toolName: subagent
+                  modelSelectionSettings: true
+              - id: tool-subagent-fork
+                name: '@deepseek-ai/dsh-tool-subagent'
+                config:
+                  provider: fork
+                  toolName: subagent_fork
+              - id: workflow-ptc
+                name: '@deepseek-ai/dsh-workflow-ptc'
+                config:
+                  provider: spawn
+              - id: tool-workflow
+                name: '@deepseek-ai/dsh-tool-workflow'
+          - id: tool-ask-user
+            name: '@deepseek-ai/dsh-tool-ask-user'
+          - id: tool-todo
+            name: '@deepseek-ai/dsh-tool-todo'
+            config:
+              allowParallelInProgress: true
+          - id: tool-web
+            name: '@deepseek-ai/dsh-tool-web'
+            config:
+              fetch: true
+              searchTimeoutMs: 60000
+          - id: present
+            name: '@deepseek-ai/dsh-tool-present'
+          - id: limix-tool
+            name: 'dsh-limix-tool'
+          - id: limix-data
+            name: 'dsh-limix-data'

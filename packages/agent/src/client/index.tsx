@@ -7,6 +7,7 @@
  */
 import { LimixToolCard } from './LimixToolCard.tsx'
 import { LimixPipelineView } from './LimixPipelineView.tsx'
+import { LimixTurnStack } from './LimixTurnStack.tsx'
 
 export const inject = ['slots', 'locale']
 
@@ -23,6 +24,10 @@ export function apply(ctx: any): void {
     ctx.slots.register({ name: 'tool.call.toolview', key: 'limix' }, LimixToolCard))
 
   // 与「对话 / 轨迹」并列的可加性视图；label 用 thunk，切语言即时生效
+  // 每轮结束处的 LimiX 卡片堆叠（可加性槽，不影响官方工具行）
+  ctx.slots.inject('conversation.chat.turnTail', () =>
+    ctx.slots.register({ name: 'conversation.chat.turnTail', id: 'limix-turn-stack', order: 30 }, LimixTurnStack))
+
   ctx.slots.inject('conversation.view', () =>
     ctx.slots.register(
       { name: 'conversation.view', id: 'limix-pipeline', order: 15, label: () => t('view.pipeline') },

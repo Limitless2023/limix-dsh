@@ -285,7 +285,79 @@ def download_result(cfg, download_id, out_path):
     return path
 
 
-def run_inference(cfg, kind, payload, sync, no_wait, out_path, wait_seconds):
+
+def _read_csv_rows(path):
+    import csv
+    with open(path, newline="", encoding="utf-8-sig") as f:
+        return list(csv.DictReader(f))
+
+
+def compute_metrics(kind, predict_path, target, result_path):
+    """结果 CSV 落地后顺带算指标：卡片和报告都需要它，算不出来就返回 None，绝不影响主流程。"""
+    try:
+        if not predict_path or not target or not result_path:
+            return None
+        truth = _read_csv_rows(predict_path)
+        preds = _read_csv_rows(result_path)
+        if not truth or not preds:
+            return None
+        cols = list(preds[0].keys())
+        low = {c.lower(): c for c in cols}
+        pred_col = low.get(target.lower())
+        if pred_col is None:
+            for cand in ("pred_label", "prediction", "predict", "y_pred", "pred", "value", "forecast"):
+                if cand in low:
+                    pred_col = low[cand]
+                    break
+        if pred_col is None:
+            for c in cols:
+                if c.lower().startswith(target.lower()):
+                    pred_col = c
+                    break
+        if pred_col is None:
+            return None
+
+        n = min(len(truth), len(preds))
+        if kind == "classification":
+            hit = 0
+            for i in range(n):
+                a, b = truth[i].get(target), preds[i].get(pred_col)
+                if a is None or b is None:
+                    continue
+                if str(a).strip() == str(b).strip():
+                    hit += 1
+            return {"accuracy": round(hit / n, 4), "n": n}
+
+        pairs = []
+        for i in range(n):
+            try:
+                pairs.append((float(truth[i][target]), float(preds[i][pred_col])))
+            except (KeyError, TypeError, ValueError):
+                continue
+        if len(pairs) < 2:
+            return None
+        m = len(pairs)
+        ys = [a for a, _ in pairs]
+        errs = [a - b for a, b in pairs]
+        mean = sum(ys) / m
+        sst = sum((a - mean) ** 2 for a in ys)
+        sse = sum(e * e for e in errs)
+        out = {
+            "n": m,
+            "mae": round(sum(abs(e) for e in errs) / m, 4),
+            "rmse": round((sse / m) ** 0.5, 4),
+        }
+        if sst:
+            out["r2"] = round(1 - sse / sst, 4)
+        mapes = [abs((a - b) / a) for a, b in pairs if a != 0]
+        if mapes:
+            out["mape"] = round(sum(mapes) / len(mapes) * 100, 3)
+        return out
+    except Exception:
+        return None
+
+
+def run_inference(cfg, kind, payload, sync, no_wait, out_path, wait_seconds, metrics_ctx=None):
     """
     预测统一编排：同步 predict 或 异步 tasks+轮询；成功后可选下载结果。
     kind: classification / regression / timeseries
@@ -313,6 +385,10 @@ def run_inference(cfg, kind, payload, sync, no_wait, out_path, wait_seconds):
     result = dict(data)
     if out_path:
         result["saved_to"] = download_result(cfg, data["result_version_id"], out_path)
+        metrics = compute_metrics(kind, (metrics_ctx or {}).get("predict_path"),
+                                  (metrics_ctx or {}).get("target"), result["saved_to"])
+        if metrics:
+            result["metrics"] = metrics
     else:
         log(f"结果版本 {data['result_version_id']}（用 download 子命令可取 CSV）")
     emit(result)
@@ -481,7 +557,8 @@ def cmd_classify(cfg, args):
         "finetuned_result_id": args.finetuned,
         "timeout_seconds": args.timeout,
     }
-    run_inference(cfg, "classification", payload, args.sync, args.no_wait, args.output, args.timeout)
+    run_inference(cfg, "classification", payload, args.sync, args.no_wait, args.output, args.timeout,
+                  {"predict_path": args.predict, "target": args.target})
 
 
 def cmd_regress(cfg, args):
@@ -495,7 +572,8 @@ def cmd_regress(cfg, args):
         "finetuned_result_id": args.finetuned,
         "timeout_seconds": args.timeout,
     }
-    run_inference(cfg, "regression", payload, args.sync, args.no_wait, args.output, args.timeout)
+    run_inference(cfg, "regression", payload, args.sync, args.no_wait, args.output, args.timeout,
+                  {"predict_path": args.predict, "target": args.target})
 
 
 def cmd_forecast(cfg, args):
@@ -522,7 +600,8 @@ def cmd_forecast(cfg, args):
         "finetuned_result_id": args.finetuned,
         "timeout_seconds": args.timeout,
     }
-    run_inference(cfg, "timeseries", payload, args.sync, args.no_wait, args.output, args.timeout)
+    run_inference(cfg, "timeseries", payload, args.sync, args.no_wait, args.output, args.timeout,
+                  {"predict_path": getattr(args, "predict", None), "target": args.target})
 
 
 def cmd_task(cfg, args):

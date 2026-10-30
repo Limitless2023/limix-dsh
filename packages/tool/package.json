@@ -1,0 +1,40 @@
+{
+  "name": "dsh-limix-tool",
+  "version": "0.2.0",
+  "private": true,
+  "description": "LimiX 工具宿主半：limix 工具 + /limix-ui/csv 只读路由（挂在 LimiX Agent preset 下）",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": {
+      "default": "./lib/index.js"
+    },
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./assets/icon.png",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib/index.js",
+    "cordis.patch.yml",
+    "assets/limix.py",
+    "assets/icon.png",
+    "locale/*.json",
+    "src",
+    "tsdown.config.ts"
+  ],
+  "scripts": {
+    "build": "tsdown"
+  },
+  "devDependencies": {
+    "@types/react": "~18.3.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "tsdown": "^0.15.7",
+    "typescript": "^5.9.3"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  }
+}

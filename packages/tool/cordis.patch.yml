@@ -1,0 +1,6 @@
+# 本包**不在 profile 层挂行**：它只由 LimiX Agent preset 的 plugins 列表挂载。
+# 之前这里 insert 了 limix-tool 行，导致 profile 与 preset 各注册一次
+# /limix-ui/csv，preset 激活时报 "duplicate exact route"。
+# 保留空的 patch 层，是因为 bundle 必须声明 dsh.bundle.patch 才能被 plugin_manager 选中；
+# 空数组 = 只把包装进 profile 的依赖里（让 preset 能按名字解析到它），不挂任何行。
+[]

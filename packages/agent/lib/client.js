@@ -1175,7 +1175,7 @@ function LimixToolCard({ block, inspect, cwd }) {
 //#endregion
 //#region src/client/LimixPipelineView.tsx
 const ACCENT = "rgb(65, 118, 230)";
-function textOf(blocks) {
+function textOf$1(blocks) {
 	return (blocks ?? []).filter((b) => (b.type === "text" || b.kind === "text") && b.text).map((b) => b.text).join("\n");
 }
 function parseArgs(raw) {
@@ -1414,7 +1414,7 @@ function parseRounds(nodes, running) {
 			cur = {
 				turn,
 				time: n.time,
-				ask: textOf(n.content).slice(0, 120) || "（空消息）",
+				ask: textOf$1(n.content).slice(0, 120) || "（空消息）",
 				result: "",
 				stages: [],
 				others: []
@@ -1424,14 +1424,14 @@ function parseRounds(nodes, running) {
 		}
 		if (!cur) continue;
 		if (n.kind === "assistant") {
-			const first = textOf(n.blocks ?? n.content).split("\n").map((s) => s.replace(/^[#>\-*\s]+/, "").trim()).find((s) => s.length > 4);
+			const first = textOf$1(n.blocks ?? n.content).split("\n").map((s) => s.replace(/^[#>\-*\s]+/, "").trim()).find((s) => s.length > 4);
 			if (first) cur.result = first.slice(0, 110);
 			continue;
 		}
 		if (n.kind !== "tool-result") continue;
 		const name = n.call?.name;
 		const args = parseArgs(n.call?.argsRaw);
-		const fullText = textOf(n.content);
+		const fullText = textOf$1(n.content);
 		const ok = !n.isError && !(/^\s*$/.test(fullText.split("\n[stderr]\n")[0]) && fullText.includes("[stderr]"));
 		const base = {
 			ok,
@@ -2152,6 +2152,373 @@ function LimixPipelineView({ useSession, useTrajectory }) {
 }
 
 //#endregion
+//#region src/client/LimixTurnStack.tsx
+const STYLE_ID = "limix-deck-style";
+const CSS = `
+.lx-deck{position:relative;height:132px;margin-top:4px}
+.lx-card{position:absolute;width:290px;background:#fff;border:1px solid rgba(16,24,40,.08);
+  border-radius:12px;padding:11px 13px 10px;text-align:left;font:inherit;cursor:pointer;
+  box-shadow:0 1px 2px rgba(16,24,40,.05),0 10px 24px -18px rgba(16,24,40,.30);
+  transition:transform .2s ease,box-shadow .2s ease}
+.lx-card::before{content:"";position:absolute;inset:0 0 auto 0;height:2px;border-radius:12px 12px 0 0;
+  background:linear-gradient(90deg,#12b76a,#5ce0a4 35%,rgba(18,183,106,0) 92%)}
+.lx-card .lx-metric{background:linear-gradient(120deg,#122a72,#2e5bff 62%,#5f7dff);-webkit-background-clip:text;background-clip:text;color:transparent}
+.lx-card.bad .lx-metric{background:none;color:#d92d20}
+.lx-card.bad::before{background:linear-gradient(90deg,#f04438,#f97066 35%,rgba(240,68,56,0) 92%)}
+.lx-card:hover{transform:translateY(-6px);box-shadow:0 2px 4px rgba(16,24,40,.06),0 18px 34px -18px rgba(16,24,40,.42);z-index:99!important}
+.lx-cards.pile{height:170px}
+.lx-cards.pile .lx-card{left:50%;translate:-50% 0}
+.lx-cards.pile .lx-card:nth-child(1){top:8px;rotate:-6deg}
+.lx-cards.pile .lx-card:nth-child(2){top:14px;rotate:-2deg;z-index:2}
+.lx-cards.pile .lx-card:nth-child(3){top:20px;rotate:2deg;z-index:3}
+.lx-cards.pile .lx-card:nth-child(4){top:26px;rotate:6deg;z-index:4}
+.lx-cards.pile .lx-card:hover{translate:-50% -6px;rotate:0deg}
+.lx-row{display:flex;align-items:baseline;gap:10px;padding:8px 12px;border:1px solid rgba(16,24,40,.08);
+  border-radius:10px;background:#fff;margin-top:6px}
+.lx-row .m{font-family:var(--ds-font-family-code,ui-monospace);font-size:11px;color:#98a2b3;width:64px;flex:none}
+.lx-row .v{font-size:13.5px;font-weight:600;font-variant-numeric:tabular-nums}
+.lx-row .u{font-size:11px;color:#667085}
+.lx-row .r{margin-left:auto;font-size:11px;color:#98a2b3}
+`;
+const KIND = {
+	classify: "分类预测",
+	regress: "回归预测",
+	forecast: "时序预测",
+	health: "连通性",
+	check: "权限检查",
+	upload: "上传数据",
+	data: "数据列表",
+	task: "查任务",
+	tasks: "任务列表",
+	cancel: "取消任务",
+	result: "取结果",
+	download: "下载结果",
+	api: "直调接口"
+};
+const PREDICT = new Set([
+	"classify",
+	"regress",
+	"forecast"
+]);
+const METRIC_OF = {
+	classify: ["accuracy", "准确率"],
+	regress: ["r2", "R²"],
+	forecast: ["mape", "MAPE"]
+};
+/** 输出 JSON 里深扫一个键（只扫两层，够用且不会失控）。 */
+function deep(obj, key, depth = 4) {
+	if (depth < 0 || obj === null || typeof obj !== "object") return void 0;
+	if (key in obj) return obj[key];
+	for (const v of Object.values(obj)) {
+		const hit = deep(v, key, depth - 1);
+		if (hit !== void 0) return hit;
+	}
+}
+function textOf(node) {
+	const blocks = node?.content ?? node?.blocks ?? [];
+	return (Array.isArray(blocks) ? blocks : []).filter((b) => (b?.type === "text" || b?.kind === "text") && b.text).map((b) => b.text).join("\n");
+}
+/** 从混杂文本里取出第一个完整 JSON 值（输出常带前导说明与尾部 [stderr] 段）。 */
+function extractJson(text) {
+	const start = text.search(/[[{]/);
+	if (start < 0) return null;
+	const open = text[start];
+	const close = open === "{" ? "}" : "]";
+	let depth = 0, inStr = false, esc = false;
+	for (let i = start; i < text.length; i++) {
+		const ch = text[i];
+		if (inStr) {
+			if (esc) esc = false;
+			else if (ch === "\\") esc = true;
+			else if (ch === "\"") inStr = false;
+			continue;
+		}
+		if (ch === "\"") {
+			inStr = true;
+			continue;
+		}
+		if (ch === open) depth++;
+		else if (ch === close) {
+			depth--;
+			if (depth === 0) try {
+				return JSON.parse(text.slice(start, i + 1));
+			} catch {
+				return null;
+			}
+		}
+	}
+	return null;
+}
+function LimixTurnStack({ turn, useTrajectory }) {
+	const nodes = useTrajectory((t) => t?.eventNodes) ?? [];
+	const [open, setOpen] = (0, react.useState)(false);
+	const [pile, setPile] = (0, react.useState)(false);
+	(0, react.useEffect)(() => {
+		if (document.getElementById(STYLE_ID)) return;
+		const tag = document.createElement("style");
+		tag.id = STYLE_ID;
+		tag.textContent = CSS;
+		document.head.appendChild(tag);
+	}, []);
+	const tasks = (0, react.useMemo)(() => {
+		const from = turn?.start?.seq ?? -Infinity;
+		const to = turn?.end?.seq ?? Infinity;
+		const list = [];
+		for (const n of Array.isArray(nodes) ? nodes : []) {
+			if (typeof n?.seq === "number" && (n.seq < from || n.seq > to)) continue;
+			const call = n?.call ?? n?.block?.call ?? null;
+			if (call?.name !== "limix") continue;
+			let args = {};
+			try {
+				args = JSON.parse(call.argsRaw ?? "{}");
+			} catch {}
+			list.push({
+				command: String(args.command ?? "limix"),
+				args,
+				text: textOf(n),
+				isError: n?.isError === true
+			});
+		}
+		const out = [];
+		const others = [];
+		for (const c of list) {
+			if (!PREDICT.has(c.command)) {
+				others.push(c);
+				continue;
+			}
+			let parsed = null;
+			parsed = extractJson(c.text);
+			if (parsed && typeof parsed.stdout === "string") {
+				const inner = extractJson(parsed.stdout);
+				if (inner) parsed = inner;
+			}
+			if (!parsed) parsed = extractJson(c.text.replace(/\\"/g, "\""));
+			const [mk, ml] = METRIC_OF[c.command] ?? ["", ""];
+			let mv = parsed ? deep(parsed, mk) : void 0;
+			if (mv === void 0 && mk) {
+				const re = new RegExp("\"?" + mk + "\"?\\s*[:=]\\s*\"?(-?[0-9.]+)", "i");
+				const hit = c.text.match(re);
+				if (hit) mv = hit[1];
+			}
+			const tid = parsed ? deep(parsed, "task_id") : c.text.match(/"task_id"\s*:\s*"([^"]+)"/)?.[1];
+			const ready = parsed ? deep(parsed, "is_ready") : void 0;
+			const ok = !c.isError && !/^\s*(error|traceback)/i.test(c.text) && ready !== false;
+			const rows$1 = parsed ? deep(parsed, "rows") : void 0;
+			const cols = parsed ? deep(parsed, "columns") : void 0;
+			const outFile = parsed ? deep(parsed, "output") : void 0;
+			const facts = [
+				outFile ? String(outFile).split("/").pop() : "",
+				rows$1 !== void 0 ? `${rows$1} 行` : "",
+				cols !== void 0 ? `${cols} 列` : "",
+				c.args?.context ? `context ${c.args.context}` : "",
+				c.args?.horizon ? `horizon ${c.args.horizon}` : ""
+			].filter(Boolean).join(" · ");
+			out.push({
+				key: `${c.command}:${String(tid ?? out.length)}`,
+				kind: KIND[c.command] ?? c.command,
+				command: c.command,
+				ok,
+				metric: mv !== void 0 ? String(mv) : ok ? String((parsed && (deep(parsed, "status") ?? (deep(parsed, "is_ready") === true ? "finished" : void 0))) ?? "已完成") : "失败",
+				unit: mv !== void 0 ? ml : "",
+				facts,
+				id: tid ? String(tid) : "",
+				count: 1
+			});
+		}
+		if (others.length > 0) {
+			const bad = others.filter((c) => c.isError || /^\s*(error|traceback)/i.test(c.text)).length;
+			const cmds = Array.from(new Set(others.map((c) => c.command)));
+			out.push({
+				key: "others",
+				kind: "其它调用",
+				command: cmds.slice(0, 3).join(" · "),
+				ok: bad === 0,
+				metric: `${others.length} 次`,
+				unit: bad ? `· ${bad} 失败` : "",
+				facts: cmds.map((c) => KIND[c] ?? c).join(" / "),
+				id: "",
+				count: others.length
+			});
+		}
+		return out;
+	}, [nodes, turn]);
+	if (tasks.length === 0) return null;
+	const shown = tasks.slice(0, 4);
+	const rest = tasks.length - shown.length;
+	return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+		style: { margin: "4px 0 2px" },
+		children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+			style: {
+				display: "flex",
+				alignItems: "center",
+				gap: 8,
+				fontSize: 12,
+				color: "var(--dsw-alias-label-caption, #98a2b3)",
+				marginBottom: 2
+			},
+			children: [
+				/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", { children: [
+					"本轮 LimiX · ",
+					tasks.length,
+					" 个任务"
+				] }),
+				/* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+					type: "button",
+					onClick: () => setPile((v) => !v),
+					style: {
+						font: "inherit",
+						fontSize: 11,
+						color: "inherit",
+						background: "transparent",
+						border: "1px solid rgba(16,24,40,.14)",
+						borderRadius: 6,
+						padding: "1px 6px",
+						cursor: "pointer"
+					},
+					children: pile ? "离开牌堆" : "牌堆"
+				}),
+				/* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+					type: "button",
+					onClick: () => setOpen((v) => !v),
+					style: {
+						marginLeft: "auto",
+						font: "inherit",
+						fontSize: 11,
+						color: "inherit",
+						background: "transparent",
+						border: 0,
+						cursor: "pointer"
+					},
+					children: open ? "收起" : "展开"
+				})
+			]
+		}), open ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", { children: tasks.map((t) => /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+			className: "lx-row",
+			children: [
+				/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+					className: "m",
+					children: t.command
+				}),
+				/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+					className: "v",
+					children: t.metric
+				}),
+				/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+					className: "u",
+					children: t.unit
+				}),
+				/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
+					className: "r",
+					children: [t.kind, t.facts ? ` · ${t.facts}` : ""]
+				})
+			]
+		}, t.key)) }) : /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+			className: `lx-deck lx-cards${pile ? " pile" : ""}`,
+			children: [shown.map((t, i) => /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("button", {
+				type: "button",
+				className: `lx-card${t.ok ? "" : " bad"}`,
+				onClick: () => setOpen(true),
+				style: pile ? {} : {
+					left: 12 + i * 30,
+					top: 8 + i * 9,
+					zIndex: i + 1
+				},
+				children: [
+					/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+						style: {
+							display: "flex",
+							alignItems: "center",
+							gap: 6,
+							fontSize: 11.5,
+							color: "#667085"
+						},
+						children: [
+							/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { style: {
+								width: 5,
+								height: 5,
+								borderRadius: 99,
+								background: t.ok ? "#12b76a" : "#d92d20",
+								display: "inline-block"
+							} }),
+							t.kind,
+							/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+								style: {
+									fontSize: 10,
+									padding: "0 6px",
+									borderRadius: 999,
+									lineHeight: "16px",
+									background: t.ok ? "#ecfdf3" : "#fef3f2",
+									color: t.ok ? "#079455" : "#d92d20"
+								},
+								children: t.ok ? "完成" : "失败"
+							}),
+							t.count > 1 && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
+								style: {
+									marginLeft: "auto",
+									fontSize: 10.5,
+									color: "#98a2b3"
+								},
+								children: ["×", t.count]
+							})
+						]
+					}),
+					/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+						style: {
+							fontSize: t.metric.length > 6 ? 15 : 23,
+							fontWeight: 600,
+							letterSpacing: "-.03em",
+							marginTop: 6,
+							lineHeight: 1,
+							fontVariantNumeric: "tabular-nums"
+						},
+						className: "lx-metric",
+						children: [t.metric, t.unit && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+							style: {
+								fontSize: 10.5,
+								fontWeight: 400,
+								color: "#98a2b3",
+								marginLeft: 4,
+								letterSpacing: 0
+							},
+							children: t.unit
+						})]
+					}),
+					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+						style: {
+							fontSize: 10.5,
+							color: "#98a2b3",
+							marginTop: 6,
+							whiteSpace: "nowrap",
+							overflow: "hidden",
+							textOverflow: "ellipsis"
+						},
+						children: t.facts || (t.id ? t.id.slice(0, 12) + "…" : t.command)
+					}),
+					t.facts && t.id && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+						style: {
+							fontSize: 10,
+							color: "#c0c7d2",
+							marginTop: 2,
+							fontFamily: "var(--ds-font-family-code,ui-monospace)"
+						},
+						children: [t.id.slice(0, 13), "…"]
+					})
+				]
+			}, t.key)), rest > 0 && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
+				style: {
+					position: "absolute",
+					right: 4,
+					bottom: 2,
+					fontSize: 10.5,
+					color: "#98a2b3"
+				},
+				children: ["+", rest]
+			})]
+		})]
+	});
+}
+
+//#endregion
 //#region src/client/index.tsx
 const inject = ["slots", "locale"];
 function apply(ctx) {
@@ -2164,6 +2531,11 @@ function apply(ctx) {
 		name: "tool.call.toolview",
 		key: "limix"
 	}, LimixToolCard));
+	ctx.slots.inject("conversation.chat.turnTail", () => ctx.slots.register({
+		name: "conversation.chat.turnTail",
+		id: "limix-turn-stack",
+		order: 30
+	}, LimixTurnStack));
 	ctx.slots.inject("conversation.view", () => ctx.slots.register({
 		name: "conversation.view",
 		id: "limix-pipeline",

@@ -62,3 +62,10 @@
 - 卡片字段中文名补全（task_type/engine_type/model_type/config_name/callback_url/priority/created_at/queued_at/…）
 - 卡片命令行里的绝对路径按会话 cwd 相对化（`/Users/.../train.csv` → `train.csv`）
 - 工具 description 补充：时序 `--predict` 可选，不传按 `--horizon` 自动外推
+
+## 卡片指标来自哪儿（0.1.4）
+
+`limix forecast|regress|classify` 成功后，CLI 会把结果 CSV 落地并**顺带算指标**写进输出的
+`metrics` 对象（n / mae / rmse / r2 / mape，分类为 accuracy）。前提是 `--predict` 传的
+CSV 里带目标列——服务端的预测集通常不带，所以推理集无标签时不出指标，这是数据事实而非 bug。
+卡片、分析过程、报告三处都从这里取数，不再依赖模型自己算。

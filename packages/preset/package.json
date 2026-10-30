@@ -1,0 +1,9 @@
+{
+  "name": "dsh-limix-preset",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "LimiX Agent：一个带 LimiX 预测能力的 DSH agent preset",
+  "files": ["cordis.patch.yml"],
+  "dsh": { "bundle": { "patch": "./cordis.patch.yml" } }
+}

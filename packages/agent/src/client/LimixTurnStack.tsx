@@ -145,6 +145,15 @@ export function LimixTurnStack({ turn, useTrajectory }: any): any {
       if (!parsed) parsed = extractJson(c.text.replace(/\\"/g, '"'))
       const [mk, ml] = METRIC_OF[c.command] ?? ['', '']
       let mv = parsed ? deep(parsed, mk) : undefined
+      if (mv === undefined) {
+        // 兜底：指标可能以 metrics 对象出现在节点的任何字段里，直接扫原始 JSON
+        const raw = JSON.stringify(n)
+        const mm = raw.match(/\\?"metrics\\?"\s*:\s*\\?{([^}]*)/)
+        if (mm && mk) {
+          const hit = mm[1].match(new RegExp('\\\\?"' + mk + '\\\\?"\\s*:\\s*(-?[0-9.]+)'))
+          if (hit) mv = hit[1]
+        }
+      }
       if (mv === undefined && mk) {
         // 兜底：指标可能被塞进某个字符串字段里（stringified JSON），直接按文本找
         const re = new RegExp('"?' + mk + '"?\\s*[:=]\\s*"?(-?[0-9.]+)', 'i')
@@ -212,14 +221,14 @@ export function LimixTurnStack({ turn, useTrajectory }: any): any {
         </button>
         <button type="button" onClick={() => setOpen((v) => !v)}
           style={{ marginLeft: 'auto', font: 'inherit', fontSize: 11, color: 'inherit', background: 'transparent', border: 0, cursor: 'pointer' }}>
-          {open ? '收起' : '展开'}
+          {open ? '收起（也可点任意一行）' : '展开'}
         </button>
       </div>
 
       {open ? (
         <div>
           {tasks.map((t) => (
-            <div key={t.key} className="lx-row">
+            <div key={t.key} className="lx-row" onClick={() => setOpen(false)} style={{ cursor: 'pointer' }} title="点击收起">
               <span className="m">{t.command}</span>
               <span className="v">{t.metric}</span>
               <span className="u">{t.unit}</span>

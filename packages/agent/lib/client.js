@@ -8,7 +8,7 @@ var __getOwnPropNames = Object.getOwnPropertyNames;
 var __getProtoOf = Object.getPrototypeOf;
 var __hasOwnProp = Object.prototype.hasOwnProperty;
 var __copyProps = (to, from, except, desc) => {
-	if (from && typeof from === "object" || typeof from === "function") for (var keys = __getOwnPropNames(from), i = 0, n = keys.length, key; i < n; i++) {
+	if (from && typeof from === "object" || typeof from === "function") for (var keys = __getOwnPropNames(from), i = 0, n$1 = keys.length, key; i < n$1; i++) {
 		key = keys[i];
 		if (!__hasOwnProp.call(to, key) && key !== except) __defProp(to, key, {
 			get: ((k) => from[k]).bind(null, key),
@@ -39,7 +39,7 @@ function short(s, max) {
 	return s.length <= max ? s : s.slice(0, max - 1) + "…";
 }
 function ConfusionMatrix({ data }) {
-	const { classes, matrix, n, accuracy, perClass, majorityBaseline } = data;
+	const { classes, matrix, n: n$1, accuracy, perClass, majorityBaseline } = data;
 	const k = classes.length;
 	if (!k) return null;
 	const cs = cellSize(k);
@@ -60,7 +60,7 @@ function ConfusionMatrix({ data }) {
 				},
 				children: [
 					"混淆矩阵 · 共 ",
-					n,
+					n$1,
 					" 个样本 · 准确率 ",
 					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("b", { children: pct(accuracy) }),
 					/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
@@ -232,19 +232,19 @@ const PAD$1 = {
 	left: 44
 };
 /** 数值数组 → SVG polyline points 串；x 从 i0 开始编号，全序列共 n 点 */
-function toPoints(ys, i0, n, min, max) {
+function toPoints(ys, i0, n$1, min, max) {
 	const iw = W$1 - PAD$1.left - PAD$1.right;
 	const ih = H$1 - PAD$1.top - PAD$1.bottom;
 	const span = max - min || 1;
 	return ys.map((y, i) => {
-		const x = PAD$1.left + (i0 + i) / Math.max(1, n - 1) * iw;
+		const x = PAD$1.left + (i0 + i) / Math.max(1, n$1 - 1) * iw;
 		const yy = PAD$1.top + (1 - (y - min) / span) * ih;
 		return `${x.toFixed(1)},${yy.toFixed(1)}`;
 	}).join(" ");
 }
 function ForecastChart({ hist, pred, p10, p90, truth, startLabel, endLabel, target }) {
 	if (!hist.length && !pred.length) return null;
-	const n = hist.length + pred.length;
+	const n$1 = hist.length + pred.length;
 	const all = [
 		...hist,
 		...pred,
@@ -258,8 +258,8 @@ function ForecastChart({ hist, pred, p10, p90, truth, startLabel, endLabel, targ
 	const hasBand = !!(p10?.length && p90?.length && p10.length === pred.length && p90.length === pred.length);
 	let bandPath = "";
 	if (hasBand) {
-		const up = toPoints(p90, hist.length, n, min, max).split(" ");
-		const dn = toPoints(p10, hist.length, n, min, max).split(" ").reverse();
+		const up = toPoints(p90, hist.length, n$1, min, max).split(" ");
+		const dn = toPoints(p10, hist.length, n$1, min, max).split(" ").reverse();
 		bandPath = "M" + [...up, ...dn].join(" L") + " Z";
 	}
 	const predWithBridge = hist.length && pred.length ? [hist[hist.length - 1], ...pred] : pred;
@@ -312,9 +312,9 @@ function ForecastChart({ hist, pred, p10, p90, truth, startLabel, endLabel, targ
 				children: endLabel
 			}),
 			hist.length > 0 && pred.length > 0 && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("line", {
-				x1: PAD$1.left + (hist.length - 1) / Math.max(1, n - 1) * (W$1 - PAD$1.left - PAD$1.right),
+				x1: PAD$1.left + (hist.length - 1) / Math.max(1, n$1 - 1) * (W$1 - PAD$1.left - PAD$1.right),
 				y1: PAD$1.top,
-				x2: PAD$1.left + (hist.length - 1) / Math.max(1, n - 1) * (W$1 - PAD$1.left - PAD$1.right),
+				x2: PAD$1.left + (hist.length - 1) / Math.max(1, n$1 - 1) * (W$1 - PAD$1.left - PAD$1.right),
 				y2: H$1 - PAD$1.bottom,
 				stroke: "currentColor",
 				opacity: "0.15",
@@ -326,21 +326,21 @@ function ForecastChart({ hist, pred, p10, p90, truth, startLabel, endLabel, targ
 				opacity: "0.13"
 			}),
 			hist.length > 1 && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("polyline", {
-				points: toPoints(hist, 0, n, min, max),
+				points: toPoints(hist, 0, n$1, min, max),
 				fill: "none",
 				stroke: "currentColor",
 				strokeWidth: "1.5",
 				opacity: "0.65"
 			}),
 			!!truth?.length && truth.length === pred.length && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("polyline", {
-				points: toPoints(hist.length ? [hist[hist.length - 1], ...truth] : truth, predStart, n, min, max),
+				points: toPoints(hist.length ? [hist[hist.length - 1], ...truth] : truth, predStart, n$1, min, max),
 				fill: "none",
 				stroke: "currentColor",
 				strokeWidth: "1.3",
 				opacity: "0.45"
 			}),
 			predWithBridge.length > 1 && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("polyline", {
-				points: toPoints(predWithBridge, predStart, n, min, max),
+				points: toPoints(predWithBridge, predStart, n$1, min, max),
 				fill: "none",
 				stroke: "#2563eb",
 				strokeWidth: "1.8",
@@ -425,7 +425,7 @@ const PAD = {
 	left: 52
 };
 function ScatterChart({ data }) {
-	const { points, n, shown, mae, rmse, r2, min, max } = data;
+	const { points, n: n$1, shown, mae, rmse, r2, min, max } = data;
 	if (!points.length) return null;
 	const span = max - min || 1;
 	const lo = min - span * .05;
@@ -448,9 +448,9 @@ function ScatterChart({ data }) {
 				},
 				children: [
 					"预测 vs 真实 · 共 ",
-					n,
+					n$1,
 					" 个样本",
-					shown < n && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
+					shown < n$1 && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
 						style: { opacity: .75 },
 						children: [
 							"（等距抽样画出 ",
@@ -665,13 +665,13 @@ function parseForecastCsv(text) {
 	return series;
 }
 /** 从训练 CSV 取目标列尾部 n 点作图表历史段；列缺失/不可数值化返回 null */
-function parseTrainTail(text, colTarget, n) {
+function parseTrainTail(text, colTarget, n$1) {
 	const lines = text.trim().split(/\r?\n/);
 	if (lines.length < 2) return null;
 	const header = splitCsvLine(lines[0]);
 	const idx = header.indexOf(colTarget);
 	if (idx < 0) return null;
-	const rows$1 = lines.slice(Math.max(1, lines.length - n)).map(splitCsvLine).filter((r) => r.length === header.length);
+	const rows$1 = lines.slice(Math.max(1, lines.length - n$1)).map(splitCsvLine).filter((r) => r.length === header.length);
 	const values = toNums(rows$1, idx);
 	if (!values.length || values.some((v) => !Number.isFinite(v))) return null;
 	return {
@@ -745,7 +745,7 @@ function buildConfusion(truthRaw, predRaw) {
 	const idx = new Map(classes.map((c, i) => [c, i]));
 	const matrix = classes.map(() => classes.map(() => 0));
 	for (const [t, p] of pairs) matrix[idx.get(t)][idx.get(p)]++;
-	const n = pairs.length;
+	const n$1 = pairs.length;
 	let correct = 0;
 	for (let i = 0; i < classes.length; i++) correct += matrix[i][i];
 	const perClass = classes.map((label, i) => {
@@ -765,11 +765,11 @@ function buildConfusion(truthRaw, predRaw) {
 	return {
 		classes,
 		matrix,
-		n,
+		n: n$1,
 		correct,
-		accuracy: correct / n,
+		accuracy: correct / n$1,
 		perClass,
-		majorityBaseline: Math.max(...perClass.map((c) => c.support)) / n
+		majorityBaseline: Math.max(...perClass.map((c) => c.support)) / n$1
 	};
 }
 /**
@@ -789,26 +789,26 @@ function buildScatter(truthRaw, predRaw) {
 		});
 	}
 	if (!all.length) return null;
-	const n = all.length;
+	const n$1 = all.length;
 	let ae = 0, se = 0, sum = 0;
 	for (const { t, p } of all) {
 		ae += Math.abs(p - t);
 		se += (p - t) ** 2;
 		sum += t;
 	}
-	const mean = sum / n;
+	const mean = sum / n$1;
 	let ssTot = 0;
 	for (const { t } of all) ssTot += (t - mean) ** 2;
 	const r2 = ssTot > 0 ? 1 - se / ssTot : null;
-	const step = Math.ceil(n / MAX_POINTS);
+	const step = Math.ceil(n$1 / MAX_POINTS);
 	const points = step > 1 ? all.filter((_, i) => i % step === 0) : all;
 	const vals = all.flatMap(({ t, p }) => [t, p]);
 	return {
 		points,
-		n,
+		n: n$1,
 		shown: points.length,
-		mae: ae / n,
-		rmse: Math.sqrt(se / n),
+		mae: ae / n$1,
+		rmse: Math.sqrt(se / n$1),
 		r2,
 		min: Math.min(...vals),
 		max: Math.max(...vals)
@@ -937,6 +937,7 @@ const ui$1 = {
 function LimixToolCard({ block, inspect, cwd }) {
 	const settled = !!block && "kind" in block;
 	const [showRaw, setShowRaw] = (0, react.useState)(false);
+	const [kvExpanded, setKvExpanded] = (0, react.useState)(false);
 	const rootRef = (0, react.useRef)(null);
 	const inspectRef = (0, react.useRef)(inspect);
 	inspectRef.current = inspect;
@@ -1143,7 +1144,7 @@ function LimixToolCard({ block, inspect, cwd }) {
 			evalView?.kind === "reg" && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(ScatterChart, { data: evalView.data }),
 			settled && parsed && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
 				style: ui$1.kv,
-				children: Object.entries(parsed).slice(0, 10).map(([k, v]) => /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
+				children: Object.entries(parsed).slice(0, kvExpanded ? 20 : 3).map(([k, v]) => /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
 					style: { display: "contents" },
 					children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
 						style: ui$1.k,
@@ -1154,7 +1155,7 @@ function LimixToolCard({ block, inspect, cwd }) {
 					})]
 				}, k))
 			}),
-			settled && text && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+			settled && text && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
 				style: {
 					fontSize: 12,
 					opacity: .6,
@@ -1162,7 +1163,11 @@ function LimixToolCard({ block, inspect, cwd }) {
 					userSelect: "none"
 				},
 				"data-lx": "raw",
-				children: showRaw ? "▲ 收起原始输出" : "▼ 原始输出"
+				children: [Object.keys(parsed).length > 3 && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+					onClick: () => setKvExpanded((v) => !v),
+					style: { marginRight: 12 },
+					children: kvExpanded ? "▲ 收起字段" : `▼ 还有 ${Object.keys(parsed).length - 3} 个字段`
+				}), showRaw ? "▲ 收起原始输出" : "▼ 原始输出"]
 			}), showRaw && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
 				style: ui$1.raw,
 				"data-lx": "rawbox",
@@ -1246,9 +1251,9 @@ const ID_ZH = {
 	data_version_id: "数据版本"
 };
 function fmtMetric(v) {
-	const n = Number(v);
-	if (!Number.isFinite(n)) return String(v);
-	return Math.abs(n) >= 100 ? n.toFixed(1) : String(Number(n.toPrecision(4)));
+	const n$1 = Number(v);
+	if (!Number.isFinite(n$1)) return String(v);
+	return Math.abs(n$1) >= 100 ? n$1.toFixed(1) : String(Number(n$1.toPrecision(4)));
 }
 /** 兜底区的工具中文名 */
 const TOOL_ZH = {
@@ -1408,13 +1413,13 @@ function parseRounds(nodes, running) {
 	const rounds = [];
 	let cur = null;
 	let turn = 0;
-	for (const n of nodes) {
-		if (n.kind === "user") {
+	for (const n$1 of nodes) {
+		if (n$1.kind === "user") {
 			turn += 1;
 			cur = {
 				turn,
-				time: n.time,
-				ask: textOf$1(n.content).slice(0, 120) || "（空消息）",
+				time: n$1.time,
+				ask: textOf$1(n$1.content).slice(0, 120) || "（空消息）",
 				result: "",
 				stages: [],
 				others: []
@@ -1423,28 +1428,28 @@ function parseRounds(nodes, running) {
 			continue;
 		}
 		if (!cur) continue;
-		if (n.kind === "assistant") {
-			const first = textOf$1(n.blocks ?? n.content).split("\n").map((s) => s.replace(/^[#>\-*\s]+/, "").trim()).find((s) => s.length > 4);
+		if (n$1.kind === "assistant") {
+			const first = textOf$1(n$1.blocks ?? n$1.content).split("\n").map((s) => s.replace(/^[#>\-*\s]+/, "").trim()).find((s) => s.length > 4);
 			if (first) cur.result = first.slice(0, 110);
 			continue;
 		}
-		if (n.kind !== "tool-result") continue;
-		const name = n.call?.name;
-		const args = parseArgs(n.call?.argsRaw);
-		const fullText = textOf$1(n.content);
-		const ok = !n.isError && !(/^\s*$/.test(fullText.split("\n[stderr]\n")[0]) && fullText.includes("[stderr]"));
+		if (n$1.kind !== "tool-result") continue;
+		const name = n$1.call?.name;
+		const args = parseArgs(n$1.call?.argsRaw);
+		const fullText = textOf$1(n$1.content);
+		const ok = !n$1.isError && !(/^\s*$/.test(fullText.split("\n[stderr]\n")[0]) && fullText.includes("[stderr]"));
 		const base = {
 			ok,
-			time: n.time,
-			start: n.callTime ?? n.time,
-			end: n.time,
+			time: n$1.time,
+			start: n$1.callTime ?? n$1.time,
+			end: n$1.time,
 			errLine: ok ? "" : firstErrLine(fullText)
 		};
 		if (name === "limix") {
 			const { cat, title } = classifyLimix(args);
 			const list = Array.isArray(args.args) ? args.args.map(String) : [];
 			cur.stages.push({
-				key: `s${n.seq}`,
+				key: `s${n$1.seq}`,
 				cat,
 				title,
 				summary: [
@@ -1468,7 +1473,7 @@ function parseRounds(nodes, running) {
 			if (args.fileName) kv.push(["落盘文件", String(args.fileName)]);
 			if (args.sql) kv.push(["SQL", String(args.sql).slice(0, 300)]);
 			cur.stages.push({
-				key: `s${n.seq}`,
+				key: `s${n$1.seq}`,
 				cat: "data",
 				title: cmd === "query" ? args.mode === "materialize" ? "取数落盘（宽表）" : "取数预览" : cmd === "inspect" ? "看库表结构" : "数据源清单",
 				summary: [
@@ -1485,7 +1490,7 @@ function parseRounds(nodes, running) {
 		} else if (name === "bash") {
 			const cmdText = String(args.command ?? "");
 			if (/\.html|\.md\b|报告/i.test(cmdText) && /python|cat|tee|>|write/i.test(cmdText)) cur.stages.push({
-				key: `s${n.seq}`,
+				key: `s${n$1.seq}`,
 				cat: "report",
 				title: "生成报告",
 				summary: cmdText.slice(0, 200),
@@ -1498,7 +1503,7 @@ function parseRounds(nodes, running) {
 				...base
 			});
 			else if (/pandas|\.csv|python/i.test(cmdText)) cur.stages.push({
-				key: `s${n.seq}`,
+				key: `s${n$1.seq}`,
 				cat: "prep",
 				title: "数据处理",
 				summary: cmdText.slice(0, 200) || "bash 数据处理",
@@ -1511,10 +1516,10 @@ function parseRounds(nodes, running) {
 				...base
 			});
 			else cur.others.push(["Shell", cmdText.slice(0, 90) || "（命令为空）"]);
-		} else if (name === "str_replace_editor" && /\.(html|md)"/.test(n.call?.argsRaw ?? "") && /create/.test(String(args.command ?? ""))) {
+		} else if (name === "str_replace_editor" && /\.(html|md)"/.test(n$1.call?.argsRaw ?? "") && /create/.test(String(args.command ?? ""))) {
 			const path = String(args.path ?? "");
 			cur.stages.push({
-				key: `s${n.seq}`,
+				key: `s${n$1.seq}`,
 				cat: "report",
 				title: "生成报告",
 				summary: `写入 ${baseName(path)}`,
@@ -1527,7 +1532,7 @@ function parseRounds(nodes, running) {
 				...base
 			});
 		} else if (name) {
-			const brief = String(args.command ?? args.path ?? args.query ?? args.name ?? "").slice(0, 90) || (n.call?.argsRaw ?? "").slice(0, 90);
+			const brief = String(args.command ?? args.path ?? args.query ?? args.name ?? "").slice(0, 90) || (n$1.call?.argsRaw ?? "").slice(0, 90);
 			cur.others.push([TOOL_ZH[name] ?? name, brief]);
 		}
 	}
@@ -1916,7 +1921,7 @@ function LimixPipelineView({ useSession, useTrajectory }) {
 								if (lx.length === 0) return null;
 								const byTitle = /* @__PURE__ */ new Map();
 								for (const st of lx) byTitle.set(st.title, (byTitle.get(st.title) ?? 0) + 1);
-								const detail = [...byTitle].map(([t, n]) => n > 1 ? `${t} ×${n}` : t).join(" · ");
+								const detail = [...byTitle].map(([t, n$1]) => n$1 > 1 ? `${t} ×${n$1}` : t).join(" · ");
 								return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
 									style: ui.limixTag,
 									title: detail,
@@ -2264,9 +2269,9 @@ function LimixTurnStack({ turn, useTrajectory }) {
 		const from = turn?.start?.seq ?? -Infinity;
 		const to = turn?.end?.seq ?? Infinity;
 		const list = [];
-		for (const n of Array.isArray(nodes) ? nodes : []) {
-			if (typeof n?.seq === "number" && (n.seq < from || n.seq > to)) continue;
-			const call = n?.call ?? n?.block?.call ?? null;
+		for (const n$1 of Array.isArray(nodes) ? nodes : []) {
+			if (typeof n$1?.seq === "number" && (n$1.seq < from || n$1.seq > to)) continue;
+			const call = n$1?.call ?? n$1?.block?.call ?? null;
 			if (call?.name !== "limix") continue;
 			let args = {};
 			try {
@@ -2275,8 +2280,8 @@ function LimixTurnStack({ turn, useTrajectory }) {
 			list.push({
 				command: String(args.command ?? "limix"),
 				args,
-				text: textOf(n),
-				isError: n?.isError === true
+				text: textOf(n$1),
+				isError: n$1?.isError === true
 			});
 		}
 		const out = [];
@@ -2295,6 +2300,13 @@ function LimixTurnStack({ turn, useTrajectory }) {
 			if (!parsed) parsed = extractJson(c.text.replace(/\\"/g, "\""));
 			const [mk, ml] = METRIC_OF[c.command] ?? ["", ""];
 			let mv = parsed ? deep(parsed, mk) : void 0;
+			if (mv === void 0) {
+				const mm = JSON.stringify(n).match(/\\?"metrics\\?"\s*:\s*\\?{([^}]*)/);
+				if (mm && mk) {
+					const hit = mm[1].match(/* @__PURE__ */ new RegExp("\\\\?\"" + mk + "\\\\?\"\\s*:\\s*(-?[0-9.]+)"));
+					if (hit) mv = hit[1];
+				}
+			}
 			if (mv === void 0 && mk) {
 				const re = new RegExp("\"?" + mk + "\"?\\s*[:=]\\s*\"?(-?[0-9.]+)", "i");
 				const hit = c.text.match(re);
@@ -2389,11 +2401,14 @@ function LimixTurnStack({ turn, useTrajectory }) {
 						border: 0,
 						cursor: "pointer"
 					},
-					children: open ? "收起" : "展开"
+					children: open ? "收起（也可点任意一行）" : "展开"
 				})
 			]
 		}), open ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", { children: tasks.map((t) => /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 			className: "lx-row",
+			onClick: () => setOpen(false),
+			style: { cursor: "pointer" },
+			title: "点击收起",
 			children: [
 				/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
 					className: "m",

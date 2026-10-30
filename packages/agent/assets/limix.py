@@ -383,14 +383,22 @@ def run_inference(cfg, kind, payload, sync, no_wait, out_path, wait_seconds, met
                      "hint": "读 error_message 定位；timeout 可调高 --timeout 重提；failed 先核对目标列与数据契约"})
 
     result = dict(data)
+    ctxm = metrics_ctx or {}
+    metrics = None
     if out_path:
         result["saved_to"] = download_result(cfg, data["result_version_id"], out_path)
-        metrics = compute_metrics(kind, (metrics_ctx or {}).get("predict_path"),
-                                  (metrics_ctx or {}).get("target"), result["saved_to"])
-        if metrics:
-            result["metrics"] = metrics
+        metrics = compute_metrics(kind, ctxm.get("predict_path"), ctxm.get("target"), result["saved_to"])
     else:
         log(f"结果版本 {data['result_version_id']}（用 download 子命令可取 CSV）")
+        # 没要输出文件时也落一份临时 CSV 算指标，算完即删：指标不能取决于用户是否传 -o
+        try:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                tmp_csv = download_result(cfg, data["result_version_id"], f"{tmpdir}/result.csv")
+                metrics = compute_metrics(kind, ctxm.get("predict_path"), ctxm.get("target"), tmp_csv)
+        except Exception:
+            metrics = None
+    if metrics:
+        result["metrics"] = metrics
     emit(result)
 
 

@@ -116,6 +116,7 @@ const ui = {
 export function LimixToolCard({ block, inspect, cwd }: Props): JSX.Element {
   const settled = !!block && 'kind' in block
   const [showRaw, setShowRaw] = useState(false)
+  const [kvExpanded, setKvExpanded] = useState(false)
 
   // 与原样例库（现 TryRunBridge 一脉）同因：宿主截断冒泡中的 click，React 根级委托收不到；
   // 在卡片容器上挂原生监听器，data-lx 委托区分"展开原始输出"与"检视调用"
@@ -289,7 +290,7 @@ export function LimixToolCard({ block, inspect, cwd }: Props): JSX.Element {
 
       {settled && parsed && (
         <div style={ui.kv}>
-          {Object.entries(parsed).slice(0, 10).map(([k, v]) => (
+          {Object.entries(parsed).slice(0, kvExpanded ? 20 : 3).map(([k, v]) => (
             <span key={k} style={{ display: 'contents' }}>
               <span style={ui.k}>{KEY_LABELS[k] ?? k}</span>
               <span style={ui.v}>{typeof v === 'object' ? JSON.stringify(v) : String(v)}</span>
@@ -304,6 +305,11 @@ export function LimixToolCard({ block, inspect, cwd }: Props): JSX.Element {
             style={{ fontSize: 12, opacity: 0.6, cursor: 'pointer', userSelect: 'none' }}
             data-lx="raw"
           >
+            {Object.keys(parsed).length > 3 && (
+              <span onClick={() => setKvExpanded((v) => !v)} style={{ marginRight: 12 }}>
+                {kvExpanded ? '▲ 收起字段' : `▼ 还有 ${Object.keys(parsed).length - 3} 个字段`}
+              </span>
+            )}
             {showRaw ? '▲ 收起原始输出' : '▼ 原始输出'}
           </span>
           {showRaw && <div style={ui.raw} data-lx="rawbox">{text}</div>}

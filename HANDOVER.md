@@ -209,7 +209,56 @@ zstd -dc "$S/session.v4.jsonl.zstd" | tail -3             # 看最后几条记�
 2. **卡片指标解析**有 4 层兜底（深扫 depth 4 / 信封解包 `stdout` / 转义 JSON / 整节点字符串扫 `"metrics"`），若仍失败，以日志里的真实 JSON 为准重写解析，不要继续加兜底。
 3. **`datasource` 拆到 preset 后，设置页「数据源」是否仍能打开**未验证（设置页是 profile 级的浏览器半，理论上不受影响）。
 4. 工具卡还能再精简：目前是 3 行，「还有 N 个字段」的口径可以按任务类型定制（如预测类只留 任务ID/状态/输出文件）。
-5. 数据源包目前只在 preset 内挂载，`csvRoots` 等 Config 默认值仍是空——需要按真实使用补默认值。
+5. **limix-gtm 安装入口页尚未创建**（见 §8.5），这是「同事能自己装上」的最后一环。
+6. 数据源包目前只在 preset 内挂载，`csvRoots` 等 Config 默认值仍是空——需要按真实使用补默认值。
+
+---
+
+## 8.5 交付流水线（验证通过后必须走完）
+
+**验证通过 ≠ 交付完成。** 以下顺序不要跳步：
+
+```bash
+cd ~/Desktop/Projects/Coffee/limix-dsh
+
+# 1) 改版本号（三个包一起改，保持同一版号）
+#    packages/agent、packages/tool、packages/data → 0.1.5
+#    packages/brand → 0.2.5（brand 自己一条版本线，历史原因）
+
+# 2) 打包
+./release.sh                       # → dist/*.tgz
+
+# 3) 推送代码
+git add -A && git commit -m "release: 0.1.5"
+git push origin master
+
+# 4) 发布 Release（附件就是 dist 里的三个 tgz）
+gh release create v0.1.5 dist/*.tgz --title "v0.1.5" --notes "<本次改了什么>"
+
+# 5) 同步安装说明里的 URL（必须改，否则同事装到旧版）
+#    INSTALL.md 与 README.md 里的 v0.1.4 → v0.1.5、包文件名同步
+git add -A && git commit -m "docs: point INSTALL at v0.1.5" && git push
+```
+
+### 更新到 limix-gtm（最后一步，别漏）
+
+`~/Desktop/Projects/limix-gtm` 是给同事看的 Next.js 站点（含 `docs/`），**目前还没有「安装 LimiX DSH 插件」这个页面**，需要新增：
+
+1. 在 limix-gtm 里新建一个安装引导页 / 区块，内容是：
+   - 一段可直接复制给同事 Agent 的安装 prompt（源：本仓库 `INSTALL.md`）
+   - 三个 tarball 链接（指向最新的 Release）
+   - 三条验收标准（插件页有条目 / 说一句「用 limix 做一次健康检查」出工具卡 / 视图栏有「分析过程」）
+2. 页面里**不要**内联技术细节（构建、槽位、preset 机制）——那些留在本仓库 HANDOVER，同事只看「怎么装、装完什么样」
+3. 截图用真实运行截图，不要设计稿
+
+> ⚠️ limix-gtm 的具体落点（`docs/` 下新增 md / `app/` 下新增路由 / 现有场景页加一节）**尚未定**，动手前先跟负责人确认，不要自行选位置。
+
+### 完成判据
+
+- [ ] Release 页有三个附件，版本号与包一致
+- [ ] `INSTALL.md` / `README.md` 里的 URL 全部指向新版本（`grep -n "releases/download" INSTALL.md` 核对）
+- [ ] limix-gtm 的安装入口可访问，链接可下载，prompt 可复制
+- [ ] 用全新会话按 INSTALL.md 走一遍能装通（这是最终验收，不是本机灰度）
 
 ---
 

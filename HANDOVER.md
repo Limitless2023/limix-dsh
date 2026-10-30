@@ -202,15 +202,53 @@ zstd -dc "$S/session.v4.jsonl.zstd" | tail -3             # 看最后几条记�
 - 工具卡默认 3 行字段 + 「还有 N 个字段」折叠
 - 分析过程视图（0.2.1 的 `useTrajectory.eventNodes` 修复）
 - CLI 指标计算：`metrics{n,mae,rmse,r2,mape}`，分类为 `accuracy`；**不传 `-o` 也会算**（临时文件 → 算完删除）
+- persona 已约束：指标必须有真值才给、只引用工具返回的 `metrics`、禁止自己用脚本重算
+- 工具卡按任务类型挑字段：预测类优先 `任务ID/状态/结果行数`，`check` 优先权限三元组，其余折叠
+
+**最近一次真实验证（2026-10-30）**：用 `limix-test/train.csv` 切 8:2 留出集（160 训练 / 40 评估），
+**不传 `-o`** 跑 `limix regress`，输出：
+`"metrics": {"n": 40, "mae": 0.0, "rmse": 0.0, "r2": 1.0, "mape": 0.0}`（该数据为线性合成，满分符合预期）。
+说明「指标产出」链路已通；剩下的未知项是**卡片端解析**，见 T1。
 
 ### 待办 / 已知问题
 
-1. **指标链路最后一公里**：用户上一次新会话里工具输出仍无 `metrics`，原因是那次调用发生在「不传 -o 也算」修复之前。需在新会话里复测；若仍无，用 §7.3 的日志命令确认 `metrics` 有没有进输出，再决定是 CLI 还是卡片解析的问题。
-2. **卡片指标解析**有 4 层兜底（深扫 depth 4 / 信封解包 `stdout` / 转义 JSON / 整节点字符串扫 `"metrics"`），若仍失败，以日志里的真实 JSON 为准重写解析，不要继续加兜底。
-3. **`datasource` 拆到 preset 后，设置页「数据源」是否仍能打开**未验证（设置页是 profile 级的浏览器半，理论上不受影响）。
-4. 工具卡还能再精简：目前是 3 行，「还有 N 个字段」的口径可以按任务类型定制（如预测类只留 任务ID/状态/输出文件）。
-5. **limix-gtm 安装入口页尚未创建**（见 §8.5），这是「同事能自己装上」的最后一环。
-6. 数据源包目前只在 preset 内挂载，`csvRoots` 等 Config 默认值仍是空——需要按真实使用补默认值。
+1. **指标链路最后一公里**：CLI 已稳定产出 `metrics`（含不传 `-o` 的场景），但**卡片是否渲染出数字尚未复测**。
+   注意：改 persona 在 preset 的 patch 层，**必须重启 DSH** 才生效；旧会话的旧调用永远没有 `metrics`（记录是冻结的）。
+2. **卡片指标解析**现有 4 层兜底（深扫 depth 4 / 信封解包 `stdout` / 转义 JSON / 整节点扫 `"metrics"`）。
+   若仍失败，**以会话日志里的真实 JSON 为准重写解析**，不要继续堆兜底。
+3. **`datasource` 拆到 preset 后，设置页「数据源」能否打开**未验证。
+4. **limix-gtm 安装入口页尚未创建**（见 §8.5），负责人暂缓，先不做。
+5. 数据源包 `csvRoots` 等 Config 默认值为空，首次使用要手填。
+
+---
+
+## 8.6 接手任务单（按优先级）
+
+> 每一项都带验收标准。做完一项就更新本节状态，不要留「应该好了」的模糊结论。
+
+| # | 任务 | 怎么做 | 验收标准 |
+|---|---|---|---|
+| **T1** | 复测卡片指标渲染 | 重启 DSH → 新会话（LimiX Agent）→ 发「用 limix 跑回归：训练集 `limix-test/holdout_train.csv`，预测集 `limix-test/holdout_eval.csv`，目标列 price」 | 本轮任务卡主数字显示 `1.0 R²`（或留出集真实值），不再是「已完成」；**若仍失败，先跑 §7.3 的 `zstd -dc … \| grep metrics` 确认输出里有无 `metrics`，再定位是 CLI 还是解析** |
+| **T2** | 验证数据源设置页 | 重启后进 设置 → 数据源，看页面是否渲染、能否新增连接/测试 | 页面可打开，功能可用（拆包后浏览器半仍由 profile 加载，理论上不受影响，但**必须实测**） |
+| **T3** | 卡片指标解析加固（仅当 T1 失败） | 从日志取一条真实工具输出，按它的实际结构改 `LimixTurnStack.tsx` 的解析；删掉无用的兜底层 | 同一会话重放后卡片出数字；代码里不留猜测性正则 |
+| **T4** | LimiX 模式专用开场白 | 先查 hero 有没有可占用槽位（`cordis_inspect_query` client `Slots`，看 `conversation.hero.*`）；有就挂 LimiX 引导（示例问题：销量预测 / 客户分层 / 电价时序） | 新会话首屏出现 LimiX 专属引导；标准模式不受影响 |
+| **T5** | `/limix-predict` 命令 | 用 `@deepseek-ai/dsh-commands` 或 preset 内命令插件，把「上传→预测→下载→报指标」串成一条命令 | 输入 `/limix-predict` 后按交互提示即可跑完一次预测，卡片正常出图出指标 |
+| **T6** | 工具裁剪（**需负责人拍板**） | 评估从 preset 移除 `workflow` / `subagent` / `tool-schedule` 是否影响真实用法 | 拍板后改 `packages/preset/cordis.patch.yml`，重启验证；**未拍板不要动** |
+| **T7** | 数据源默认配置 | 给 `packages/data` 的 `csvRoots` / `samplesDir` 补默认值（参考原 `limix-ui` 的 `dshHomePath()` 写法） | 新装用户无需手填即可在设置页看到默认目录 |
+
+### 每天开工前的固定检查
+
+```bash
+# 1) 环境对不对
+echo $DSH_PROFILE $DSH_WEB_URL          # 期望 desktop / http://127.0.0.1:<port>
+cat ~/.dsh/profiles/desktop/package.json | grep -A12 bundles
+
+# 2) 你改的包是不是 link 安装（是的话改文件即改线上）
+ls -l ~/.dsh/profiles/desktop/node_modules | grep limix
+
+# 3) 构建产物是否比源码新
+ls -la packages/agent/lib/client.js packages/agent/src/client/*.tsx | head
+```
 
 ---
 

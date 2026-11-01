@@ -2,7 +2,7 @@
 
 > L2 | 父级: ../CLAUDE.md
 
-tool.js - 注册 limix 及参数帮助；report 在宿主执行，其余转交 CLI；Windows 取消终止进程树；登记预测、解释、报告副本、预览与本地真值读取权限。
+tool.js - 注册 limix 及参数帮助；容错参数型命令的重复命令词；report 在宿主执行，其余转交 CLI；Windows 取消终止进程树；登记预测、解释、报告副本、预览与本地真值读取权限。
 predict-command.js - 注册 /limix-predict，转交输入与附件，核对数据可用性、指定模型、预测终态和业务效果解读。
 explain-command.js - 注册 /limix-explain；核对模型与样本范围，区分预测解释与关系探索，约束带符号均值、尺度和误差表述。
 benchmark-command.js - 注册 /limix-compare，仅比较分类/回归，遵守模型范围、固定拆分与回执续跑，解释基线及指标方向。

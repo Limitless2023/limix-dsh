@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 依赖 react（宿主 external）；数据面走同源路由 GET/POST /limix-datasource/config、POST /test
- * [OUTPUT]: 对外提供 DatasourceSettings——设置页"数据源"整页：连接清单、增删改表单、测试连接、保存
+ * [OUTPUT]: 对外提供 DatasourceSettings：连接清单、演示标识、增删改表单、测试连接、保存
  * [POS]: limix-datasource 的设置 UI（对位 Next.js 版 /datasources 管理页的 DSH 形态）；
  *        样式对齐宿主 token（主色 rgb(65,118,230)、胶囊、幽灵钮、13px）
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
@@ -143,6 +143,10 @@ export function DatasourceSettings(): JSX.Element {
             {F(i, "password", "密码", 140, "password")}
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <label style={{ display: "flex", alignItems: "center", gap: 5, marginRight: "auto", fontSize: 12 }}>
+              <input type="checkbox" checked={!!s.isDemo} onChange={(e) => patch(i, "isDemo", e.target.checked)} />
+              演示数据（模拟数据源）
+            </label>
             <span role="button" style={ui.btn(false)} onClick={() => void test(i)}>
               {testing === i ? "测试中…" : "测试连接"}
             </span>

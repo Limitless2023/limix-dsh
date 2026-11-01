@@ -124,7 +124,7 @@ const COMMANDS = [
 ];
 const DESCRIPTION = `调用 LimiX 开放平台 API 完成表格数据预测（免训练、零调参），覆盖 上传数据 → 分类/回归/时序预测 → 任务轮询 → 结果下载 全流程。
 子命令：health / check（连通性）；upload <文件>（上传得 data_version_id）；classify / regress / forecast（上传→提交→轮询→下载一条龙，需 --train --predict --target，时序另需 --date --context --horizon；时序的 --predict 可选，不传则按 --horizon 自动外推）；task <id> / tasks（查任务）；result <id> / download <id> -o 文件（取结果）；data files|versions（查数据）；api <METHOD> <path>（逃生舱裸调任意端点）。
-参数帮助：通过本工具传 command="forecast"、args=["--help"]（其它子命令同理）。CLI 由本工具封装，不在 shell 的 PATH 中，不要搜索或执行 shell limix 命令。
+参数帮助：通过本工具传 command="forecast"、args=["--help"]（其它子命令同理）。args 不重复 command，也不包含 limix。CLI 由本工具封装，不在 shell 的 PATH 中，不要搜索或执行 shell limix 命令。
 时序区间：--quantile --levels 0.1,0.5,0.9 返回 P10/P50/P90；--context 90 直接使用最近 90 个历史点，无需剪裁原始文件。--output 指定保存 CSV 的路径。
 评估：可传 --truth 本地 CSV，含目标列，时序还须含日期列；它只用于本地对照，不会上传。
 解释：explain --mode local --train 参考CSV --data 待解释CSV --target 目标 --task-type regression或classification --row 1 --output 解释.json。全局图用 --mode directed或undirected --data 含目标CSV --target 目标 --features 特征1,特征2；字段须完整数值。可选 --labels 字段字典.json、--prediction 原预测.csv。解释自动上传、轮询和保存JSON/CSV；--task-id 续查，不重复提交。参数未知、版本变化或参数校验失败时用 explain --help；已有适用说明直接复用。
@@ -143,6 +143,17 @@ function resolveCli(config) {
 	const found = tried.find((p$2) => existsSync(p$2));
 	if (!found) throw new Error("limix CLI 未找到：包内 assets/limix.py 缺失。可用 LIMIX_CLI_PATH 指向 scripts/limix.py 覆盖。已尝试：" + (tried.join(" , ") || "（无候选）"));
 	return found;
+}
+/** 仅参数型命令允许移除重复命令词；有位置参数的命令保留原值。 */
+function normalizeCommandArgs(command, args = []) {
+	return [
+		"classify",
+		"regress",
+		"forecast",
+		"explain",
+		"benchmark",
+		"report"
+	].includes(command) && args[0] === command && args[1]?.startsWith("-") ? args.slice(1) : args;
 }
 /** 一次 CLI 调用；Windows 使用 taskkill 收掉树，POSIX 委派层转发终止信号。 */
 function runCli(pythonBin, cliPath, command, args, workdir, timeoutMs, signal, runtime = {}) {
@@ -254,7 +265,7 @@ function registerLimixTool(ctx, config = {}) {
 				args: {
 					type: "array",
 					items: { type: "string" },
-					description: "传给子命令的参数，每项一个 token，不经过 shell 解析（含空格的路径/值直接作为单个 token 传入）"
+					description: "只传子命令的参数，不重复 command 或 limix；每项一个 token，不经过 shell 解析（含空格的路径/值直接作为单个 token 传入）"
 				},
 				workdir: {
 					type: "string",
@@ -288,6 +299,10 @@ function registerLimixTool(ctx, config = {}) {
 		},
 		async execute(args, exec) {
 			if (!COMMANDS.includes(args.command)) throw new Error(`未知的 limix 子命令：${args.command}`);
+			args = {
+				...args,
+				args: normalizeCommandArgs(args.command, args.args)
+			};
 			if (args.command === "runtime") {
 				const action = args.args?.[0] ?? "status";
 				if (!["status", "prepare"].includes(action) || (args.args?.length ?? 0) > 1) return {
@@ -5531,6 +5546,8 @@ async function renderChart(chart, read) {
 	const source = await read(chart.source, ".csv");
 	if (chart.type === "forecast") {
 		if (!chart.date) throw new Error("时序图需要 date 日期列名");
+		if (!pickColumn(source, chart.date)) throw new Error(`时序预测 CSV 缺少日期列 ${chart.date}`);
+		if (!pickColumn(source, `pred_${chart.target}`)) throw new Error(`时序预测 CSV 缺少预测列 pred_${chart.target}；target 应填原始业务目标列名。例如 target=cups_sold 对应 pred_cups_sold，无需删除分位数列。`);
 		const series = parseForecastCsv(source, chart.target, chart.date);
 		if (!series || pickColumn(source, chart.date)?.length !== series.pred.length || new Set(series.dates).size !== series.dates.length) throw new Error("时序结果无效或日期重复");
 		const predictionTimes = orderedDates(series.dates, "预测");
@@ -5545,15 +5562,23 @@ async function renderChart(chart, read) {
 		const truth$1 = chart.truth ? parseForecastTruth(await read(chart.truth, ".csv"), chart.target, chart.date, series.dates) : void 0;
 		if (chart.truth && !truth$1) throw new Error("真值与预测日期未逐行对齐");
 		const metrics = truth$1 ? buildScatter(truth$1.map(String), series.pred.map(String)) : null;
-		const facts = [{
-			name: "预测步数",
-			value: series.pred.length
-		}, ...metricFacts(metrics ? {
-			n: metrics.n,
-			mae: metrics.mae,
-			rmse: metrics.rmse,
-			r2: metrics.r2
-		} : {})];
+		const facts = [
+			{
+				name: "预测步数",
+				value: series.pred.length
+			},
+			{
+				name: "点预测合计",
+				value: Number(series.pred.reduce((a, b) => a + b, 0).toFixed(6)),
+				meaning: "先汇总原始小数，再舍入；不是分位区间的合计"
+			},
+			...metricFacts(metrics ? {
+				n: metrics.n,
+				mae: metrics.mae,
+				rmse: metrics.rmse,
+				r2: metrics.r2
+			} : {})
+		];
 		series.dates.forEach((date, i) => facts.push({
 			name: date,
 			value: series.pred[i],
@@ -5677,7 +5702,7 @@ const HELP = `limix report --manifest /绝对路径/报告清单.json --output /
 所有文件路径相对清单目录解析；charts 可为空。正文单独一行 <!-- limix-chart:图表id --> 可指定插图位置，未指定的图追加在正文后；标记在 Markdown 阅读器中隐藏。
 每张图须有 id（字母数字下划线短横线）、title、type、source，可选 caption（图的业务解读）。
 type=regression 或 classification：source=预测CSV、truth=独立真值CSV、target=目标列；优先 id_column=共同样本ID列，否则核对行序后 alignment="input_order"。无真值时不要配置效果对照图。
-type=forecast：source=预测CSV、target=目标列、date=日期列，可选 train=历史CSV、truth=真值CSV、history_points=90；真值须与预测日期逐行对齐。
+type=forecast：source=原始预测CSV、target=原始业务目标列（如 cups_sold，对应预测列 pred_cups_sold）、date=日期列，可选 train=历史CSV、truth=真值CSV、history_points=90；真值须与预测日期逐行对齐。保留 pred_q10_<目标列>、pred_q90_<目标列> 以绘制区间阴影，不要删列。
 type=explanation：source=explain 返回 explanation.detail_path 指向的完整 .view.json（单行/批量/时序贡献、有向/无向关系）；不使用原始 API JSON。
 type=benchmark：source=benchmark 保存的比较JSON，包含所有数据集和运行状态。
 HTML 内嵌图表和样式，可离线阅读；长图可横向滚动。正文支持标题、段落、粗体、列表、表格、代码、网页链接；原始 HTML 转义，远程图片不加载。`;

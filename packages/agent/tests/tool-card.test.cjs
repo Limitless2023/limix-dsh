@@ -101,6 +101,15 @@ test('排队中的异步任务不冒充已完成', () => {
   assert.match(html, /排队中/)
   assert.doesNotMatch(html, /已完成|pending-task/)
 })
+test('本地报告 error-only 输出显示未完成，不误报成功', () => {
+  const html = renderToStaticMarkup(React.createElement(LimixToolCard, { callId: 'report-error', block: {
+    kind: 'tool-result', call: { name: 'limix', argsRaw: JSON.stringify({command: 'report'}) },
+    content: [{type: 'text', text: JSON.stringify({error: '时序图缺少预测列 pred_cups_sold'})}],
+  }}))
+  assert.match(html, /未完成/)
+  assert.match(html, /时序图缺少预测列/)
+  assert.doesNotMatch(html, /已完成|下载 HTML/)
+})
 test('参数帮助不冒充一次已完成的预测', () => {
   const html = renderToStaticMarkup(React.createElement(LimixToolCard, {
     callId: 'help', block: { kind: 'tool-result', call: { name: 'limix', argsRaw: JSON.stringify({ command: 'forecast', args: ['--help'] }) },

@@ -220,6 +220,7 @@ async function withMysql(conn, timeoutMs, fn) {
 		user: conn.username,
 		password: conn.password,
 		connectTimeout: CONNECT_TIMEOUT_MS,
+		dateStrings: ["DATE"],
 		ssl: isLocalHost(conn.host) ? void 0 : { rejectUnauthorized: false }
 	});
 	try {

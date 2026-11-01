@@ -2,7 +2,7 @@
 
 > L2 | 父级: ../CLAUDE.md
 
-limix.py - API 调用、上传、轮询与下载；上传名转安全 ASCII，原文件不变；--truth 不上传。
+limix.py - API 调用、上传、轮询与下载；上传名转安全 ASCII，原文件不变；--truth 不上传，无真值不评估基线。
 limix_explain.py - 表格/时序局部解释与全局关系；所有成功模式保存 JSON/CSV/.view.json，视图保留任务状态；输入签名和回执核验续查归属。
 limix_explain_input.py - 数值特征预检、可覆盖的标识列排除、按预测类别确定性抽样；保留原行号。
 limix_explain_batch.py - 行号与原始特征对齐、部分覆盖、带符号平均贡献及长表导出。
@@ -18,5 +18,7 @@ icon.png - 插件图标。
 benchmark 在写入前隔离输入路径，使用跨平台锁并支持取消进程树。
 
 limix_runtime.py - 固定依赖的独立 venv 预准备、进程锁与限时导入校验；venv/ensurepip/pip/probe 统一终止进程树。
+
+limix_forecast.py - 时序上传前校验日期、必需列、窗口、协变量与有限分位数；识别常用分隔符及 UTF BOM，未知编码明确交服务端校验。
 
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md

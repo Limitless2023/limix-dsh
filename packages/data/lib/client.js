@@ -272,6 +272,20 @@ function DatasourceSettings() {
 							gap: 8
 						},
 						children: [
+							/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("label", {
+								style: {
+									display: "flex",
+									alignItems: "center",
+									gap: 5,
+									marginRight: "auto",
+									fontSize: 12
+								},
+								children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("input", {
+									type: "checkbox",
+									checked: !!s.isDemo,
+									onChange: (e) => patch(i, "isDemo", e.target.checked)
+								}), "演示数据（模拟数据源）"]
+							}),
 							/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
 								role: "button",
 								style: ui.btn(false),

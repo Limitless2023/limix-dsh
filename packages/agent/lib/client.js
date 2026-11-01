@@ -766,7 +766,7 @@ function parseToolResult(text$1) {
 	const errorData = errorJson(stderr);
 	return {
 		data,
-		failed: typeof envelope?.exitCode === "number" && envelope.exitCode !== 0 || data?.ok === false || data?.success === false || ["failed", "timeout"].includes(data?.task_status ?? data?.status) || !stdout.trim() && !!stderr.trim(),
+		failed: typeof envelope?.exitCode === "number" && envelope.exitCode !== 0 || data?.ok === false || data?.success === false || ["failed", "timeout"].includes(data?.task_status ?? data?.status) || !data?.status && !data?.task_status && typeof data?.error === "string" && !!data.error.trim() || !stdout.trim() && !!stderr.trim(),
 		error: errorData ?? data
 	};
 }

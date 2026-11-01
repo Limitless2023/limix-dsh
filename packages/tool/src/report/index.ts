@@ -20,7 +20,7 @@ const HELP = `limix report --manifest /绝对路径/报告清单.json --output /
 所有文件路径相对清单目录解析；charts 可为空。正文单独一行 <!-- limix-chart:图表id --> 可指定插图位置，未指定的图追加在正文后；标记在 Markdown 阅读器中隐藏。
 每张图须有 id（字母数字下划线短横线）、title、type、source，可选 caption（图的业务解读）。
 type=regression 或 classification：source=预测CSV、truth=独立真值CSV、target=目标列；优先 id_column=共同样本ID列，否则核对行序后 alignment="input_order"。无真值时不要配置效果对照图。
-type=forecast：source=预测CSV、target=目标列、date=日期列，可选 train=历史CSV、truth=真值CSV、history_points=90；真值须与预测日期逐行对齐。
+type=forecast：source=原始预测CSV、target=原始业务目标列（如 cups_sold，对应预测列 pred_cups_sold）、date=日期列，可选 train=历史CSV、truth=真值CSV、history_points=90；真值须与预测日期逐行对齐。保留 pred_q10_<目标列>、pred_q90_<目标列> 以绘制区间阴影，不要删列。
 type=explanation：source=explain 返回 explanation.detail_path 指向的完整 .view.json（单行/批量/时序贡献、有向/无向关系）；不使用原始 API JSON。
 type=benchmark：source=benchmark 保存的比较JSON，包含所有数据集和运行状态。
 HTML 内嵌图表和样式，可离线阅读；长图可横向滚动。正文支持标题、段落、粗体、列表、表格、代码、网页链接；原始 HTML 转义，远程图片不加载。`

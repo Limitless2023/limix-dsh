@@ -89,6 +89,22 @@ class MetricsTests(unittest.TestCase):
         self.assertEqual(stopped.exception.code, 2)
         self.assertIn("date", json.loads(error.getvalue())["error"])
 
+    def test_future_covariates_without_truth_do_not_attempt_baseline_evaluation(self):
+        self.truth.write_text("date,promo\n2026-11-01,0\n2026-11-02,1\n")
+        self.result.write_text("date,pred_sales\n2026-11-01,600\n2026-11-02,700\n")
+        output = io.StringIO()
+        with patch.object(limix, "api_call", return_value={"task_id": "test"}), \
+             patch.object(limix, "poll_task", return_value={"status": "finished", "result_version_id": "test"}), \
+             patch.object(limix, "download_result", return_value=str(self.result)), \
+             patch.object(limix, "seasonal_baseline") as baseline, contextlib.redirect_stdout(output):
+            limix.run_inference({}, "timeseries", {}, False, False, str(self.result), 10,
+                                {"train": "history.csv", "predict_path": str(self.truth), "target": "sales", "date": "date"})
+        baseline.assert_not_called()
+        result = json.loads(output.getvalue())
+        self.assertEqual(result['status'], 'finished')
+        self.assertNotIn('baseline_evaluation', result)
+        self.assertNotIn('metrics', result)
+
     def test_without_output_downloads_and_cleans_temporary_csv(self):
         self.truth.write_text("price\n10\n20\n")
         paths = []

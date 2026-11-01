@@ -1,7 +1,7 @@
 /**
  * [INPUT]: CLI 的 stdout / stderr 文本与工具错误标记。
  * [OUTPUT]: parseToolResult、resultState、metricEntries。
- * [POS]: 工具卡的展示模型；不从日志猜指标，区分预测 status 与扩展 task_status，保留降级和等待态。
+ * [POS]: 工具卡的展示模型；识别本地 error-only 失败，区分预测 status 与扩展 task_status，保留降级和等待态。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
 type Json = Record<string, any>
@@ -27,6 +27,7 @@ export function parseToolResult(text: string) {
   const errorData = errorJson(stderr)
   const failed = (typeof envelope?.exitCode === 'number' && envelope.exitCode !== 0)
     || data?.ok === false || data?.success === false || ['failed', 'timeout'].includes(data?.task_status ?? data?.status)
+    || (!data?.status && !data?.task_status && typeof data?.error === 'string' && !!data.error.trim())
     || (!stdout.trim() && !!stderr.trim())
   return { data, failed, error: errorData ?? data }
 }

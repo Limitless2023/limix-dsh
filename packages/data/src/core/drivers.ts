@@ -1,7 +1,7 @@
 
 /**
  * [INPUT]: 依赖 pg(Pool)/mysql2(纯JS, 懒加载) 驱动、./types 的统一接口
- * [OUTPUT]: 对外提供 getDriver(kind) — postgres(兼容金仓)/mysql 两驱动的统一实现
+ * [OUTPUT]: 对外提供 getDriver(kind)；MySQL DATE 保留日历字符串，不经过时区换算。
  * [POS]: lib/datasource 的驱动适配层 — 每次调用建短连接即用即弃(serverless 友好, 不留池);
  *        只读三闸之二: 会话级 read-only + 语句超时(第一闸 guard 在上游, 第三闸=客户只读账号)
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
@@ -208,6 +208,7 @@ async function withMysql<T>(
     user: conn.username,
     password: conn.password,
     connectTimeout: CONNECT_TIMEOUT_MS,
+    dateStrings: ['DATE'], // 营业日期不代表某个时刻，不能转 UTC 后改变日期。
     ssl: isLocalHost(conn.host) ? undefined : { rejectUnauthorized: false },
   });
   try {

@@ -88,6 +88,16 @@ test('多预测列只读取指定目标，兼容平台 pred_label；缺少目标
   assert.equal(JSON.parse((await inspect()).stdout).charts[0].facts.find(f => f.name === 'MAE').value, 0)
 }))
 
+test('时序报告误填预测列时提示原始目标，并保留分位数', () => fixture(async ({ root, put, spec, run }) => {
+  await put('body.md', '# 时序报告')
+  spec.charts = [spec.charts.find(c => c.type === 'forecast')]
+  spec.charts[0].target = 'pred_y'
+  assert.match((await run()).stdout, /缺少预测列 pred_pred_y.*原始业务目标列/)
+  spec.charts[0].target = 'y'
+  assert.equal((await run()).exitCode, 0)
+  assert.match(await readFile(join(root, 'report.html'), 'utf8'), /P10/)
+}))
+
 test('时序报告拒绝乱序、未来历史和无效日期，接受 ISO 日期时间', () => fixture(async ({ root, put, spec }) => {
   spec.charts = [spec.charts.find(c => c.type === 'forecast')]
   delete spec.charts[0].truth

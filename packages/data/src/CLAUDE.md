@@ -5,6 +5,6 @@
 index.ts - 全局设置路由与 limixDatasource 工厂；工具注册使用调用方上下文。
 host/ - 把参数字段表转换成宿主接受的 JSON Schema。
 core/ - 配置存储、SQL 只读校验、数据库驱动与 CSV 导出。
-client/ - 注册数据源设置页，通过同源路由访问配置。
+client/ - 注册数据源设置页，通过同源路由保存连接和演示标识。
 
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md

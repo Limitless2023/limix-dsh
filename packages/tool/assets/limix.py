@@ -7,13 +7,14 @@
           config / health / check / upload / classify / regress / forecast /
           task / tasks / cancel / result / download / data / api / docs / doctor / explain / benchmark
 [POS]: dsh-limix-tool 的 CLI；指标计算由同目录 limix_metrics 提供；解释由 limix_explain 编排。
-       本地真值校验失败使用统一错误出口。
+       本地真值与时序输入校验失败使用统一错误出口；时序上传前由 limix_forecast 预检；无真值不评估基线。
        上传头使用安全 ASCII 文件名，保留原文件路径、扩展名与内容。
        预测与解释零第三方依赖；benchmark 的本地模型依赖独立 Python 环境；docs 子命令读取 Mintlify Markdown，无需凭证。
        文档 https://limix.mintlify.site/api/overview，2026-09-14 核对（54 主线 + 3 按需端点）。
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 """
 
+from limix_forecast import forecast_payload
 from limix_metrics import compute_metrics, inference_metrics_context, seasonal_baseline
 from limix_explain import add_parser as add_explain_parser
 from limix_benchmark import add_parser as add_benchmark_parser
@@ -342,7 +343,7 @@ def run_inference(cfg, kind, payload, sync, no_wait, out_path, wait_seconds, met
         result["metrics"] = metrics
         result["evaluation"] = {"status": "needs_review" if metrics.get("r2", 0) < 0 else "evaluated",
                                 "business_acceptance": "unknown_without_tolerance"}
-    if kind == "timeseries" and out_path and ctxm.get("train") and ctxm.get("predict_path"):
+    if kind == "timeseries" and metrics and out_path and ctxm.get("train") and ctxm.get("predict_path"):
         result["baseline_evaluation"] = seasonal_baseline(ctxm["train"], ctxm["predict_path"], result["saved_to"], ctxm.get("target"), ctxm.get("date"))
     emit(result)
 
@@ -540,29 +541,10 @@ def cmd_regress(cfg, args):
 
 def cmd_forecast(cfg, args):
     metrics_ctx = local_metrics_context(args)
-    if not args.target:
-        die("时序预测必须指定 --target（col_target 目标列名）", exit_code=2)
-    covariates = [c.strip() for c in args.covariates.split(",")] if args.covariates else None
-    if covariates and not args.predict:
-        die("传 --covariates 时必须提供 --predict（预测集需包含未来协变量，服务端约束）", exit_code=2)
-    payload = {
-        "train_data_version_id": resolve_data_ref(cfg, args.train, "训练集"),
-        "predict_data_version_id": resolve_data_ref(cfg, args.predict, "预测集") if args.predict else None,
-        "context_size": args.context,
-        "horizon": args.horizon,
-        "col_target": args.target,
-        "col_date": args.date,
-        "col_date_format": args.date_format,
-        "col_covariates": covariates,
-        "quantile": True if args.quantile else None,
-        "quantile_levels": [float(x) for x in args.levels.split(",")] if args.levels else None,
-        "distribution_point": args.point,
-        "reduce_window": args.reduce_window,
-        "stride": args.stride,
-        "model_type": args.model,
-        "finetuned_result_id": args.finetuned,
-        "timeout_seconds": args.timeout,
-    }
+    try:
+        payload = forecast_payload(args, lambda ref, label: resolve_data_ref(cfg, ref, label))
+    except (ValueError, OSError, csv.Error) as exc:
+        die(f"时序输入校验失败：{exc}", exit_code=2)
     run_inference(cfg, "timeseries", payload, args.sync, args.no_wait, args.output, args.timeout,
                   metrics_ctx)
 

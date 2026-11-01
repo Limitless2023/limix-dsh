@@ -1,11 +1,13 @@
 # LimiX × DeepSeek Harness 插件：交接文档
 
+> **v0.3.8 咖啡全年库续测与修复交付。** 本地 MySQL `coffee_store_demo_v2` 已接入 DSH；304 天模拟销量，六个固定周窗口、两组特征方案与上周同日基线，14 个真实预测任务全部完成。入口 `../coffee-store-demo-v2/验收记录.md`，最终报告为 `outputs/report/*-v3.html`。修复时序上传预检、重复命令词、MySQL DATE 时区、无真值基线误提示、报告缺列指引和错误卡状态；报告新增数字复算与分位数/因果/采购边界。交叉审查见 `reviews/coffee-release-review.md`；69 项工具 Python、110 项 Node、29 项模型比较 Python 测试通过；桌面端查询、预测卡、CSV/HTML 下载、报告离线显示均已验收。首轮报告仍需人工审阅，本轮经对话纠正后交付；不是无干预自动报告验收。未重测浏览器 DSH 全链路、远端电脑或 Windows。
+
 > **v0.3.7 本轮交付。** 报告、独立 Python 环境、解释预检/抽样、热力图与时序基线已合入；交叉审查与最终检查见 `reviews/scenarios-release-review.md`。本机截图和报告见 `../limix-optimization-validation-20261101/index.html`。首轮报告推断仍需复核；纯浏览器 DSH 全流程、第二台电脑、Windows 实机和连续录像未验收；20 变量无向解释仍为上游失败。
 
 
 > 读者：接手开发的人/Agent（此前没有接触过 DeepSeek Harness 的插件体系）。
 > 目标：让你能独立完成「改代码 → 构建 → 安装 → 在 GUI 里验证」这个闭环。
-> 最后更新：2026-11-01（DSH 0.2.1-rc.5，插件套件 0.3.7）
+> 最后更新：2026-11-01（DSH 0.2.1-rc.5，插件套件 0.3.8）
 
 > **历史记录：带图 HTML 报告早期开发（现已纳入 v0.3.7）。** `limix report` 在宿主本地生成单文件 HTML，保留 Markdown，复用预测、贡献、关系和比较图。当前 GitHub v0.3.6 与已有演示包不含此功能。宿主重建后须重启 DSH，新会话才使用新版提示词。验证证据见 `../_recon/html-report-validation-20261101/`；未重新请求预测 API，也未冒充远端电脑已验收。
 

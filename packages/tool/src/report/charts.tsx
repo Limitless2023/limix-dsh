@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 已保存的结果文件；Agent 图表、CSV 解析和解释导出函数。
- * [OUTPUT]: renderChart，返回与结果卡共用绘制逻辑的静态图表。
+ * [OUTPUT]: renderChart，返回与结果卡共用绘制逻辑的静态图表；缺列时明确提示字段契约。
  * [POS]: 宿主报告的数据适配层；不请求 API，不接受模型手写点阵。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
@@ -64,6 +64,8 @@ export async function renderChart(chart: ChartSpec, read: ReadSource) {
   const source = await read(chart.source, '.csv')
   if (chart.type === 'forecast') {
     if (!chart.date) throw new Error('时序图需要 date 日期列名')
+    if (!pickColumn(source, chart.date)) throw new Error(`时序预测 CSV 缺少日期列 ${chart.date}`)
+    if (!pickColumn(source, `pred_${chart.target}`)) throw new Error(`时序预测 CSV 缺少预测列 pred_${chart.target}；target 应填原始业务目标列名。例如 target=cups_sold 对应 pred_cups_sold，无需删除分位数列。`)
     const series = parseForecastCsv(source, chart.target, chart.date)
     if (!series || pickColumn(source, chart.date)?.length !== series.pred.length || new Set(series.dates).size !== series.dates.length) throw new Error('时序结果无效或日期重复')
     const predictionTimes = orderedDates(series.dates, '预测')
@@ -79,7 +81,7 @@ export async function renderChart(chart: ChartSpec, read: ReadSource) {
     const truth = chart.truth ? parseForecastTruth(await read(chart.truth, '.csv'), chart.target, chart.date, series.dates) : undefined
     if (chart.truth && !truth) throw new Error('真值与预测日期未逐行对齐')
     const metrics = truth ? buildScatter(truth.map(String), series.pred.map(String)) : null
-    const facts: Fact[] = [{ name: '预测步数', value: series.pred.length }, ...metricFacts(metrics ? { n: metrics.n, mae: metrics.mae, rmse: metrics.rmse, r2: metrics.r2 } : {})]
+    const facts: Fact[] = [{ name: '预测步数', value: series.pred.length }, { name: '点预测合计', value: Number(series.pred.reduce((a, b) => a + b, 0).toFixed(6)), meaning: '先汇总原始小数，再舍入；不是分位区间的合计' }, ...metricFacts(metrics ? { n: metrics.n, mae: metrics.mae, rmse: metrics.rmse, r2: metrics.r2 } : {})]
     series.dates.forEach((date, i) => facts.push({ name: date, value: series.pred[i], meaning: `${weekday(date)}${truth ? `；真实值 ${truth[i]}；差值 ${Number((series.pred[i]-truth[i]).toFixed(4))}` : '；无真值，不能评估误差'}` }))
     return { html: renderToStaticMarkup(<ForecastChart hist={hist?.values ?? []} {...series} truth={truth} startLabel={hist?.dates[0] ?? series.dates[0]} endLabel={series.dates.at(-1)} />), warnings: chart.truth ? [] : ['未提供独立真值，此图展示预测趋势，不能评估误差。'], count: series.pred.length, facts }
 

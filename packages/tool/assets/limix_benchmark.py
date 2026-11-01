@@ -432,6 +432,7 @@ def remote_run(case, model, folder, seed, deps, cfg, cli, uploads, timeout):
             submit = cli.api_call(cfg,'POST',f'/v1/inference/{case["meta"]["task_type"]}/tasks',body=payload,timeout=120)
             record.update(task_id=submit['task_id'],submission=submit,stage='poll')
             save_json(record['receipt_path'],record)
+            cli.log(f'已提交异步任务 {submit["task_id"]}')
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
             state = cli.api_call(cfg,'GET',f'/v1/inference/tasks/{record["task_id"]}',retries=2)

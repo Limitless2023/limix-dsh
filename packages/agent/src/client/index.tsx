@@ -1,8 +1,8 @@
 /**
- * [INPUT]: 宿主 cordis 服务 slots（插槽注册表）+ locale（自有词条）；组件见同目录 LimixToolCard / LimixPipelineView
+ * [INPUT]: 宿主 cordis 服务 slots、locale、sessions、sidebarRight（会话授权文件预览）；组件见同目录 LimixToolCard / LimixPipelineView
  * [OUTPUT]: 浏览器半 Cordis 插件（inject + apply）：
  *           ① tool.call.toolview 以 key='limix' 认领自家工具的结果卡片
- *           ② conversation.view 挂「分析过程」标签（分轮 LimiX 调用管线）
+ *           ② conversation.view 挂「分析过程」标签（统一业务流程）
  * [POS]: dsh-limix-agent 的浏览器入口。品牌层由 dsh-limix-cover 负责。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
@@ -11,7 +11,7 @@ import { LimixPipelineView } from './LimixPipelineView.tsx'
 import { LimixTurnStack } from './LimixTurnStack.tsx'
 import { LimixWelcome } from './LimixWelcome.tsx'
 
-export const inject = ['slots', 'locale']
+export const inject = ['slots', 'locale', 'sessions', 'sidebarRight']
 
 export function apply(ctx: any): void {
   ctx.effect(() => ctx.locale.register('limix-agent', {
@@ -36,7 +36,19 @@ export function apply(ctx: any): void {
 
   ctx.slots.inject('conversation.view', () =>
     ctx.slots.register(
-      { name: 'conversation.view', id: 'limix-pipeline', order: 15, label: () => t('view.pipeline') },
+      { name: 'conversation.view', id: 'limix-pipeline', order: 15, label: () => t('view.pipeline'),
+        inject: (sessionId: string) => ({
+          cwd: ctx.sessions.list.getSnapshot().byId[sessionId]?.cwd,
+          openFile: (path: string) => {
+            // 对齐宿主 fileAddressFor；保留会话授权，不拼接裸文件路由。
+            const cwd = ctx.sessions.list.getSnapshot().byId[sessionId]?.cwd?.replace(/\\/g, '/').replace(/\/+$/, '')
+            let normalized = path.replace(/\\/g, '/').replace(/^(?:\.\/)+/, '')
+            if (cwd && normalized.startsWith(cwd + '/')) normalized = normalized.slice(cwd.length + 1)
+            const encode = (value: string) => encodeURIComponent(value).replace(/%3A/gi, ':')
+            ctx.sidebarRight.openResource(`dsh-resource://file/session/${encode(sessionId)}/${normalized.split('/').map(encode).join('/')}`)
+          },
+        }),
+      },
       LimixPipelineView,
     ))
 }

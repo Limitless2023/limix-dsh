@@ -1,6 +1,6 @@
 """
 [INPUT]: explain 模块；模拟真实异步返回与临时 CSV。
-[OUTPUT]: 单样本/原值对应、时序参数拒绝、回执恢复和输出完整性验证。
+[OUTPUT]: 单样本/原值对应、时序参数拒绝、回执恢复、进度日志和输出完整性验证。
 [POS]: 解释业务契约测试，不调用生产 API。
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 """
@@ -9,6 +9,7 @@ import json
 import sys
 import tempfile
 import unittest
+import unittest.mock
 from pathlib import Path
 from unittest.mock import Mock
 
@@ -52,6 +53,30 @@ class ExplainTests(unittest.TestCase):
         self.assertEqual(summary['explanation']['samples'][0]['feature_values'],['4','8'])
         self.assertNotIn('feature_values_by_row',summary['explanation'])
         self.assertTrue((self.root/'out.csv').exists())
+
+    def test_progress_log_records_submit_status_changes_and_save(self):
+        cli=Mock();cli.upload_file.return_value={'data_version_id':'version-1'}
+        cli.api_call.side_effect=[{'task_id':'task-1'},{'task_status':'running'},{'task_status':'running'},self.result()]
+        cli.die.side_effect=RuntimeError
+        with unittest.mock.patch.object(explain.time,'sleep'):explain.run({},self.args,cli)
+        lines=[call.args[0] for call in cli.log.call_args_list]
+        self.assertTrue(lines[0].startswith('解释任务 task-1；'))
+        self.assertEqual(lines[1:3],['任务 task-1: running','任务 task-1: succeeded'])
+        self.assertTrue(lines[3].startswith('已保存解释 → '))
+
+    def test_summary_keeps_service_model(self):
+        result=self.result();result['result']['model_type']='LIMIX_16M'
+        cli=Mock();cli.upload_file.return_value={'data_version_id':'version-1'}
+        cli.api_call.side_effect=[{'task_id':'task-1'},result];cli.die.side_effect=RuntimeError
+        explain.run({},self.args,cli)
+        self.assertEqual(cli.emit.call_args.args[0]['model_type'],'LIMIX_16M')
+
+    def test_resume_logs_lookup_instead_of_submission(self):
+        _,_,context=explain.validate(self.args)
+        (self.root/'out.receipt.json').write_text(json.dumps({'task_id':'task-1','context':context}))
+        self.args.task_id='task-1';cli=Mock();cli.api_call.return_value=self.result();cli.die.side_effect=RuntimeError
+        explain.run({},self.args,cli)
+        self.assertEqual(cli.log.call_args_list[0].args[0],'续查解释任务 task-1')
 
     def test_invalid_row_and_missing_mode_arguments_rejected(self):
         self.args.row=3

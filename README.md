@@ -69,6 +69,8 @@ npm install --prefix packages/data
 
 `release.sh` 构建五个插件，核验 tarball 入口与全部 CLI 模块，写入 `dist/v<版本>/`，同时生成 `manifest.json` 和 `SHA256SUMS`。不自动上传或发布。
 
+已按 [HANDOVER.md](HANDOVER.md) §5 软链工具链的机器跳过 `npm install`；它会把软链换成真实目录。
+
 离线验证：
 
 ```sh
@@ -76,6 +78,8 @@ python3 -m unittest discover -s packages/tool/tests -v
 node --test packages/tool/tests/*.test.mjs
 node --test packages/agent/tests/*.test.cjs
 npm test --prefix packages/data
+node --test benchmarks/tests/*.test.mjs
+.venv-benchmark/bin/python -m unittest discover -s benchmarks/tests -v
 ```
 
 代码边界见 [CLAUDE.md](CLAUDE.md)；本轮验收与真实界面证据见 [GOAL-PLAN.md](GOAL-PLAN.md)。

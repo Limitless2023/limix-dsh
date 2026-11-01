@@ -3,7 +3,7 @@
 > L2 | 父级: ../CLAUDE.md
 
 test_metrics.py - 覆盖预测列选择、日期对齐、真值错误 JSON、真值不上传及临时下载清理。
-test_explain.py - 单条样本与原值对齐、异常参数、回执续查输入签名与降级验证。
+test_explain.py - 单条样本与原值对齐、异常参数、回执续查输入签名、降级和进度日志验证。
 test_explain_batch.py - 行选择、缺索引/错位拒绝、未知方向、带符号平均及全量导出。
 test_explain_timeseries.py - 预测版本、参数覆盖、矩阵长表校验、未知输出尺度、时间与续查契约。
 workflow.test.mjs - 验证构建后的三类流程注册、preset 默认配置与隔离、附件、取消与文件边界。

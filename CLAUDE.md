@@ -17,6 +17,8 @@ dist/ - 本地分发压缩包；发布前按源码重建。
 <config>
 README.md - 安装步骤、构建入口和已知边界。
 INSTALL.md - 同事安装说明。
+HANDOVER.md - 开发接手入口与历史调试记录。
+USER-ACCEPTANCE.md - v0.3.1 换机安装、真实界面验收与证据交付计划。
 NOTES.md - DSH 0.2.1 移植约束与验证记录。
 TODO.md - 插件迁移进度。
 DECISION-AGENT-PLAN.md - 产业决策与因果解释方案；记录接口边界、案例和验收顺序。

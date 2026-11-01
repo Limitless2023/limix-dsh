@@ -27,6 +27,7 @@ spec.loader.exec_module(prepare)
 
 
 class FakeCLI:
+    def log(self,*a):pass
     def __init__(self,unknown=False):
         self.posts = 0
         self.unknown = unknown

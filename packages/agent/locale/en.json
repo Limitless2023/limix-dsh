@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "LimiX Agent",
-    "description": "The limix tool for the LimiX open platform, its result card, and the Analysis view of the call pipeline."
+    "title": "LimiX Analysis UI",
+    "description": "Displays result cards and charts for predictions, explanations, and model comparisons, with an Analysis view and report previews."
   }
 }

@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "LimiX Agent",
-    "description": "limix 工具（LimiX 开放平台全流程）+ 工具结果卡片 + 「分析过程」调用管线视图。"
+    "title": "LimiX 预测工具",
+    "description": "在 LimiX Agent 模式中执行数据上传、预测、解释和模型比较，并保存结果文件。"
   }
 }

@@ -4,19 +4,19 @@
 
 ## 插件组成
 
-套件由五个包组成，当前版本为 0.3.3。`data`、`tool`、`agent`、`preset` 共同提供 LimiX Agent；`cover` 负责品牌外观，可选。
+套件由五个包组成，当前版本为 0.3.4。`data`、`tool`、`agent`、`preset` 共同提供 LimiX Agent；`cover` 负责品牌外观，可选。
 
 | 包 | 职责 |
 | --- | --- |
 | `dsh-limix-data` | 数据源设置、连接测试、受限只读查询与 CSV 导出 |
-| `dsh-limix-tool` | Python CLI、预测/解释/比较命令、结果文件读取权限 |
-| `dsh-limix-agent` | 结果卡、图表、全屏解释、分析过程与 LimiX 专属首屏 |
+| `dsh-limix-tool` | LimiX 预测工具：数据上传、预测、解释、模型比较和结果保存 |
+| `dsh-limix-agent` | LimiX 分析界面：结果卡片、图表、分析过程和报告预览 |
 | `dsh-limix-preset` | 将通用工具与 LimiX 工具组成独立 Agent，并设为新任务默认；保留用户已保存的默认选择 |
 | `dsh-limix-cover` | 官方 LimiX 标识与首页品牌；原图来源见包内 `assets/SOURCES.md` |
 
 安装步骤见 [INSTALL.md](INSTALL.md)。下载预构建 tarball 后无需在用户机器编译。
 
-v0.3.3 包含新版“分析过程”页面，按实际执行顺序展示数据准备、预测、解释、模型比较和报告。步骤详情与结果图表按需展开，报告可在侧栏预览。
+v0.3.4 包含新版“分析过程”页面，按实际执行顺序展示数据准备、预测、解释、模型比较和报告。步骤详情与结果图表按需展开，报告可在侧栏预览。
 
 ## 使用
 

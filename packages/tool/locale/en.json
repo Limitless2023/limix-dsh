@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "LimiX Agent",
-    "description": "The limix tool for the LimiX open platform, its result card, and the Analysis view of the call pipeline."
+    "title": "LimiX Prediction Tools",
+    "description": "Uploads data, runs predictions, explanations, and model comparisons in LimiX Agent mode, and saves result files."
   }
 }

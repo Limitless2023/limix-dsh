@@ -1,18 +1,18 @@
 /**
  * [INPUT]: 宿主 commands、systemPrompt 与 Agent.followup；已接纳的附件。
- * [OUTPUT]: registerPredictCommand，注册 preset 专属 /limix-predict 与简短结论指引。
+ * [OUTPUT]: registerPredictCommand，注册 preset 专属预测、数据可用性与效果解读指引。
  * [POS]: 预测流程入口；复用 limix 工具完成执行，不另建预测通道。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
 import { randomUUID } from 'node:crypto'
 
-const WORKFLOW = `当用户使用 /limix-predict 时，执行完整预测流程，全程用用户的语言交流，默认中文：
-1. 从用户描述、附件和会话中识别训练数据、待预测数据、目标列及业务问题。缺少信息时，用一条简短问题列出缺少的内容；不要猜测文件或目标列。空命令且没有已知数据时，先问用户要预测什么、训练和待预测文件在哪里，不扫描工作区寻找样例。任务类型由你根据数据判断，不要求用户选择 classify/regress 等内部命令。
-2. 查看文件列名、样本与行数，用 Python 标准库 csv 即可，不需要 pandas。选择 classify（类别）、regress（连续数值）或 forecast（时间序列）。保留待预测数据中的真实目标列供评估；没有真值也能预测，但不能报告准确率。不要把训练集直接当作测试集。
-3. 通过 limix 工具的一次 classify/regress/forecast 调用完成上传、提交、轮询、下载。直接传本地文件绝对路径给 --train 和 --predict，不要先调用 upload 换成版本 ID，否则会丢失本地评估来源。必须传 --target 和 --output；结果保存到会话工作目录，用唯一文件名 limix-<目标列>-<时间戳>.csv，避免覆盖已有文件。workdir 传会话工作目录。
-4. forecast 还需要 --date、--context、--horizon；有未来协变量时传包含未来协变量的 --predict，没有协变量时可省略 --predict。P10/P50/P90 使用 --quantile --levels 0.1,0.5,0.9，不要猜参数或自行估算平台区间；不确定时先用 limix 工具的 args=["--help"] 查参数。--context 已限制历史长度，无需剪裁文件。不要把未来真值用作模型输入。有独立真实值文件时，通过 --truth 传给本地评估；时序真实值文件须包含日期列和目标列，并与预测日期逐行一致。--truth 不上传、不参与预测。
-5. 成功后检查 saved_to、metrics 与任务终态。工具卡已自动展示图表、混淆矩阵和指标，不另写脚本重算或重画。最终回复只写两三句话：完成了多少条预测、一项主要指标、结果文件链接；不重复数据清单、矩阵、指标定义或逐类分析。metrics 来自本地真实值对照，不称为服务端评估。只使用工具实际返回的指标，不猜测价格或误差单位，不凭 R² 或 MAE/RMSE 断言没有偏差、没有异常点。合成样例只说明流程可用。无真值时明确说明无法评估。用户无需再要求下载，不要再次运行 download。
-6. 上传或字段校验失败时指出具体问题。提交结果不确定或等待超时时，按返回的任务 ID 查询现有任务，禁止盲目重新提交。未完成不能称成功，任务 ID 和内部命令不放在主要说明里。`
+const WORKFLOW = `当用户要求预测、分类、回归、时序外推，或使用 /limix-predict，执行预测流程：
+1. 识别业务目标、训练数据、待预测数据与目标列，查看列名、样本和行数。任务类型由你根据数据判断：classify（类别）、regress（连续数值）、forecast（时间序列）。用户尚未给数据时只问必要信息，不要求用户选择内部命令。
+2. 核对特征在业务预测时点是否可获得，排除目标泄漏、事后信息和纯标识列。保留待预测数据的真实目标值供本地评估，不能把训练集直接当测试集。需要拆分时，分类分层，同一实体或重复样本按组，时序按时间；拆分规则不能按测试成绩调整。
+3. 通过一次 limix classify/regress/forecast 调用完成上传、提交、轮询和保存。直接传本地绝对路径给 --train 和 --predict，不先 upload 换成版本 ID，以保留本地评估来源。必须传 --target、--output，workdir 传会话工作目录；输出文件采用 limix-<目标列>-<时间戳>.csv。用户指定模型时必须显式传 --model（如 LIMIX_7M），不能遗漏后使用服务默认模型；未指定才使用默认。提交后核对回执中的实际模型，未知时不把期望模型写成已使用的模型；模型不符时如实说明并纠正，不混入指定模型的报告结论。
+4. forecast 还需 --date、--context、--horizon。根据频率、可用历史和主要周期选择 context；历史不足一个完整周期时说明限制，不凭空补齐。未来协变量须覆盖预测日期，并区分预先已知信息、当时可用的预测信息和事后观测；事后真值不能作为模型输入。有未来协变量时传 --predict，没有时省略 --predict，按 --horizon 外推。--context 已限制历史长度，无需剪裁文件。P10/P50/P90 用 --quantile --levels 0.1,0.5,0.9，不自行估算区间。
+5. 有独立真值时传 --truth 本地 CSV；时序真值须含日期列与目标列，日期逐行对齐预测。--truth 不上传、不参与预测。没有真值也能预测，但无法评估。metrics 是本地真实值对照，不称为服务端评估。--truth 是预测流程参数，不是现成 CSV 的独立评分入口；后补真值时不能承诺传 --truth 就无需重跑预测。
+6. 成功须 status=finished、result_version_id 和 saved_to；is_ready=true 仅表示停止轮询。报告交代业务目标、实际数据和预测范围，引用关键 metrics 并解释其含义：回归 MAE/RMSE 越低越好，R² 越高越好，负值表示在本测试集上不如用测试真值均值作常数预测（区别于训练均值基线）；分类准确率须结合类别分布解读。只使用已核对的单位，不凭 R² 或 MAE/RMSE 断言没有偏差或异常点。没有业务容差时不声称已达到生产要求；合成样例只说明流程可用。上传或字段校验失败时指出具体问题。`
 
 export function registerPredictCommand(ctx) {
   ctx.systemPrompt.section({ name: 'limix:predict-workflow', order: 500, text: WORKFLOW, interpolate: false })

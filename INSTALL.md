@@ -1,12 +1,12 @@
-# 安装 LimiX Agent 0.3.0
+# 安装 LimiX Agent 0.3.1
 
-从 [GitHub Releases](https://github.com/Limitless2023/limix-dsh/releases) 下载 0.3.0 的插件文件。请保留现有 profile，按顺序安装或更新：
+从 [GitHub Releases](https://github.com/Limitless2023/limix-dsh/releases) 下载 0.3.1 的插件文件。请保留现有 profile，按顺序安装或更新：
 
-1. `dsh-limix-data-0.3.0.tgz`
-2. `dsh-limix-tool-0.3.0.tgz`
-3. `dsh-limix-agent-0.3.0.tgz`
-4. `dsh-limix-preset-0.3.0.tgz`
-5. 可选品牌外观：`dsh-limix-cover-0.3.0.tgz`
+1. `dsh-limix-data-0.3.1.tgz`
+2. `dsh-limix-tool-0.3.1.tgz`
+3. `dsh-limix-agent-0.3.1.tgz`
+4. `dsh-limix-preset-0.3.1.tgz`
+5. 可选品牌外观：`dsh-limix-cover-0.3.1.tgz`
 
 在 DeepSeek Harness 的“插件 → 添加插件”中选择文件；也可让 DSH Agent 使用 `plugin_manager` 的 `install_bundle`，`target` 传 tarball 的绝对路径。升级时使用同名包的新版，无需手动删配置。
 

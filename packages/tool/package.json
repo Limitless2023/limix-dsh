@@ -1,6 +1,6 @@
 {
   "name": "dsh-limix-tool",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "private": true,
   "description": "LimiX 工具：预测、解释、多模型比较与受控结果下载；限于 LimiX Agent preset",
   "type": "module",

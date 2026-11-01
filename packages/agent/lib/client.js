@@ -1686,7 +1686,8 @@ const CSS$4 = `
 .lx-matrix-heading{display:flex;justify-content:space-between;align-items:center;gap:12px;font-size:11px;color:var(--dsw-alias-label-secondary);margin:2px 0 14px}
 .lx-matrix-scroll{overflow-x:auto}.lx-matrix-svg{display:block;width:100%;min-width:650px;max-height:430px;color:var(--dsw-alias-label-primary)}
 .lx-matrix-svg text{fill:currentColor;font-family:inherit;pointer-events:none}.lx-matrix-cell{cursor:pointer}.lx-matrix-cell:hover,.lx-matrix-cell:focus{outline:none;stroke:var(--dsw-alias-label-primary,#26364a);stroke-width:1;paint-order:fill stroke}
-.lx-matrix-readout{font-size:11px;min-height:20px;margin:6px 0 0;color:var(--dsw-alias-label-secondary);line-height:1.6;font-variant-numeric:tabular-nums}
+.lx-matrix-readout{font-size:11px;min-height:20px;margin:6px 0 0;color:var(--dsw-alias-label-secondary);line-height:1.6;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.lx-matrix-feature{cursor:help}.lx-matrix-feature:hover,.lx-matrix-feature:focus-visible{color:var(--dsw-alias-state-business-primary,#3465ce);outline:none}.lx-matrix-feature:focus-visible rect{stroke:currentColor;stroke-width:.7}
 .lx-matrix-help-trigger{cursor:pointer;color:var(--dsw-alias-label-secondary)}.lx-matrix-help-trigger:hover,.lx-matrix-help-trigger:focus-visible,.lx-matrix-help-trigger[aria-expanded=true]{color:var(--dsw-alias-state-business-primary,#3465ce)}
 .lx-matrix-help-trigger:focus-visible{outline:1px solid currentColor;outline-offset:1px;border-radius:3px}
 .lx-matrix-help-body{box-sizing:border-box;margin:2px;padding:11px 13px;border:1px solid var(--dsw-alias-border-primary,#dfe3e8);border-radius:7px;background:var(--dsw-alias-background-primary,#fff);color:var(--dsw-alias-label-primary,#1c2330);box-shadow:0 3px 12px #00000012;font-family:inherit;font-size:11px;line-height:1.65}
@@ -1697,21 +1698,24 @@ const CSS$4 = `
 .lx-matrix-expand{display:flex;justify-content:flex-end;margin-top:4px;font-size:11px}.lx-matrix-expand button{font-size:11px!important;color:var(--dsw-alias-state-business-primary,#3465ce)!important}
 @container(max-width:520px){.lx-matrix-heading{align-items:flex-start;flex-direction:column}}
 `;
-function labelLines(label, limit) {
-	const lines = [];
-	let line = "", width = 0;
-	for (const character of label) {
-		const size = /[^\x00-\xff]/.test(character) ? 1 : .55;
-		if (line && width + size > limit) {
-			lines.push(line);
-			line = "";
-			width = 0;
+const textWidth = (label) => Array.from(label).reduce((width, c) => width + (/[^\x00-\xff]/.test(c) ? 1 : .6), 0);
+function shortLabel(label, limit) {
+	if (textWidth(label) <= limit) return label;
+	const characters = Array.from(label);
+	let start$1 = "", end$1 = "", left = 0, right = characters.length - 1;
+	while (left <= right) {
+		const takeStart = textWidth(start$1) <= textWidth(end$1);
+		const next = takeStart ? characters[left] : characters[right];
+		if (textWidth(start$1 + end$1 + next) + 1 > limit) break;
+		if (takeStart) {
+			start$1 += next;
+			left++;
+		} else {
+			end$1 = next + end$1;
+			right--;
 		}
-		line += character;
-		width += size;
 	}
-	if (line) lines.push(line);
-	return lines;
+	return start$1 + "…" + end$1;
 }
 function ContributionHeatmap({ data, scope = "全部", scales }) {
 	const root = (0, react.useRef)(null), [hint, setHint] = (0, react.useState)(""), [expanded, setExpanded] = (0, react.useState)(false);
@@ -1719,6 +1723,13 @@ function ContributionHeatmap({ data, scope = "全部", scales }) {
 	const samples = data.samples ?? [], names = data.feature_names ?? [];
 	const { helpRef, helpId, helpOpen } = useExplanationHelp(!!samples.length && !!names.length);
 	const plotHeight = expanded ? Math.max(312, names.length * 22) : 312, plotWidth = 548, rowHeight = plotHeight / (samples.length || 1), columnWidth = plotWidth / (names.length || 1);
+	const angledLabels = names.some((name) => textWidth(data.labels?.[name] ?? name) * 11 > columnWidth - 6);
+	const axisFont = angledLabels ? Math.min(11, Math.max(7, columnWidth * .7)) : 11;
+	const axisWidth = angledLabels ? 94 : Math.min(120, columnWidth - 6);
+	const featureHint = (index) => {
+		const name = names[index], label = data.labels?.[name];
+		return `特征 ${index + 1} · ${label && label !== name ? `${label} · 字段：` : ""}${name}`;
+	};
 	const unknown = samples.some((s) => s.directions.some((d) => !knownDirection(d)));
 	const neutral = samples.some((s) => s.directions.includes(0)), prediction = explanationPrediction(data);
 	const ranking = expanded ? matrix.ranking : matrix.ranking.slice(0, 16), maxMean = (scales?.meanMaximum ?? Math.abs(ranking[0]?.mean ?? 0)) || 1, maximum = scales?.maximum ?? matrix.maximum;
@@ -1745,12 +1756,18 @@ function ContributionHeatmap({ data, scope = "全部", scales }) {
 	(0, react.useEffect)(() => {
 		const element = root.current;
 		const describe = (event) => {
-			const cell = event.target.closest("[data-lx-matrix-cell]");
-			if (cell) setHint(cell.getAttribute("aria-label") ?? "");
+			const target = event.target.closest("[data-lx-matrix-cell], [data-lx-feature-label]");
+			if (target) setHint(target.getAttribute("aria-label") ?? "");
 		};
 		const keydown = (event) => {
 			const cell = event.target.closest("[data-lx-matrix-cell]");
-			if (!cell) return;
+			if (!cell) {
+				if (["Enter", " "].includes(event.key) && event.target.closest("[data-lx-feature-label]")) {
+					event.preventDefault();
+					describe(event);
+				}
+				return;
+			}
 			if (event.key === "Enter" || event.key === " ") {
 				event.preventDefault();
 				cell.dispatchEvent(new MouseEvent("click", { bubbles: true }));
@@ -1781,10 +1798,12 @@ function ContributionHeatmap({ data, scope = "全部", scales }) {
 		};
 		element?.addEventListener("pointerover", describe);
 		element?.addEventListener("focusin", describe);
+		element?.addEventListener("click", describe);
 		element?.addEventListener("keydown", keydown);
 		return () => {
 			element?.removeEventListener("pointerover", describe);
 			element?.removeEventListener("focusin", describe);
+			element?.removeEventListener("click", describe);
 			element?.removeEventListener("keydown", keydown);
 		};
 	}, [samples.length, names.length]);
@@ -1822,7 +1841,7 @@ function ContributionHeatmap({ data, scope = "全部", scales }) {
 				className: "lx-matrix-scroll",
 				children: /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("svg", {
 					className: "lx-matrix-svg",
-					viewBox: `0 0 900 ${plotHeight + 96}`,
+					viewBox: `0 0 900 ${plotHeight + (angledLabels ? 138 : 72)}`,
 					role: "group",
 					"aria-label": `${scope} ${samples.length} 个样本、${names.length} 个特征的贡献热力图，共 ${matrix.cellCount} 个色块`,
 					children: [
@@ -1873,23 +1892,25 @@ function ContributionHeatmap({ data, scope = "全部", scales }) {
 							}, cell.name);
 						}) }, row.rowNumber)),
 						names.map((name, i) => {
-							const label = data.labels?.[name] ?? name, lines = labelLines(label, Math.max(2, (columnWidth - 3) / 11));
+							const label = data.labels?.[name] ?? name;
 							return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("g", {
-								transform: `translate(${36 + (i + .5) * columnWidth} ${plotHeight + 46})`,
-								children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("text", {
-									textAnchor: "middle",
-									fontSize: "11",
-									children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("title", { children: label }), lines.slice(0, 3).map((line, j) => /* @__PURE__ */ (0, react_jsx_runtime.jsx)("tspan", {
-										x: "0",
-										dy: j ? 12 : 0,
-										children: j === 2 && lines.length > 3 ? line + "…" : line
-									}, j))]
-								}), label !== name && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("text", {
-									y: Math.min(lines.length, 3) * 12 + 5,
-									textAnchor: "middle",
-									fontSize: "9",
-									opacity: ".5",
-									children: name.length > 8 ? name.slice(0, 7) + "…" : name
+								className: "lx-matrix-feature",
+								"data-lx-feature-label": true,
+								role: "button",
+								tabIndex: 0,
+								"aria-label": featureHint(i),
+								transform: `translate(${36 + (i + .5) * columnWidth} ${plotHeight + 44})${angledLabels ? " rotate(60)" : ""}`,
+								children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("rect", {
+									x: angledLabels ? -2 : -axisWidth / 2,
+									y: -axisFont,
+									width: axisWidth + 4,
+									height: axisFont + 5,
+									rx: "2",
+									fill: "transparent"
+								}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("text", {
+									textAnchor: angledLabels ? "start" : "middle",
+									fontSize: axisFont,
+									children: shortLabel(label, axisWidth / axisFont)
 								})]
 							}, name);
 						}),
@@ -1913,19 +1934,29 @@ function ContributionHeatmap({ data, scope = "全部", scales }) {
 									const color = value === null || value === 0 ? contributionColors.unknown : value < 0 ? contributionColors.negative : contributionColors.positive;
 									return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("g", {
 										transform: `translate(0 ${30 + (i + .5) * plotHeight / ranking.length})`,
-										role: "img",
+										role: "group",
 										"aria-label": `${feature.label} ${feature.name}：平均贡献 ${label}`,
 										children: [
 											/* @__PURE__ */ (0, react_jsx_runtime.jsx)("title", { children: `${feature.label} · ${feature.name}：${value === null ? `${feature.unknownCount} 个样本缺少方向，无法计算平均贡献` : label}` }),
-											/* @__PURE__ */ (0, react_jsx_runtime.jsx)("text", {
-												x: "626",
-												y: "4",
-												fontSize: "11",
-												children: labelLines(feature.label, 7.5).slice(0, 2).map((line, j) => /* @__PURE__ */ (0, react_jsx_runtime.jsx)("tspan", {
+											/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("g", {
+												className: "lx-matrix-feature",
+												"data-lx-feature-label": true,
+												role: "button",
+												tabIndex: 0,
+												"aria-label": `${featureHint(feature.featureIndex)} · 平均贡献 ${label}`,
+												children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("rect", {
+													x: "624",
+													y: "-10",
+													width: "88",
+													height: "17",
+													rx: "2",
+													fill: "transparent"
+												}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("text", {
 													x: "626",
-													dy: j ? 12 : 0,
-													children: line
-												}, j))
+													y: "4",
+													fontSize: "11",
+													children: shortLabel(feature.label, 7.5)
+												})]
 											}),
 											value !== null && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("rect", {
 												className: "lx-contribution-mean",
@@ -2026,7 +2057,7 @@ function ContributionHeatmap({ data, scope = "全部", scales }) {
 			/* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
 				className: "lx-matrix-readout",
 				role: "status",
-				children: hint || "每行一个样本，每列一个特征；悬停查看数值，点击色块查看该样本。"
+				children: hint || "悬停或点击特征名查看全称；点击色块查看该样本。"
 			}),
 			samples.length > plotHeight && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
 				className: "lx-explain-foot",
@@ -3221,6 +3252,14 @@ const CSS$1 = `
 .lx-result a:hover{text-decoration:underline}
 .lx-result-raw{margin:10px 0 0;padding:12px;max-height:250px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;background:var(--dsw-alias-interactive-bg-hover,#f5f6f8);border-radius:6px;font-size:11px;line-height:1.7}
 .lx-result-command{font-size:11px;white-space:pre-wrap;margin:10px 0 0;color:var(--dsw-alias-label-secondary)}
+.lx-result-compact{padding:9px 12px;border-radius:9px}
+.lx-result-compact .lx-result-head{gap:8px 12px}
+.lx-result-compact .lx-result-brand{margin:0;flex-shrink:0}
+.lx-result-compact h3{font-size:13px}
+.lx-result-compact .lx-result-status{white-space:nowrap}
+.lx-result button.lx-result-details-toggle{display:inline-flex;align-items:center;gap:4px;min-height:28px;white-space:nowrap}
+.lx-result-compact .lx-result-note{margin:7px 0 0}
+.lx-result-details-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
 `;
 function LimixToolCard({ callId, block, inspect, cwd, openFile }) {
 	const settled = !!block && "kind" in block;
@@ -3409,6 +3448,25 @@ function LimixToolCard({ callId, block, inspect, cwd, openFile }) {
 	const hint = typeof result.error?.hint === "string" ? result.error.hint : "";
 	const detailsId = `lx-result-details-${String(callId).replace(/[^a-zA-Z0-9_-]/g, "-")}`;
 	const metricsId = `${detailsId}-metrics`;
+	const compact = help || command === "health";
+	const rawToggle = text$1 && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+		type: "button",
+		"data-lx": "raw",
+		className: compact ? "lx-result-details-toggle" : void 0,
+		"aria-label": compact ? `${showRaw ? "收起" : "展开"}${title}详情` : void 0,
+		"aria-expanded": showRaw,
+		"aria-controls": detailsId,
+		children: compact ? /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [showRaw ? "收起" : "详情", /* @__PURE__ */ (0, react_jsx_runtime.jsx)("svg", {
+			width: "12",
+			height: "12",
+			viewBox: "0 0 16 16",
+			fill: "none",
+			stroke: "currentColor",
+			strokeWidth: "1.5",
+			"aria-hidden": "true",
+			children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)("path", { d: showRaw ? "M4 10l4-4 4 4" : "M4 6l4 4 4-4" })
+		})] }) : showRaw ? "收起详情 ↑" : "调用详情 ↓"
+	});
 	return /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
 		className: "lx-card-host",
 		ref: fullscreen.hostRef,
@@ -3419,25 +3477,30 @@ function LimixToolCard({ callId, block, inspect, cwd, openFile }) {
 			"aria-modal": fullscreen.expanded,
 			"aria-label": fullscreen.expanded ? `${title}${target ? ` · ${target}` : ""}` : void 0,
 			children: /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("section", {
-				className: "lx-result",
+				className: `lx-result${compact ? " lx-result-compact" : ""}`,
 				ref: rootRef,
 				"aria-label": `LimiX ${title}`,
 				children: [
 					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("style", { children: CSS$1 + CARD_FULLSCREEN_CSS }),
-					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+					!compact && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
 						className: "lx-result-brand",
 						children: "LimiX"
 					}),
 					/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 						className: "lx-result-head",
 						children: [
+							compact && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+								className: "lx-result-brand",
+								children: "LimiX"
+							}),
 							/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("h3", { children: [title, target ? ` · ${target}` : ""] }),
 							/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
 								className: "lx-result-status",
 								"data-state": status.kind,
 								role: "status",
-								children: status.label
+								children: !help && command === "health" && status.kind === "done" ? "连接正常" : status.label
 							}),
+							compact && rawToggle,
 							(explanation || benchmark) && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
 								type: "button",
 								className: "lx-fullscreen-button",
@@ -3465,13 +3528,9 @@ function LimixToolCard({ callId, block, inspect, cwd, openFile }) {
 						role: "alert",
 						children: fullscreen.error
 					}),
-					/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("p", {
+					!compact && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("p", {
 						className: "lx-result-meta",
-						children: [
-							typeof rows$1 === "number" && Number.isFinite(rows$1) ? `${rows$1} 行预测结果` : "",
-							typeof sampleCount === "number" && Number.isFinite(sampleCount) ? `${typeof rows$1 === "number" ? " · " : ""}${sampleCount} 个样本参与评估` : "",
-							!prediction && command === "health" && status.kind === "done" ? "LimiX 服务连接正常" : ""
-						]
+						children: [typeof rows$1 === "number" && Number.isFinite(rows$1) ? `${rows$1} 行预测结果` : "", typeof sampleCount === "number" && Number.isFinite(sampleCount) ? `${typeof rows$1 === "number" ? " · " : ""}${sampleCount} 个样本参与评估` : ""]
 					}),
 					benchmark && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(BenchmarkView, { data: benchmark }),
 					cliFailed ? /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("p", {
@@ -3485,7 +3544,7 @@ function LimixToolCard({ callId, block, inspect, cwd, openFile }) {
 							children: "本次解释存在限制，请结合返回说明使用结果。"
 						}),
 						explanation && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(ExplanationView, { data: explanation }),
-						command === "explain" && !settled && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
+						!help && command === "explain" && !settled && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
 							className: "lx-result-note",
 							children: "正在分析变量贡献与关系…"
 						}),
@@ -3505,7 +3564,7 @@ function LimixToolCard({ callId, block, inspect, cwd, openFile }) {
 						evalView?.kind === "cls" && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(ConfusionMatrix, { data: evalView.data }),
 						evalView?.kind === "reg" && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(ScatterChart, { data: evalView.data })
 					] }),
-					(text$1 || file || inspect) && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+					!compact && (text$1 || file || inspect) && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 						className: "lx-result-actions",
 						children: [
 							benchmark && typeof parsed?.csv_path === "string" && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("a", {
@@ -3556,13 +3615,7 @@ function LimixToolCard({ callId, block, inspect, cwd, openFile }) {
 								className: "lx-result-meta",
 								children: ["已保存 · ", file.split("/").pop()]
 							})),
-							text$1 && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
-								type: "button",
-								"data-lx": "raw",
-								"aria-expanded": showRaw,
-								"aria-controls": detailsId,
-								children: showRaw ? "收起详情 ↑" : "调用详情 ↓"
-							}),
+							rawToggle,
 							metrics.length > 0 && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
 								type: "button",
 								"data-lx": "metrics",
@@ -3590,9 +3643,16 @@ function LimixToolCard({ callId, block, inspect, cwd, openFile }) {
 					}),
 					showRaw && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 						id: detailsId,
-						children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
-							className: "lx-result-command",
-							children: cmdLine
+						children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+							className: "lx-result-details-head",
+							children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
+								className: "lx-result-command",
+								children: cmdLine
+							}), compact && inspect && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+								type: "button",
+								"data-lx": "inspect",
+								children: "检视调用 ↗"
+							})]
 						}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("pre", {
 							className: "lx-result-raw",
 							children: text$1

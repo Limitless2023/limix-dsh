@@ -2,7 +2,7 @@
  * [INPUT]: 仅 Node 内建（child_process/fs/path/url）；limix CLI 由本包 assets/limix.py 自带，
  *          解析链 config.cliPath > LIMIX_CLI_PATH > <包>/assets/limix.py
  * [OUTPUT]: registerLimixTool(ctx, config) 与可离线验证的 runCli；注册 `limix` 工具（15 个子命令，
- *          提供参数与帮助入口，覆盖预测与解释流程，并登记结果文件读取权限）
+ *          提供按需帮助，覆盖预测、解释与比较，并登记结果文件读取权限）
  * [POS]: dsh-limix-agent 的宿主工具面。**不 import @deepseek-ai/dsh-tools**：
  *        树外包在 profile 的 node_modules 下按 Node 规则解析，够不到 dsh 安装里的包；
  *        这里直接给出 register 需要的规范化定义（等价于 defineTool 的产物）。
@@ -25,8 +25,8 @@ const DESCRIPTION = `调用 LimiX 开放平台 API 完成表格数据预测（�
 参数帮助：通过本工具传 command="forecast"、args=["--help"]（其它子命令同理）。CLI 由本工具封装，不在 shell 的 PATH 中，不要搜索或执行 shell limix 命令。
 时序区间：--quantile --levels 0.1,0.5,0.9 返回 P10/P50/P90；--context 90 直接使用最近 90 个历史点，无需剪裁原始文件。--output 指定保存 CSV 的路径。
 评估：可传 --truth 本地 CSV，含目标列，时序还须含日期列；它只用于本地对照，不会上传。
-解释：explain --mode local --train 参考CSV --data 待解释CSV --target 目标 --task-type regression或classification --row 1 --output 解释.json。全局图用 --mode directed或undirected --data 含目标CSV --target 目标 --features 特征1,特征2；字段须完整数值。可选 --labels 字段字典.json、--prediction 原预测.csv。解释自动上传、轮询和保存JSON/CSV；--task-id 续查，不重复提交。先用 explain --help 查看参数。
-模型比较：benchmark --manifest 数据集清单.json --models LIMIX_7M,LIMIX_16M,XGBoost,BASELINE --output 比较.json；自动保存可恢复回执、JSON/CSV/HTML，使用同一固定拆分。--python 可指定具备 sklearn/xgboost 的独立 Python 环境。先查 --help。
+解释：explain --mode local --train 参考CSV --data 待解释CSV --target 目标 --task-type regression或classification --row 1 --output 解释.json。全局图用 --mode directed或undirected --data 含目标CSV --target 目标 --features 特征1,特征2；字段须完整数值。可选 --labels 字段字典.json、--prediction 原预测.csv。解释自动上传、轮询和保存JSON/CSV；--task-id 续查，不重复提交。参数未知、版本变化或参数校验失败时用 explain --help；已有适用说明直接复用。
+模型比较：benchmark --manifest 数据集清单.json --models LIMIX_7M,LIMIX_16M,XGBoost,BASELINE --output 比较.json；自动保存可恢复回执、JSON/CSV/HTML，使用同一固定拆分。比较入口需要 numpy/pandas/scikit-learn，选择 XGBoost 时另需 xgboost；--python 指定独立 Python 环境。仅支持回归/分类；参数未知、版本变化或参数校验失败时查 --help。
 时序解释：explain --mode local --task-type timeseries --result-version-id 已完成时序预测的结果版本ID --output 解释.json，沿用原预测参数，不传 data/train/target。
 终态口径：预测任务成功须 status=finished 且有 result_version_id（is_ready=true 仅表示停止轮询）；扩展解释使用 task_status=succeeded，降级或部分成功须说明。凭据由现有配置读取，无需额外传参。文件路径用绝对路径，或相对调用时所在目录的相对路径。`
 

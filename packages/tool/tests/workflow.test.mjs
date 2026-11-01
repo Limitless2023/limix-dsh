@@ -1,17 +1,50 @@
 /**
- * [INPUT]: node:test；预测命令与 CSV 读取边界。
- * [OUTPUT]: 附件传递、取消、历史读取与越界回归验证。
+ * [INPUT]: node:test；构建后的工具入口、preset 补丁、命令与 CSV 边界。
+ * [OUTPUT]: preset 挂载隔离、工作流注册、附件传递、取消与文件边界验证。
  * [POS]: tool 宿主契约测试，不调用生产 API。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdtemp, mkdir, writeFile, symlink, unlink, rm, realpath, truncate } from 'node:fs/promises'
+import { mkdtemp, mkdir, readFile, writeFile, symlink, unlink, rm, realpath, truncate } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { registerPredictCommand } from '../src/host/predict-command.js'
 import { createCsvAccess } from '../src/host/csv-access.js'
 import { registerExplainCommand } from '../src/host/explain-command.js'
+
+test('构建产物在挂载时只注册一次三类流程，工具 schema 包含全部执行入口', async () => {
+  const { apply } = await import('../lib/index.js')
+  const sections = [], commands = [], tools = [], effects = []
+  const ctx = {
+    limixDatasource: { register() {} },
+    systemPrompt: { section: value => sections.push(value) },
+    commands: { register: value => commands.push(value) },
+    tools: { register: value => tools.push(value) },
+    effect: value => effects.push(value),
+  }
+  assert.equal(sections.length, 0, '导入模块不向全局注册提示词')
+  apply(ctx)
+  assert.deepEqual(sections.map(s => [s.name, s.order]), [
+    ['limix:predict-workflow', 500], ['limix:explain-workflow', 510], ['limix:benchmark-workflow', 520],
+  ])
+  assert.ok(sections.every(s => s.interpolate === false))
+  assert.deepEqual(commands.map(c => c.name), ['limix-predict', 'limix-explain', 'limix-compare'])
+  assert.deepEqual(tools.map(t => t.name), ['limix'])
+  for (const command of ['classify','regress','forecast','explain','benchmark']) assert.ok(tools[0].parameters.properties.command.enum.includes(command))
+})
+
+test('安装补丁只添加独立 LimiX preset，工具包不向标准模式挂载', async () => {
+  const preset = await readFile(new URL('../../preset/cordis.patch.yml', import.meta.url), 'utf8')
+  const tool = await readFile(new URL('../cordis.patch.yml', import.meta.url), 'utf8')
+  const operations = preset.split('\n').filter(line => /^- /.test(line))
+  assert.deepEqual(operations, ['- insert:'], '不能通过修改/删除操作覆盖标准 preset')
+  assert.equal((preset.match(/^    - id:/gm) ?? []).length, 1)
+  assert.match(preset, /^    - id: preset-limix$/m)
+  assert.match(preset, /^        id: limix$/m)
+  assert.match(preset, /^          - id: limix-tool\n            name: 'dsh-limix-tool'$/m)
+  assert.equal(tool.split('\n').filter(line => !line.trimStart().startsWith('#')).join('\n').trim(), '[]')
+})
 
 test('解释入口保留附件且只排入一条消息', () => {
   let definition

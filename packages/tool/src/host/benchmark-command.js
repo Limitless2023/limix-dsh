@@ -1,17 +1,17 @@
 /**
  * [INPUT]: 宿主 commands、systemPrompt 与 Agent.followup；用户的数据拆分。
- * [OUTPUT]: registerBenchmarkCommand，注册 /limix-compare 与可恢复比较流程。
+ * [OUTPUT]: registerBenchmarkCommand，注册分类/回归比较，约束拆分、模型范围、恢复与基线解读。
  * [POS]: 多模型比较入口；复用 limix benchmark，不另建网络调用。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
 import { randomUUID } from 'node:crypto'
 
-const WORKFLOW = `当用户要求比较 LimiX 和其他模型或使用 /limix-compare：
-1. 先明确数据、目标与独立测试集。同一数据集必须让所有模型使用完全相同的训练/测试拆分和特征；真值仅供本地评估。分类用分层拆分，重复样本放在同组；时序按时间拆分。不能根据成绩挑测试样本或删除差结果。
-2. 用 limix 工具 command=benchmark，先用 --help 查契约。manifest JSON 的 datasets 数组包含 id/name/task_type/target/train/predict/truth，文件相对 manifest 所在目录解析。目前比较支持 regression/classification。默认比较 LIMIX_7M、LIMIX_16M、XGBoost 与均值/多数类 BASELINE；固定 --seed，保存唯一 --output 结果路径。
-3. XGBoost 需要独立 Python 环境中的 numpy/pandas/scikit-learn/xgboost。先检查已有环境，缺依赖时说明具体缺项；可通过 --python 指定解释器，不修改宿主运行时。预测和解释自身不需要这些第三方库。
-4. 命令保存每项回执、JSON、CSV 与 HTML 报告。等待超时使用同一 manifest/参数/output 续跑读取回执，不盲目重提。failed/pending/partial 不称全部完成，缺失指标不能填0。报告按数据集比较，不跨不同单位平均原始误差。
-5. 结果卡已展示比较，回复只写完成数量、关键差异和报告链接。测试集上的领先只适用于这次固定拆分，不称模型普遍更好。`
+const WORKFLOW = `当用户要求比较 LimiX 与其他模型、比较不同 LimiX 模型，或使用 /limix-compare，执行固定拆分模型比较：
+1. 当前 benchmark 仅支持 regression/classification。时序比较尚未接入；收到时序比较请求时先说明边界，不能将任务伪装成回归比较或承诺自动完成。先明确数据、目标和独立测试集；同一数据集的所有模型使用完全相同的训练/测试拆分和特征，真值只用于本地评估。分类分层，同一实体或重复样本放在同组；不按成绩挑样本或删除差结果。
+2. 用 limix 工具 command=benchmark；manifest JSON 的 datasets 数组包含 id/name/task_type/target/train/predict/truth，文件相对 manifest 所在目录解析。遵守用户指定模型范围，未指定时默认 LIMIX_7M、LIMIX_16M、XGBoost 与均值/多数类 BASELINE；固定 --seed，保存唯一 --output 路径。核对特征在业务预测时点可获得，不能使用目标泄漏或事后信息。
+3. 比较入口需要独立 Python 环境中的 numpy/pandas/scikit-learn；选择 XGBoost 时另需 xgboost，并在固定训练集上训练。先检查已有环境，缺依赖时指出具体缺项，通过 --python 指定解释器，不修改宿主运行时。LimiX 预测和解释自身不需要这些第三方库。
+4. 命令保存每项回执、JSON、CSV 与 HTML。等待超时使用同一 manifest/参数/output 续跑读取回执。failed/pending/partial 不称全部完成，缺失指标不填0。报告按数据集比较，不跨不同单位平均原始误差。
+5. 报告说明业务目标、数据来源、样本数、固定拆分、参与模型、完成数量、关键指标与报告链接。BASELINE 回归用训练目标均值、分类用训练多数类，对每个测试样本输出同一个值；它不学习特征关系。明确误差越低越好、R²和准确率越高越好，不把长误差条当成更好效果。测试集领先只适用于本次固定拆分，不称模型普遍更好。测试样本很少时说明结论稳定性有限，不把一次小样本演示当成最终选型依据。`
 
 export function registerBenchmarkCommand(ctx) {
   ctx.systemPrompt.section({ name: 'limix:benchmark-workflow', order: 520, text: WORKFLOW, interpolate: false })

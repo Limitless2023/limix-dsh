@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 完整贡献矩阵、统一图例与 ExplanationHelp 的即时说明交互。
- * [OUTPUT]: 全量热力图、同尺度统计与样本跳转；区分中性和缺方向。
+ * [OUTPUT]: 全量热力图、同尺度统计与样本跳转；密集轴标签斜排，完整字段名即时可查。
  * [POS]: ExplanationBatch 默认视图；父组件执行样本跳转，不重跑解释。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
@@ -14,7 +14,8 @@ const CSS = `
 .lx-matrix-heading{display:flex;justify-content:space-between;align-items:center;gap:12px;font-size:11px;color:var(--dsw-alias-label-secondary);margin:2px 0 14px}
 .lx-matrix-scroll{overflow-x:auto}.lx-matrix-svg{display:block;width:100%;min-width:650px;max-height:430px;color:var(--dsw-alias-label-primary)}
 .lx-matrix-svg text{fill:currentColor;font-family:inherit;pointer-events:none}.lx-matrix-cell{cursor:pointer}.lx-matrix-cell:hover,.lx-matrix-cell:focus{outline:none;stroke:var(--dsw-alias-label-primary,#26364a);stroke-width:1;paint-order:fill stroke}
-.lx-matrix-readout{font-size:11px;min-height:20px;margin:6px 0 0;color:var(--dsw-alias-label-secondary);line-height:1.6;font-variant-numeric:tabular-nums}
+.lx-matrix-readout{font-size:11px;min-height:20px;margin:6px 0 0;color:var(--dsw-alias-label-secondary);line-height:1.6;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.lx-matrix-feature{cursor:help}.lx-matrix-feature:hover,.lx-matrix-feature:focus-visible{color:var(--dsw-alias-state-business-primary,#3465ce);outline:none}.lx-matrix-feature:focus-visible rect{stroke:currentColor;stroke-width:.7}
 .lx-matrix-help-trigger{cursor:pointer;color:var(--dsw-alias-label-secondary)}.lx-matrix-help-trigger:hover,.lx-matrix-help-trigger:focus-visible,.lx-matrix-help-trigger[aria-expanded=true]{color:var(--dsw-alias-state-business-primary,#3465ce)}
 .lx-matrix-help-trigger:focus-visible{outline:1px solid currentColor;outline-offset:1px;border-radius:3px}
 .lx-matrix-help-body{box-sizing:border-box;margin:2px;padding:11px 13px;border:1px solid var(--dsw-alias-border-primary,#dfe3e8);border-radius:7px;background:var(--dsw-alias-background-primary,#fff);color:var(--dsw-alias-label-primary,#1c2330);box-shadow:0 3px 12px #00000012;font-family:inherit;font-size:11px;line-height:1.65}
@@ -25,15 +26,18 @@ const CSS = `
 .lx-matrix-expand{display:flex;justify-content:flex-end;margin-top:4px;font-size:11px}.lx-matrix-expand button{font-size:11px!important;color:var(--dsw-alias-state-business-primary,#3465ce)!important}
 @container(max-width:520px){.lx-matrix-heading{align-items:flex-start;flex-direction:column}}
 `
-function labelLines(label: string, limit: number) {
-  const lines: string[] = []; let line = '', width = 0
-  for (const character of label) {
-    const size = /[^\x00-\xff]/.test(character) ? 1 : .55
-    if (line && width + size > limit) { lines.push(line); line = ''; width = 0 }
-    line += character; width += size
+const textWidth = (label: string) => Array.from(label).reduce((width, c) => width + (/[^\x00-\xff]/.test(c) ? 1 : .6), 0)
+// Keep both ends: engineered features often share a prefix and differ only in their suffix.
+function shortLabel(label: string, limit: number) {
+  if (textWidth(label) <= limit) return label
+  const characters = Array.from(label); let start = '', end = '', left = 0, right = characters.length - 1
+  while (left <= right) {
+    const takeStart = textWidth(start) <= textWidth(end)
+    const next = takeStart ? characters[left] : characters[right]
+    if (textWidth(start + end + next) + 1 > limit) break
+    if (takeStart) { start += next; left++ } else { end = next + end; right-- }
   }
-  if (line) lines.push(line)
-  return lines
+  return start + '…' + end
 }
 
 export function ContributionHeatmap({ data, scope = '全部', scales }: { data: ExplanationData; scope?: string; scales?: { maximum: number; meanMaximum: number } }) {
@@ -42,6 +46,13 @@ export function ContributionHeatmap({ data, scope = '全部', scales }: { data: 
   const samples = data.samples ?? [], names = data.feature_names ?? []
   const { helpRef, helpId, helpOpen } = useExplanationHelp<SVGGElement>(!!samples.length && !!names.length)
   const plotHeight = expanded ? Math.max(312, names.length * 22) : 312, plotWidth = 548, rowHeight = plotHeight / (samples.length || 1), columnWidth = plotWidth / (names.length || 1)
+  const angledLabels = names.some(name => textWidth(data.labels?.[name] ?? name) * 11 > columnWidth - 6)
+  const axisFont = angledLabels ? Math.min(11, Math.max(7, columnWidth * .7)) : 11
+  const axisWidth = angledLabels ? 94 : Math.min(120, columnWidth - 6)
+  const featureHint = (index: number) => {
+    const name = names[index], label = data.labels?.[name]
+    return `特征 ${index + 1} · ${label && label !== name ? `${label} · 字段：` : ''}${name}`
+  }
   const unknown = samples.some(s => s.directions.some(d => !knownDirection(d)))
   const neutral = samples.some(s => s.directions.includes(0)), prediction = explanationPrediction(data)
   const ranking = expanded ? matrix.ranking : matrix.ranking.slice(0,16), maxMean = (scales?.meanMaximum ?? Math.abs(ranking[0]?.mean ?? 0)) || 1, maximum = scales?.maximum ?? matrix.maximum
@@ -57,12 +68,15 @@ export function ContributionHeatmap({ data, scope = '全部', scales }: { data: 
   useEffect(() => {
     const element = root.current
     const describe = (event: Event) => {
-      const cell = (event.target as Element).closest('[data-lx-matrix-cell]')
-      if (cell) setHint(cell.getAttribute('aria-label') ?? '')
+      const target = (event.target as Element).closest('[data-lx-matrix-cell], [data-lx-feature-label]')
+      if (target) setHint(target.getAttribute('aria-label') ?? '')
     }
     const keydown = (event: KeyboardEvent) => {
       const cell = (event.target as Element).closest<SVGRectElement>('[data-lx-matrix-cell]')
-      if (!cell) return
+      if (!cell) {
+        if (['Enter', ' '].includes(event.key) && (event.target as Element).closest('[data-lx-feature-label]')) { event.preventDefault(); describe(event) }
+        return
+      }
       if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); cell.dispatchEvent(new MouseEvent('click', { bubbles: true })); return }
       if (!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End'].includes(event.key)) return
       event.preventDefault()
@@ -77,14 +91,14 @@ export function ContributionHeatmap({ data, scope = '全部', scales }: { data: 
       const next = element?.querySelector<SVGRectElement>(`[data-lx-matrix-cell][data-index="${row}"][data-feature="${column}"]`)
       cell.setAttribute('tabindex', '-1'); next?.setAttribute('tabindex', '0'); next?.focus()
     }
-    element?.addEventListener('pointerover', describe); element?.addEventListener('focusin', describe); element?.addEventListener('keydown', keydown)
-    return () => { element?.removeEventListener('pointerover', describe); element?.removeEventListener('focusin', describe); element?.removeEventListener('keydown', keydown) }
+    element?.addEventListener('pointerover', describe); element?.addEventListener('focusin', describe); element?.addEventListener('click', describe); element?.addEventListener('keydown', keydown)
+    return () => { element?.removeEventListener('pointerover', describe); element?.removeEventListener('focusin', describe); element?.removeEventListener('click', describe); element?.removeEventListener('keydown', keydown) }
   }, [samples.length, names.length])
   if (!samples.length || !names.length) return <div ref={root}><div className="lx-matrix-heading">{scope} · 0 个样本</div><p className="lx-explain-foot">没有可展示的样本贡献。</p></div>
   return <div ref={root} className={expanded ? 'lx-matrix-expanded' : undefined}>
     <style>{CSS}</style>
     <div className="lx-matrix-heading"><span>{scope} {samples.length} 个样本 · {names.length} 个特征 · 不分页</span><ContributionLegend maximum={maximum} unknown={unknown} neutral={neutral} /></div>
-    <div className="lx-matrix-scroll"><svg className="lx-matrix-svg" viewBox={`0 0 900 ${plotHeight + 96}`} role="group" aria-label={`${scope} ${samples.length} 个样本、${names.length} 个特征的贡献热力图，共 ${matrix.cellCount} 个色块`}>
+    <div className="lx-matrix-scroll"><svg className="lx-matrix-svg" viewBox={`0 0 900 ${plotHeight + (angledLabels ? 138 : 72)}`} role="group" aria-label={`${scope} ${samples.length} 个样本、${names.length} 个特征的贡献热力图，共 ${matrix.cellCount} 个色块`}>
       <text x="0" y="12" fontSize="10" opacity=".6">{data.task_type === 'timeseries' ? '预测步' : '原始行'}</text>
       <g role="group" aria-label="各影响因子影响分数对比">
         <text x="626" y="12" fontSize="11">各影响因子影响分数对比</text>
@@ -98,8 +112,11 @@ export function ContributionHeatmap({ data, scope = '全部', scales }: { data: 
         })}
       </g>)}
       {names.map((name, i) => {
-        const label = data.labels?.[name] ?? name, lines = labelLines(label, Math.max(2, (columnWidth - 3) / 11))
-        return <g key={name} transform={`translate(${36 + (i + .5) * columnWidth} ${plotHeight + 46})`}><text textAnchor="middle" fontSize="11"><title>{label}</title>{lines.slice(0,3).map((line, j) => <tspan key={j} x="0" dy={j ? 12 : 0}>{j === 2 && lines.length > 3 ? line + '…' : line}</tspan>)}</text>{label !== name && <text y={Math.min(lines.length, 3) * 12 + 5} textAnchor="middle" fontSize="9" opacity=".5">{name.length > 8 ? name.slice(0,7) + '…' : name}</text>}</g>
+        const label = data.labels?.[name] ?? name
+        return <g key={name} className="lx-matrix-feature" data-lx-feature-label role="button" tabIndex={0} aria-label={featureHint(i)} transform={`translate(${36 + (i + .5) * columnWidth} ${plotHeight + 44})${angledLabels ? ' rotate(60)' : ''}`}>
+          <rect x={angledLabels ? -2 : -axisWidth / 2} y={-axisFont} width={axisWidth + 4} height={axisFont + 5} rx="2" fill="transparent" />
+          <text textAnchor={angledLabels ? 'start' : 'middle'} fontSize={axisFont}>{shortLabel(label, axisWidth / axisFont)}</text>
+        </g>
       })}
       <g role="group" aria-label="带正负的平均贡献，按绝对大小排序">
         <line x1={barZero} x2={barZero} y1="29" y2={plotHeight + 32} stroke="currentColor" opacity=".18" />
@@ -109,9 +126,12 @@ export function ContributionHeatmap({ data, scope = '全部', scales }: { data: 
           const rounded = value === null ? null : Number(value.toFixed(4))
           const label = value === null ? '方向未定' : rounded === 0 ? '0' : (rounded! > 0 ? '+' : '') + number(value)
           const color = value === null || value === 0 ? contributionColors.unknown : value < 0 ? contributionColors.negative : contributionColors.positive
-          return <g key={feature.name} transform={`translate(0 ${30 + (i + .5) * plotHeight / ranking.length})`} role="img" aria-label={`${feature.label} ${feature.name}：平均贡献 ${label}`}>
+          return <g key={feature.name} transform={`translate(0 ${30 + (i + .5) * plotHeight / ranking.length})`} role="group" aria-label={`${feature.label} ${feature.name}：平均贡献 ${label}`}>
             <title>{`${feature.label} · ${feature.name}：${value === null ? `${feature.unknownCount} 个样本缺少方向，无法计算平均贡献` : label}`}</title>
-            <text x="626" y="4" fontSize="11">{labelLines(feature.label, 7.5).slice(0,2).map((line, j) => <tspan key={j} x="626" dy={j ? 12 : 0}>{line}</tspan>)}</text>
+            <g className="lx-matrix-feature" data-lx-feature-label role="button" tabIndex={0} aria-label={`${featureHint(feature.featureIndex)} · 平均贡献 ${label}`}>
+              <rect x="624" y="-10" width="88" height="17" rx="2" fill="transparent" />
+              <text x="626" y="4" fontSize="11">{shortLabel(feature.label, 7.5)}</text>
+            </g>
             {value !== null && <rect className="lx-contribution-mean" data-value={value} x={value < 0 ? barZero - width : barZero} y="-4" width={width} height="8" rx="1" fill={color} />}
             <text x="898" y="4" textAnchor="end" fontSize={value === null ? 9 : 10} style={{ fontVariantNumeric:'tabular-nums' }}>{label}</text>
           </g>
@@ -130,7 +150,7 @@ export function ContributionHeatmap({ data, scope = '全部', scales }: { data: 
       </g>
     </svg></div>
     {names.length > 16 && <div className="lx-matrix-expand"><button type="button" data-lx-matrix-expand aria-expanded={expanded}>{expanded ? '收起影响因子' : `影响分数显示前 16 项 · 查看全部 ${names.length} 项`}</button></div>}
-    <p className="lx-matrix-readout" role="status">{hint || '每行一个样本，每列一个特征；悬停查看数值，点击色块查看该样本。'}</p>
+    <p className="lx-matrix-readout" role="status">{hint || '悬停或点击特征名查看全称；点击色块查看该样本。'}</p>
     {samples.length > plotHeight && <p className="lx-explain-foot">全量视图的行高不足 1 像素，可切换逐样本核对明细。</p>}
   </div>
 }

@@ -4,7 +4,7 @@
 
 index.tsx - 注册工具卡、分析过程、turnTail 与输入区引导槽位。
 LimixWelcome.tsx - 空白 LimiX 会话的销量、材料性能、电价示例；通过 Portal 挂在输入框下方，卸载时移除挂载点。
-LimixToolCard.tsx - 显示预测、解释或模型比较卡、图表与 JSON/CSV 下载；降级状态保留限制，说明默认折叠。
+LimixToolCard.tsx - 显示预测、解释或模型比较卡、图表与 JSON/CSV 下载；服务连接与参数帮助采用紧凑行，失败原因可见，详情默认折叠。
 BenchmarkView.tsx - 按数据集切换指标，对比固定拆分下各模型效果；失败不补零。
 use-card-fullscreen.ts - 原生 dialog 整卡放大；退出先清除模态语义，提交关闭状态后恢复焦点，保留内容与滚动。
 ExplanationView.tsx - 解释入口；按稳定任务身份加载详情。切换身份立即隔离旧详情与错误。
@@ -14,7 +14,7 @@ ExplanationBatch.tsx - 筛选与全量同尺度对比，逐样本及原始数据
 ExplanationFilter.tsx - 按需展开行范围、预测或特征原值条件；提交前校验。
 ExplanationDataTable.tsx - 完整贡献与关系原值搜索、25 条分页；不截断数值精度。
 ExplanationExport.tsx - 解析宿主主题，导出 SVG / PNG；失败保留可见反馈。
-ContributionHeatmap.tsx - 全量色块与带符号均值；中性和缺失方向使用统一语义。
+ContributionHeatmap.tsx - 全量色块与带符号均值；长轴名称单行斜排、中间省略，悬停/点击/键盘可读全称；中性和缺失方向使用统一语义。
 ContributionLegend.tsx - 全局蓝绿数值色阶；中性灰蓝、未知灰色，翻页不改变范围。
 contribution-matrix.ts - 保留行列顺序；中性计零，缺方向不补零。对比共用色阶与均值轴。
 ExplanationGraph.tsx - 完整网络、目标聚焦、高亮、原始表及图片导出；说明按需展开。

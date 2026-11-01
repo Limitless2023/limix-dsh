@@ -30,8 +30,8 @@ const DESCRIPTION = `调用 LimiX 开放平台 API 完成表格数据预测（�
 参数帮助：通过本工具传 command="forecast"、args=["--help"]（其它子命令同理）。CLI 由本工具封装，不在 shell 的 PATH 中，不要搜索或执行 shell limix 命令。
 时序区间：--quantile --levels 0.1,0.5,0.9 返回 P10/P50/P90；--context 90 直接使用最近 90 个历史点，无需剪裁原始文件。--output 指定保存 CSV 的路径。
 评估：可传 --truth 本地 CSV，含目标列，时序还须含日期列；它只用于本地对照，不会上传。
-解释：explain --mode local --train 参考CSV --data 待解释CSV --target 目标 --task-type regression或classification --row 1 --output 解释.json。全局图用 --mode directed或undirected --data 含目标CSV --target 目标 --features 特征1,特征2；字段须完整数值。可选 --labels 字段字典.json、--prediction 原预测.csv。解释自动上传、轮询和保存JSON/CSV；--task-id 续查，不重复提交。先用 explain --help 查看参数。
-模型比较：benchmark --manifest 数据集清单.json --models LIMIX_7M,LIMIX_16M,XGBoost,BASELINE --output 比较.json；自动保存可恢复回执、JSON/CSV/HTML，使用同一固定拆分。--python 可指定具备 sklearn/xgboost 的独立 Python 环境。先查 --help。
+解释：explain --mode local --train 参考CSV --data 待解释CSV --target 目标 --task-type regression或classification --row 1 --output 解释.json。全局图用 --mode directed或undirected --data 含目标CSV --target 目标 --features 特征1,特征2；字段须完整数值。可选 --labels 字段字典.json、--prediction 原预测.csv。解释自动上传、轮询和保存JSON/CSV；--task-id 续查，不重复提交。参数未知、版本变化或参数校验失败时用 explain --help；已有适用说明直接复用。
+模型比较：benchmark --manifest 数据集清单.json --models LIMIX_7M,LIMIX_16M,XGBoost,BASELINE --output 比较.json；自动保存可恢复回执、JSON/CSV/HTML，使用同一固定拆分。比较入口需要 numpy/pandas/scikit-learn，选择 XGBoost 时另需 xgboost；--python 指定独立 Python 环境。仅支持回归/分类；参数未知、版本变化或参数校验失败时查 --help。
 时序解释：explain --mode local --task-type timeseries --result-version-id 已完成时序预测的结果版本ID --output 解释.json，沿用原预测参数，不传 data/train/target。
 终态口径：预测任务成功须 status=finished 且有 result_version_id（is_ready=true 仅表示停止轮询）；扩展解释使用 task_status=succeeded，降级或部分成功须说明。凭据由现有配置读取，无需额外传参。文件路径用绝对路径，或相对调用时所在目录的相对路径。`;
 /** Python CLI 入口的解析链：显式配置 > 环境变量 > 包内自带。 */
@@ -230,13 +230,13 @@ function registerLimixTool(ctx, config = {}) {
 
 //#endregion
 //#region src/host/predict-command.js
-const WORKFLOW$2 = `当用户使用 /limix-predict 时，执行完整预测流程，全程用用户的语言交流，默认中文：
-1. 从用户描述、附件和会话中识别训练数据、待预测数据、目标列及业务问题。缺少信息时，用一条简短问题列出缺少的内容；不要猜测文件或目标列。空命令且没有已知数据时，先问用户要预测什么、训练和待预测文件在哪里，不扫描工作区寻找样例。任务类型由你根据数据判断，不要求用户选择 classify/regress 等内部命令。
-2. 查看文件列名、样本与行数，用 Python 标准库 csv 即可，不需要 pandas。选择 classify（类别）、regress（连续数值）或 forecast（时间序列）。保留待预测数据中的真实目标列供评估；没有真值也能预测，但不能报告准确率。不要把训练集直接当作测试集。
-3. 通过 limix 工具的一次 classify/regress/forecast 调用完成上传、提交、轮询、下载。直接传本地文件绝对路径给 --train 和 --predict，不要先调用 upload 换成版本 ID，否则会丢失本地评估来源。必须传 --target 和 --output；结果保存到会话工作目录，用唯一文件名 limix-<目标列>-<时间戳>.csv，避免覆盖已有文件。workdir 传会话工作目录。
-4. forecast 还需要 --date、--context、--horizon；有未来协变量时传包含未来协变量的 --predict，没有协变量时可省略 --predict。P10/P50/P90 使用 --quantile --levels 0.1,0.5,0.9，不要猜参数或自行估算平台区间；不确定时先用 limix 工具的 args=["--help"] 查参数。--context 已限制历史长度，无需剪裁文件。不要把未来真值用作模型输入。有独立真实值文件时，通过 --truth 传给本地评估；时序真实值文件须包含日期列和目标列，并与预测日期逐行一致。--truth 不上传、不参与预测。
-5. 成功后检查 saved_to、metrics 与任务终态。工具卡已自动展示图表、混淆矩阵和指标，不另写脚本重算或重画。最终回复只写两三句话：完成了多少条预测、一项主要指标、结果文件链接；不重复数据清单、矩阵、指标定义或逐类分析。metrics 来自本地真实值对照，不称为服务端评估。只使用工具实际返回的指标，不猜测价格或误差单位，不凭 R² 或 MAE/RMSE 断言没有偏差、没有异常点。合成样例只说明流程可用。无真值时明确说明无法评估。用户无需再要求下载，不要再次运行 download。
-6. 上传或字段校验失败时指出具体问题。提交结果不确定或等待超时时，按返回的任务 ID 查询现有任务，禁止盲目重新提交。未完成不能称成功，任务 ID 和内部命令不放在主要说明里。`;
+const WORKFLOW$2 = `当用户要求预测、分类、回归、时序外推，或使用 /limix-predict，执行预测流程：
+1. 识别业务目标、训练数据、待预测数据与目标列，查看列名、样本和行数。任务类型由你根据数据判断：classify（类别）、regress（连续数值）、forecast（时间序列）。用户尚未给数据时只问必要信息，不要求用户选择内部命令。
+2. 核对特征在业务预测时点是否可获得，排除目标泄漏、事后信息和纯标识列。保留待预测数据的真实目标值供本地评估，不能把训练集直接当测试集。需要拆分时，分类分层，同一实体或重复样本按组，时序按时间；拆分规则不能按测试成绩调整。
+3. 通过一次 limix classify/regress/forecast 调用完成上传、提交、轮询和保存。直接传本地绝对路径给 --train 和 --predict，不先 upload 换成版本 ID，以保留本地评估来源。必须传 --target、--output，workdir 传会话工作目录；输出文件采用 limix-<目标列>-<时间戳>.csv。用户指定模型时必须显式传 --model（如 LIMIX_7M），不能遗漏后使用服务默认模型；未指定才使用默认。提交后核对回执中的实际模型，未知时不把期望模型写成已使用的模型；模型不符时如实说明并纠正，不混入指定模型的报告结论。
+4. forecast 还需 --date、--context、--horizon。根据频率、可用历史和主要周期选择 context；历史不足一个完整周期时说明限制，不凭空补齐。未来协变量须覆盖预测日期，并区分预先已知信息、当时可用的预测信息和事后观测；事后真值不能作为模型输入。有未来协变量时传 --predict，没有时省略 --predict，按 --horizon 外推。--context 已限制历史长度，无需剪裁文件。P10/P50/P90 用 --quantile --levels 0.1,0.5,0.9，不自行估算区间。
+5. 有独立真值时传 --truth 本地 CSV；时序真值须含日期列与目标列，日期逐行对齐预测。--truth 不上传、不参与预测。没有真值也能预测，但无法评估。metrics 是本地真实值对照，不称为服务端评估。--truth 是预测流程参数，不是现成 CSV 的独立评分入口；后补真值时不能承诺传 --truth 就无需重跑预测。
+6. 成功须 status=finished、result_version_id 和 saved_to；is_ready=true 仅表示停止轮询。报告交代业务目标、实际数据和预测范围，引用关键 metrics 并解释其含义：回归 MAE/RMSE 越低越好，R² 越高越好，负值表示在本测试集上不如用测试真值均值作常数预测（区别于训练均值基线）；分类准确率须结合类别分布解读。只使用已核对的单位，不凭 R² 或 MAE/RMSE 断言没有偏差或异常点。没有业务容差时不声称已达到生产要求；合成样例只说明流程可用。上传或字段校验失败时指出具体问题。`;
 function registerPredictCommand(ctx) {
 	ctx.systemPrompt.section({
 		name: "limix:predict-workflow",
@@ -274,16 +274,16 @@ function registerPredictCommand(ctx) {
 
 //#endregion
 //#region src/host/explain-command.js
-const WORKFLOW$1 = `当用户要求解释预测或使用 /limix-explain：
-1. 识别局部预测归因或全局关系探索。表格局部归因用 explain --mode local --train 参考CSV --data 待解释CSV --target 目标 --task-type regression或classification --row 1。行号从1开始，不含表头。批量使用 --rows 1-10、--rows 1,3,5-8 或 --rows all，与 --row 互斥；不能把标识列当特征。时序局部归因用 explain --mode local --task-type timeseries --result-version-id 已完成时序预测的结果版本ID，沿用原预测数据、目标、特征、窗口、步长和模型，不能再传 data/train/target/features/model/row/rows/prediction。缺少数据、目标或时序结果版本时只问必要信息，不扫描工作区找案例。
-2. 全局有向关系用 explain --mode directed --data 含目标的CSV --target 目标 --features 特征1,特征2；无向关系用 undirected。所选列必须是完整有限数值。保持默认阈值，不为得到更好看的图调阈值。先用 --help 查参数，不猜参数。
-3. 所有解释经 limix 工具调用 command=explain，不走 shell。必须 --output 唯一的绝对路径.json。工具自动上传、等待、保存原始JSON与贡献/边CSV。不要手写或篡改解释结果。--labels 可使用已知字段字典 JSON（fields、target_label、unit）；--prediction 可传同一输入逐行对应的原预测CSV作对比。用户指定全部样本时直接使用 --rows all；数据说明中的示例行数不能覆盖本轮需求，不需要额外先提交10行任务。
-4. 表格解释会重算预测，使用工具 explanation.prediction 并称“解释时预测”。有 prior_prediction 与 prediction_delta 时简要说明差异，不能冒充与原预测完全一致。时序 prediction_scale=unverified 时称“解释模型输出”：业务尺度尚未核实，不附目标单位，不与原预测做差，不根据数值形态自行做 exp 等逆变换；target_unit 只描述业务目标，不是解释模型输出的单位。贡献分数无目标单位，不得写成增减多少MPa；方向表示模型归因，不是调参的实际因果效果。分类接口未声明 sign_scores 对应哪一类别，只称“服务返回的贡献方向”，不能解释为提升类别1或某个类别的概率，也不能把不同预测标签的平均方向当成同一类别的效果。
-5. 图的边权是模型关系分数，不是增益、实验效应或已验证概率。发现图与物理机制相符可表述为“一致”，不能声称证明因果或个体反事实。实验记录与模型发现分开。不要自动请求预留自然语言报告接口。
-6. 终态使用 task_status；succeeded 才是完整成功。degraded_succeeded 或 partially_succeeded 必须说明限制。等待超时按 task_id 和原参数/output续查，不重复提交；缺回执但有请求文件时先通过api GET /v1/extensions/tasks排查。
-7. 批量结果返回 requested_count、explained_count、missing_rows 和带正负的平均贡献（各影响因子影响分数对比）。平均贡献按每条 abs(score)×direction 求平均，按平均值绝对大小排序；未知方向不补零。samples 完整矩阵由界面按 detail_path 加载。missing_rows 非空时不得称全部完成；mapping=input_order 表示服务未返回索引、按输入顺序对应，不能声称已用服务索引核验。样本不足且没有索引时工具拒绝错配。时序行代表预测步，时间与特征名称只使用返回值；整体贡献排名不是有向因果图。
-8. 贡献解释说明模型使用了哪些信号，不能证明预测误差的原因。可描述具体偏差日期和数值；缺少天气、日历信息不足、分布变化等只能作为待验证假设。没有补充数据或对照实验，不得断言某因素是误差的主要来源，或模型仅凭某些特征就无法提前预测。中性或零贡献不等于该变量没有实际作用，也不能仅凭零贡献断定其由共线性造成。
-9. 结果卡已显示贡献、关系图和下载链接，最终用两三句话说明结果、重要边界和文件链接，不重复全部表格。标准模式不执行此命令。`;
+const WORKFLOW$1 = `当用户要求解释预测、分析影响因素、探索变量关系或使用 /limix-explain，先区分预测解释与关系探索：
+1. 表格局部归因用 limix explain --mode local --train 参考CSV --data 待解释CSV --target 目标 --task-type regression或classification；单行用 --row，行号从1开始、不含表头。指定多行用 --rows 1-10 或 --rows 1,3,5-8，全部用 --rows all；row 与 rows 互斥。遵守本轮样本范围，不用数据说明中的示例行数覆盖需求，不额外先提交10行任务。不能把标识列当特征。
+2. 时序局部归因用 explain --mode local --task-type timeseries --result-version-id 已完成时序预测的结果版本ID。沿用原预测数据、目标、特征、窗口、步长和模型，不能再传 data/train/target/features/model/row/rows/prediction；行代表预测步。按任务类型补充必要参数：时序已有结果版本时不追问数据、目标或样本范围；表格缺数据、目标或样本范围时只问缺项。
+3. 全局关系探索用 explain --mode directed或undirected --data 含目标的CSV --target 目标 --features 特征1,特征2。所选列须为完整有限数值。保持默认阈值，不为让图更复杂而调阈值。边权是模型关系分数，不是增益、实验效应或已验证概率；与物理机制相符只称“一致”，不能声称证明因果或个体反事实。实验记录与模型发现分开，不自动请求预留自然语言报告接口。
+4. 必须 --output 唯一的绝对路径.json；工具自动保存原始JSON与贡献/边CSV，不手写或篡改结果。--labels 可传已知字段字典 JSON（fields、target_label、unit），--prediction 可传同一输入逐行对应的原预测CSV作对比。
+5. 表格解释原预测时，按原预测实际模型显式传 --model；用户单独指定解释模型时遵守指定。核对解释返回的 model_type，不将不同模型的归因冒充原模型的解释；指定模型被服务拒绝时报告失败，不擅自换模型重试。表格解释会重算预测，使用 explanation.prediction 并称“解释时预测”；有 prior_prediction、prediction_delta 时说明差异，不冒充与原预测一致。时序 prediction_scale=unverified 时称“解释模型输出”：不附业务单位，不与原预测做差，不自行做 exp 等逆变换；target_unit 不是解释模型输出的单位。
+6. 贡献分数无目标单位，不写成增减多少MPa；方向是模型归因，不是实际调节收益。分类接口未声明 sign_scores 对应哪一类别，只称“服务返回的贡献方向”，不解释为提升某一类别概率，也不把不同预测标签的平均方向当成同一类别效果。中性或零贡献不等于变量没有实际作用，也不能据此断定共线性。
+7. 批量核对 requested_count、explained_count、missing_rows。各影响因子影响分数对比采用带正负的平均贡献：每条 abs(score)×direction 求平均，再按平均值绝对大小排序；未知方向不补零。samples 完整矩阵由界面按 detail_path 加载。missing_rows 非空不得称全部完成；mapping=input_order 只是按输入顺序对应，不是服务索引核验。样本不足且无索引时拒绝错配；时间与特征名称只使用返回值，整体排名不是有向因果图。
+8. 解释终态用 task_status；仅 succeeded 是完整成功，degraded_succeeded 或 partially_succeeded 必须说明限制。续查用 task_id 和原参数/output；缺回执但有请求文件时先通过 api GET /v1/extensions/tasks 排查。参数或权限错误先核对帮助、公开文档与原始错误，不猜测 API 端点，不追加用户未请求的探测任务。
+9. 用户问预测误差原因时，先区分模型归因与误差诊断。可描述真实值对照中的日期和偏差；缺少天气、日历信息不足或分布变化等只能列为待验证假设。没有补充数据或对照实验，不断言某因素是主要误差原因，也不声称仅凭某些特征就无法提前预测。`;
 function registerExplainCommand(ctx) {
 	ctx.systemPrompt.section({
 		name: "limix:explain-workflow",
@@ -321,12 +321,12 @@ function registerExplainCommand(ctx) {
 
 //#endregion
 //#region src/host/benchmark-command.js
-const WORKFLOW = `当用户要求比较 LimiX 和其他模型或使用 /limix-compare：
-1. 先明确数据、目标与独立测试集。同一数据集必须让所有模型使用完全相同的训练/测试拆分和特征；真值仅供本地评估。分类用分层拆分，重复样本放在同组；时序按时间拆分。不能根据成绩挑测试样本或删除差结果。
-2. 用 limix 工具 command=benchmark，先用 --help 查契约。manifest JSON 的 datasets 数组包含 id/name/task_type/target/train/predict/truth，文件相对 manifest 所在目录解析。目前比较支持 regression/classification。默认比较 LIMIX_7M、LIMIX_16M、XGBoost 与均值/多数类 BASELINE；固定 --seed，保存唯一 --output 结果路径。
-3. XGBoost 需要独立 Python 环境中的 numpy/pandas/scikit-learn/xgboost。先检查已有环境，缺依赖时说明具体缺项；可通过 --python 指定解释器，不修改宿主运行时。预测和解释自身不需要这些第三方库。
-4. 命令保存每项回执、JSON、CSV 与 HTML 报告。等待超时使用同一 manifest/参数/output 续跑读取回执，不盲目重提。failed/pending/partial 不称全部完成，缺失指标不能填0。报告按数据集比较，不跨不同单位平均原始误差。
-5. 结果卡已展示比较，回复只写完成数量、关键差异和报告链接。测试集上的领先只适用于这次固定拆分，不称模型普遍更好。`;
+const WORKFLOW = `当用户要求比较 LimiX 与其他模型、比较不同 LimiX 模型，或使用 /limix-compare，执行固定拆分模型比较：
+1. 当前 benchmark 仅支持 regression/classification。时序比较尚未接入；收到时序比较请求时先说明边界，不能将任务伪装成回归比较或承诺自动完成。先明确数据、目标和独立测试集；同一数据集的所有模型使用完全相同的训练/测试拆分和特征，真值只用于本地评估。分类分层，同一实体或重复样本放在同组；不按成绩挑样本或删除差结果。
+2. 用 limix 工具 command=benchmark；manifest JSON 的 datasets 数组包含 id/name/task_type/target/train/predict/truth，文件相对 manifest 所在目录解析。遵守用户指定模型范围，未指定时默认 LIMIX_7M、LIMIX_16M、XGBoost 与均值/多数类 BASELINE；固定 --seed，保存唯一 --output 路径。核对特征在业务预测时点可获得，不能使用目标泄漏或事后信息。
+3. 比较入口需要独立 Python 环境中的 numpy/pandas/scikit-learn；选择 XGBoost 时另需 xgboost，并在固定训练集上训练。先检查已有环境，缺依赖时指出具体缺项，通过 --python 指定解释器，不修改宿主运行时。LimiX 预测和解释自身不需要这些第三方库。
+4. 命令保存每项回执、JSON、CSV 与 HTML。等待超时使用同一 manifest/参数/output 续跑读取回执。failed/pending/partial 不称全部完成，缺失指标不填0。报告按数据集比较，不跨不同单位平均原始误差。
+5. 报告说明业务目标、数据来源、样本数、固定拆分、参与模型、完成数量、关键指标与报告链接。BASELINE 回归用训练目标均值、分类用训练多数类，对每个测试样本输出同一个值；它不学习特征关系。明确误差越低越好、R²和准确率越高越好，不把长误差条当成更好效果。测试集领先只适用于本次固定拆分，不称模型普遍更好。测试样本很少时说明结论稳定性有限，不把一次小样本演示当成最终选型依据。`;
 function registerBenchmarkCommand(ctx) {
 	ctx.systemPrompt.section({
 		name: "limix:benchmark-workflow",

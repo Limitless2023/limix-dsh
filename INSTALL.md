@@ -1,12 +1,12 @@
-# 安装 LimiX Agent 0.3.1
+# 安装 LimiX Agent 0.3.2
 
-从 [GitHub Releases](https://github.com/Limitless2023/limix-dsh/releases) 下载 0.3.1 的插件文件。请保留现有 profile，按顺序安装或更新：
+从 [GitHub Releases](https://github.com/Limitless2023/limix-dsh/releases) 下载 0.3.2 的插件文件。请保留现有 profile，按顺序安装或更新：
 
-1. `dsh-limix-data-0.3.1.tgz`
-2. `dsh-limix-tool-0.3.1.tgz`
-3. `dsh-limix-agent-0.3.1.tgz`
-4. `dsh-limix-preset-0.3.1.tgz`
-5. 可选品牌外观：`dsh-limix-cover-0.3.1.tgz`
+1. `dsh-limix-data-0.3.2.tgz`
+2. `dsh-limix-tool-0.3.2.tgz`
+3. `dsh-limix-agent-0.3.2.tgz`
+4. `dsh-limix-preset-0.3.2.tgz`
+5. 可选品牌外观：`dsh-limix-cover-0.3.2.tgz`
 
 在 DeepSeek Harness 的“插件 → 添加插件”中选择文件；也可让 DSH Agent 使用 `plugin_manager` 的 `install_bundle`，`target` 传 tarball 的绝对路径。升级时使用同名包的新版，无需手动删配置。
 
@@ -17,6 +17,8 @@
 确认 `python3` 可用，并沿用已有 LimiX 配置。可以使用 `LIMIX_API_KEY` 环境变量或 `~/.limix/config.json`。凭据只在本机配置，不要发到聊天或写入代码仓库。
 
 预测和解释不需要额外 pip 包。要比较 XGBoost，请按 [benchmarks/README.md](benchmarks/README.md) 创建独立环境，通过比较命令的 `--python` 使用它；不向宿主 Python 安装额外依赖。
+
+安装 preset 后，未保存默认选择的新环境会默认使用 LimiX Agent。已有的用户默认选择优先保留，之后也可在“设置 → Agent 预设”中切换。已有会话不变。
 
 ## 安装后验证
 

@@ -1,8 +1,14 @@
 # [INPUT]: DSH preset/persona 与 LimiX 工具插件。
-# [OUTPUT]: 专属角色、公共执行规则、业务分析报告指引及三类工具组合。
-# [POS]: 仅在 LimiX Agent 会话挂载；不修改标准模式。
+# [OUTPUT]: 新任务默认预设、专属角色、公共执行规则、业务分析报告指引及三类工具组合。
+# [POS]: 声明 LimiX Agent 并设置安装默认值；工具仅在 LimiX Agent 会话挂载。
 # [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 # 只有选中「LimiX Agent」的新会话才有 limix 工具；标准模式等其它 preset 不受影响。
+# profile 中已保存的用户选择优先于 bundle 默认值；用户仍可在设置中切换。
+- id: agent-preset-registry
+  name: '@deepseek-ai/dsh-agent-preset-registry'
+  config:
+    default: limix
+    selectedDefault: limix
 - insert:
     - id: preset-limix
       name: '@deepseek-ai/dsh-agent-preset'

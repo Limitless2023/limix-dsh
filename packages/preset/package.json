@@ -1,6 +1,6 @@
 {
   "name": "dsh-limix-preset",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "private": true,
   "type": "module",
   "description": "LimiX Agent：预测、预测解释、关系探索与模型比较的 DSH preset",

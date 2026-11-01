@@ -1,6 +1,6 @@
 {
   "name": "dsh-limix-agent",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "private": true,
   "description": "LimiX 界面半：工具结果卡片 + 「分析过程」视图",
   "type": "module",

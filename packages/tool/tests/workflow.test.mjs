@@ -1,6 +1,6 @@
 /**
  * [INPUT]: node:test；构建后的工具入口、preset 补丁、命令与 CSV 边界。
- * [OUTPUT]: preset 挂载隔离、工作流注册、附件传递、取消与文件边界验证。
+ * [OUTPUT]: preset 默认配置与挂载隔离、工作流注册、附件传递、取消与文件边界验证。
  * [POS]: tool 宿主契约测试，不调用生产 API。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
@@ -34,11 +34,12 @@ test('构建产物在挂载时只注册一次三类流程，工具 schema 包含
   for (const command of ['classify','regress','forecast','explain','benchmark']) assert.ok(tools[0].parameters.properties.command.enum.includes(command))
 })
 
-test('安装补丁只添加独立 LimiX preset，工具包不向标准模式挂载', async () => {
+test('安装补丁设置 LimiX 默认值，工具包不向标准模式挂载', async () => {
   const preset = await readFile(new URL('../../preset/cordis.patch.yml', import.meta.url), 'utf8')
   const tool = await readFile(new URL('../cordis.patch.yml', import.meta.url), 'utf8')
   const operations = preset.split('\n').filter(line => /^- /.test(line))
-  assert.deepEqual(operations, ['- insert:'], '不能通过修改/删除操作覆盖标准 preset')
+  assert.deepEqual(operations, ['- id: agent-preset-registry', '- insert:'], '只允许修改 registry 并添加 LimiX preset，不覆盖标准 preset')
+  assert.match(preset, /^- id: agent-preset-registry\n  name: '@deepseek-ai\/dsh-agent-preset-registry'\n  config:\n    default: limix\n    selectedDefault: limix\n- insert:/m)
   assert.equal((preset.match(/^    - id:/gm) ?? []).length, 1)
   assert.match(preset, /^    - id: preset-limix$/m)
   assert.match(preset, /^        id: limix$/m)

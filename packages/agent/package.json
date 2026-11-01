@@ -1,6 +1,6 @@
 {
   "name": "dsh-limix-agent",
-  "version": "0.3.5",
+  "version": "0.3.6",
   "private": true,
   "description": "展示预测、解释和模型比较的结果卡片与图表，提供“分析过程”页面和报告预览。",
   "type": "module",

@@ -1,1 +1,6 @@
-{"meta":{"title":"LimiX Data","description":"The datasource tool (read-only NL2SQL) and the data-source settings page."}}
+{
+  "meta": {
+    "title": "LimiX Data Sources",
+    "description": "Configures database connections, inspects table schemas, runs read-only queries, and exports CSV files for LimiX prediction and analysis."
+  }
+}

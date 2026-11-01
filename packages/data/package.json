@@ -1,9 +1,9 @@
 {
   "name": "dsh-limix-data",
-  "version": "0.3.5",
+  "version": "0.3.6",
   "private": true,
   "type": "module",
-  "description": "LimiX Data：datasource 工具（NL2SQL 三闸只读）+ 设置页数据源管理",
+  "description": "配置数据库连接，查看库表结构，执行只读查询并导出 CSV，供 LimiX 预测分析使用。",
   "main": "lib/index.js",
   "exports": {
     ".": {

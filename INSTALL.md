@@ -16,7 +16,7 @@
 
 确认 `python3` 可用，并沿用已有 LimiX 配置。可以使用 `LIMIX_API_KEY` 环境变量或 `~/.limix/config.json`。凭据只在本机配置，不要发到聊天或写入代码仓库。
 
-预测和解释不需要额外 pip 包。要比较 XGBoost，请按 [benchmarks/README.md](benchmarks/README.md) 创建独立环境，通过比较命令的 `--python` 使用它；不向宿主 Python 安装额外依赖。
+预测和解释不需要额外 pip 包。模型比较（包括 BASELINE）需要 NumPy、pandas、scikit-learn；选择 XGBoost 时另需 xgboost。请按 [benchmarks/README.md](benchmarks/README.md) 创建独立环境，通过比较命令的 `--python` 使用它；不向宿主 Python 安装额外依赖。
 
 ## 安装后验证
 

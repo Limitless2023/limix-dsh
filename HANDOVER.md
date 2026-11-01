@@ -2,7 +2,9 @@
 
 > 读者：接手开发的人/Agent（此前没有接触过 DeepSeek Harness 的插件体系）。
 > 目标：让你能独立完成「改代码 → 构建 → 安装 → 在 GUI 里验证」这个闭环。
-> 最后更新：2026-11-01（DSH 0.2.1-rc.2，插件套件 0.3.1）
+> 最后更新：2026-11-01（DSH 0.2.1-rc.5，插件套件 0.3.1）
+
+> **换机接手入口：先读 [USER-ACCEPTANCE.md](USER-ACCEPTANCE.md)。** 新电脑使用 v0.3.1 发布 tarball，不复制下文维护者的 profile、开发软链接或独立 MCP。本文后续保留历史开发笔记；安装以 INSTALL.md 为准，验收以 USER-ACCEPTANCE.md 为准。测试数据另随便携交接包提供，未放入源码仓库。
 
 > 0.3.1 本轮交付：默认业务分析报告与 Markdown 文件、中文专属提示词、紧凑辅助卡及长特征标签。标准模式隔离保留。审查与验证见 reviews/report-release-review.md。
 
@@ -48,7 +50,7 @@ LimiX 是一个预训练的结构化数据基础模型（表格 / 时序预测�
 
 | 项 | 值 |
 |---|---|
-| DSH 应用 | `/Applications/DeepSeek Harness.app`（版本 0.2.1-rc.2，代码在 `Contents/Resources/app.asar` 里，**asar 有签名与完整性校验，不要改它**） |
+| DSH 应用 | `/Applications/DeepSeek Harness.app`（版本 0.2.1-rc.5，代码在 `Contents/Resources/app.asar` 里，**asar 有签名与完整性校验，不要改它**） |
 | 当前 profile | `desktop`，目录 `~/.dsh/profiles/desktop`（`package.json` 的 `dsh.profile.bundles` 决定装了什么） |
 | 仓库 | `~/Desktop/Projects/Coffee/limix-dsh` |
 | 构建工具链 | `tsdown`（在 `~/Desktop/Projects/DeepSeek_Harness/packages/limix-ui/node_modules` 里；构建时把这个 node_modules 软链到目标包即可，见 §5） |
@@ -114,13 +116,14 @@ profile 里的包按 Node 规则从自己的 realpath 向上找模块，`@deepse
 ```
 limix-dsh/
 ├─ packages/
-│  ├─ tool/            dsh-limix-tool    宿主：limix 工具 + /limix-ui/csv 路由
-│  │  ├─ src/index.ts        注册工具 + /limix-predict + 路由；Config: csvRoots/cliPath/pythonBin
+│  ├─ tool/            dsh-limix-tool    宿主：limix 工具、三个命令、受控结果下载
+│  │  ├─ src/index.ts        注册工具、命令与路由；Config: csvRoots/cliPath/pythonBin
 │  │  ├─ src/host/tool.js    工具定义；成功调用登记 CSV 读取记录
-│  │  ├─ src/host/predict-command.js  原生命令、附件转交与完整预测流程
-│  │  ├─ src/host/csv-access.js       CSV 真实路径与大小校验；读取记录持久化
-│  │  ├─ assets/limix.py     自带 CLI（纯标准库）：API 编排
-│  │  ├─ assets/limix_metrics.py  显式预测列与真值比较；必须随 CLI 一起打包
+│  │  ├─ src/host/predict-command.js    /limix-predict 与完整预测流程
+│  │  ├─ src/host/explain-command.js    /limix-explain 入口与解释口径
+│  │  ├─ src/host/benchmark-command.js  /limix-compare 入口；仅分类与回归
+│  │  ├─ src/host/csv-access.js       CSV/JSON 真实路径与大小校验；读取记录持久化
+│  │  ├─ assets/limix*.py    自带 CLI 的 7 个模块；发布脚本逐个核验
 │  │  └─ cordis.patch.yml    空 []（只由 preset 挂载）
 │  ├─ agent/           dsh-limix-agent   浏览器：工具卡 + 分析过程 + 本轮卡堆
 │  │  ├─ src/index.ts        宿主半：空 apply（只占位，让 dsh.client 被扫描）
@@ -130,14 +133,20 @@ limix-dsh/
 │  │  ├─ src/client/LimixTurnStack.tsx    本轮任务摘要（类型 + 指标 + 样本数）
 │  │  ├─ src/client/LimixWelcome.tsx      空白 LimiX 会话开场白与示例
 │  │  ├─ src/client/tool-result.ts        卡片与摘要共用的输出展示模型
-│  │  └─ src/client/{ForecastChart,ScatterChart,ConfusionMatrix,eval-csv,forecast-csv}.tsx
+│  │  ├─ src/client/Explanation*.tsx      解释卡：热力图、逐样本、筛选、关系图、全屏、导出
+│  │  ├─ src/client/BenchmarkView.tsx     模型比较结果
+│  │  └─ src/client/{ForecastChart,ScatterChart,ConfusionMatrix}.tsx
 │  ├─ data/            dsh-limix-data    全局设置页/路由 + preset 可调用的工具工厂
 │  ├─ preset/          dsh-limix-preset  cordis.patch.yml 声明 preset-limix（30 行插件）
 │  └─ brand/           dsh-limix-cover   封面 + 侧边栏（priority -1 抢官方槽位）
-├─ dist/                 pnpm pack 产物（发布用）
-├─ release.sh            三个包打包到 dist/
+├─ benchmarks/           公开数据、固定拆分与多模型比较
+├─ reviews/              交叉审查与离线复现记录
+├─ scripts/release.mjs   构建与核验五包
+├─ dist/v<版本>/         npm pack 产物、manifest.json、SHA256SUMS（发布用）
+├─ release.sh            发布入口；不上传
 ├─ NOTES.md              0.2.1 移植约束与验证记录（更细的技术笔记）
-├─ INSTALL.md            给同事 agent 的安装 prompt
+├─ INSTALL.md            同事安装说明
+├─ USER-ACCEPTANCE.md    换机验收计划
 └─ HANDOVER.md           本文
 ```
 
@@ -150,15 +159,19 @@ limix-dsh/
 NM=~/Desktop/Projects/DeepSeek_Harness/packages/limix-ui/node_modules
 ln -sfn "$NM" ~/Desktop/Projects/Coffee/limix-dsh/packages/agent/node_modules
 ln -sfn "$NM" ~/Desktop/Projects/Coffee/limix-dsh/packages/tool/node_modules
+ln -sfn ~/Desktop/Projects/DeepSeek_Harness/packages/limix-datasource/node_modules \
+  ~/Desktop/Projects/Coffee/limix-dsh/packages/data/node_modules
 
 # agent（浏览器半）
 cd ~/Desktop/Projects/Coffee/limix-dsh/packages/agent && ./node_modules/.bin/tsdown
-# → lib/index.js（宿主座位）+ lib/client.js（浏览器 bundle，约 80KB）
+# → lib/index.js（宿主座位）+ lib/client.js（浏览器 bundle，约 200KB）
 
 # tool（宿主半）
 cd ../tool && ./node_modules/.bin/tsdown
-# → lib/index.js（约 6.6KB，零 @deepseek-ai 依赖）
+# → lib/index.js（约 26KB，零 @deepseek-ai 依赖）
 ```
+
+没有 DeepSeek_Harness 检出的机器按 README 运行 `npm install`。npm 会把软链换成真实目录；已在干净克隆验证可构建。
 
 `tsdown.config.ts` 的关键点：
 - 浏览器半必须产成 `window.__ModuleLoader__.load({ id: '<包名>', factory: (require) => { ... } })` 的 CJS 闭包（banner/footer/intro 三件套，照抄现有配置，`id` 必须等于包名）
@@ -170,7 +183,7 @@ cd ../tool && ./node_modules/.bin/tsdown
 ## 6. 安装 / 卸载
 
 ```bash
-# 装（三个 profile 包 + preset；target 用绝对路径）
+# 装五个包（target 用绝对路径）
 # 通过 DSH 工具：
 plugin_manager(action="install_bundle", target="/Users/limitless/Desktop/Projects/Coffee/limix-dsh/packages/tool")
 # 同样方式装 preset / agent / data / brand
@@ -331,14 +344,14 @@ ls -la packages/agent/lib/client.js packages/agent/src/client/*.tsx | head
 
 ## 8.5 交付流水线
 
-五个包使用同一套件版本。当前版本为 0.3.0；brand 不再使用独立版本线。
+五个包使用同一套件版本，以各包 `package.json` 为准；brand 不再使用独立版本线。
 
 1. 完成离线测试、真实接口调用、界面验收和独立审查。
 2. 同步五个 package.json、README.md、INSTALL.md 与验收记录。
 3. 运行 `./release.sh`，核验五个 tarball 的安装入口和 CLI 模块。
 4. 提交源码与构建产物，再运行 `./release.sh`。
-5. 确认 `dist/v0.3.0/manifest.json` 的 source_commit 指向该提交，source_dirty 为 false。
-6. 推送提交和 v0.3.0 标签，创建 GitHub Release。
+5. 确认 `dist/v<版本>/manifest.json` 的 source_commit 指向该提交，source_dirty 为 false。
+6. 推送提交和 `v<版本>` 标签，创建 GitHub Release。
 7. 上传五个 tarball、SHA256SUMS 和 manifest.json，下载后复核摘要。
 
 发布器只构建与核验，不提交 Git，不上传附件。禁止使用 dist 根目录的历史包混发。

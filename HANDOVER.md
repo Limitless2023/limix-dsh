@@ -2,7 +2,7 @@
 
 > 读者：接手开发的人/Agent（此前没有接触过 DeepSeek Harness 的插件体系）。
 > 目标：让你能独立完成「改代码 → 构建 → 安装 → 在 GUI 里验证」这个闭环。
-> 最后更新：2026-11-01（DSH 0.2.1-rc.5，插件套件 0.3.1）
+> 最后更新：2026-11-01（DSH 0.2.1-rc.5，插件套件 0.3.2 + master 页面改版）
 
 > **换机接手入口：先读 [USER-ACCEPTANCE.md](USER-ACCEPTANCE.md)。** 新电脑使用 v0.3.1 发布 tarball，不复制下文维护者的 profile、开发软链接或独立 MCP。本文后续保留历史开发笔记；安装以 INSTALL.md 为准，验收以 USER-ACCEPTANCE.md 为准。测试数据另随便携交接包提供，未放入源码仓库。
 
@@ -344,6 +344,16 @@ zstd -dc "$S/session.v4.jsonl.zstd" | tail -3             # 看最后几条记�
 - 复现：`../materials-datasets/.venv/bin/python -m unittest discover -s benchmarks/tests -v`；`node --test benchmarks/tests/cancellation.test.mjs`。
 - 环境版本：NumPy 2.5.4、pandas 3.1.0、scikit-learn 1.9.1、XGBoost 3.4.1；本次未安装依赖。
 - 边界：未重新发起生产预测；运行态、失败、分类/时序与三种解释模式由自动化测试覆盖。
+
+### 2026-11-01：合并 master 与本机重启验收
+
+- 合并 `fix/analysis-process-view` 的页面改版、完整测试记录及其文档前置提交；保留 v0.3.2 的默认预设配置。合并提交为 `7b8008e`。
+- 合并后验证：83 项 Node 测试（含宿主契约与取消）、52 项 CLI Python 测试、29 项 benchmark Python 测试、2 项 data 契约测试全部通过。agent TypeScript、四包构建及品牌 smoke 检查通过。
+- 本机 desktop profile 继续使用现有源码链接；四个包已指向合并后的主工作区。独立 limix-cover 副本同步到 0.3.2 并重新构建。
+- 完整退出原生 DSH，确认进程退出后重开。历史会话的新版分析过程正常恢复；数据步骤可展开、收起，HTML 报告通过宿主侧栏正常预览。
+- 新建空白会话默认显示 LimiX Agent；输入 /limix 可见 predict、explain、compare 三个命令。测试草稿已清空，没有发送任务。
+- 本次仅合并主分支并更新本机开发链接，未创建新 Release，也未覆盖 v0.3.2 发布附件。页面改版尚未纳入发布包。
+- 验证边界：复用历史真实任务，未重新调用生产预测或解释接口；历史 4103/4102 错误保持原样显示。
 
 ### 每天开工前的固定检查
 

@@ -3,8 +3,8 @@
  *          （结构对齐官方 ToolCallOwnerProps：callId/toolName/block/cwd/openFile/inspect——
  *           为守构建纯度门禁不 value-import 官方包，此处以最小结构类型自持）
  * [OUTPUT]: 对外提供 LimixToolCard 组件——limix 工具调用在对话流里的富卡片：
- *           命令徽章 + 成败态 + CLI JSON 输出的关键字段表 + 可折叠原始输出
- *           + 三类任务各自的结果图（时序曲线 / 分类混淆矩阵 / 回归散点）
+ *           任务名称 + 业务指标 + 结果文件下载与打开；指标说明和调用详情默认折叠
+ *           + 三类预测图、可全屏的解释/模型比较卡及 JSON/CSV 下载；参数帮助不显示预测完成。
  * [POS]: limix-ui 的工具结果渲染器；对位 Next.js 版 tools-ui 的 DSH 形态。
  *        未认领的其他工具不受影响（keyed 插槽按工具名分派，自有工具=纯增量）。
  *        三类结果图共用 /limix-ui/csv 一条只读通道，取数失败一律静默降级为纯文本卡片
@@ -15,7 +15,11 @@ import { ConfusionMatrix } from './ConfusionMatrix.tsx'
 import { ForecastChart, type ForecastChartData } from './ForecastChart.tsx'
 import { ScatterChart } from './ScatterChart.tsx'
 import { buildConfusion, buildScatter, pickColumn, pickPredLabel, type ConfusionData, type ScatterData } from './eval-csv.ts'
-import { parseForecastCsv, parseTrainTail } from './forecast-csv.ts'
+import { parseForecastCsv, parseTrainTail, parseForecastTruth } from './forecast-csv.ts'
+import { parseToolResult, resultState, metricEntries } from './tool-result.ts'
+import { ExplanationView } from './ExplanationView.tsx'
+import { BenchmarkView } from './BenchmarkView.tsx'
+import { CARD_FULLSCREEN_CSS, useCardFullscreen } from './use-card-fullscreen'
 
 /** 经 Node 半自建的只读同源路由取 CSV；三处图表共用此一条通道 */
 async function fetchCsv(p: string): Promise<string> {
@@ -51,95 +55,53 @@ interface Props {
   inspect?: () => void
 }
 
-/** 中文指标名映射：CLI JSON 键 → 业务读者能看懂的行标签 */
-const KEY_LABELS: Record<string, string> = {
-  status: '状态', task_id: '任务 ID', is_ready: '完成', data_version_id: '数据版本',
-  accuracy: '准确率', rmse: 'RMSE', mae: 'MAE', mape: 'MAPE', r2: 'R²',
-  message: '消息', file: '文件', output: '输出文件', rows: '行数',
-  task_type: '任务类型', engine_type: '引擎', model_type: '模型',
-  config_name: '配置', callback_url: '回调地址', priority: '优先级',
-  created_at: '创建时间', queued_at: '入队时间', started_at: '开始时间',
-  finished_at: '完成时间', updated_at: '更新时间', elapsed: '耗时',
-  file_id: '文件 ID', filename: '文件名', columns: '列数', n_rows: '行数',
+const COMMAND_LABELS: Record<string, string> = {
+  regress: '回归预测', classify: '分类预测', forecast: '时序预测',
+  health: '服务连接', check: '访问权限', upload: '上传数据', download: '保存结果',
+  task: '任务进度', tasks: '任务列表', result: '预测结果', data: '数据查询', cancel: '取消任务',
+  explain: '预测解释', benchmark: '多模型效果比较',
 }
+const CSS = `
+.lx-result{border:1px solid var(--dsw-alias-border-l3,#e3e6eb);border-radius:12px;padding:16px 18px;margin:4px 0;font:inherit;font-size:13px;line-height:1.6;min-width:0;overflow-wrap:anywhere;color:var(--dsw-alias-label-primary)}
+.lx-result-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.lx-result-brand{font-size:11px;letter-spacing:.04em;color:var(--dsw-alias-label-tertiary);margin-bottom:5px}
+.lx-result h3{margin:0;font:inherit;font-weight:600;font-size:15px}
+.lx-result-status{display:inline-flex;align-items:center;gap:5px;font-size:12px;margin-left:auto;color:var(--dsw-alias-label-secondary)}
+.lx-result-status::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+.lx-result-status[data-state=done]{color:#21835c}
+.lx-result-status[data-state=error]{color:#cf4545}
+.lx-result-status[data-state=running]{color:#a56b16}
+.lx-result-status[data-state=warning]{color:#a56b16}
+.lx-result-meta{margin:5px 0 0;color:var(--dsw-alias-label-secondary);font-size:12px}
+.lx-result-metrics{display:flex;flex-wrap:wrap;gap:14px 28px;margin:17px 0 12px;padding:0}
+.lx-result-metrics div{min-width:90px}
+.lx-result-metrics dt{font-size:11px;color:var(--dsw-alias-label-tertiary)}
+.lx-result-metrics dd{margin:3px 0 0;font-size:21px;line-height:1.25;font-weight:500;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.lx-result-note{margin:12px 0;color:var(--dsw-alias-label-secondary);font-size:12px}
+.lx-result-actions{display:flex;align-items:center;flex-wrap:wrap;gap:14px;margin-top:14px;padding-top:10px;border-top:1px solid var(--dsw-alias-border-l3,#e3e6eb)}
+.lx-result button,.lx-result a{border:0;background:transparent;padding:2px 0;color:var(--dsw-alias-label-secondary);font:inherit;font-size:12px;cursor:pointer;text-align:left;text-decoration:none}
+.lx-result button:hover{color:var(--dsw-alias-state-business-primary,#3465ce)}
+.lx-result button:focus-visible{outline:2px solid var(--dsw-alias-state-business-primary,#3465ce);outline-offset:3px;border-radius:3px}
+.lx-result button[data-lx=file]{color:var(--dsw-alias-state-business-primary,#3465ce)}
+.lx-result a{color:var(--dsw-alias-state-business-primary,#3465ce)}
+.lx-result a:hover{text-decoration:underline}
+.lx-result-raw{margin:10px 0 0;padding:12px;max-height:250px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;background:var(--dsw-alias-interactive-bg-hover,#f5f6f8);border-radius:6px;font-size:11px;line-height:1.7}
+.lx-result-command{font-size:11px;white-space:pre-wrap;margin:10px 0 0;color:var(--dsw-alias-label-secondary)}
+`
 
-/**
- * 从 CLI 文本输出里尽力解析 JSON，失败返回 null 走原文展示。
- * 真实形态：limix.py 的 emit() 是 indent=2 的多行美化 JSON，且工具 render 会把
- * stderr 以 "\n[stderr]\n" 拼接在 stdout 之后——解析顺序：
- * ① 剥离 stderr 段后整体 parse ② 首"{"到末"}"截取 parse ③ JSON-lines 逐行取末条
- */
-function parseCliJson(text: string): Record<string, unknown> | null {
-  const stdout = text.split('\n[stderr]\n')[0].trim()
-  if (!stdout) return null
-  const asObj = (v: unknown): Record<string, unknown> | null =>
-    typeof v === 'object' && v !== null && !Array.isArray(v) ? (v as Record<string, unknown>) : null
-  try { const v = asObj(JSON.parse(stdout)); if (v) return v } catch { /* 下一级 */ }
-  const a = stdout.indexOf('{')
-  const b = stdout.lastIndexOf('}')
-  if (a >= 0 && b > a) {
-    try { const v = asObj(JSON.parse(stdout.slice(a, b + 1))); if (v) return v } catch { /* 下一级 */ }
-  }
-  let last: Record<string, unknown> | null = null
-  for (const line of stdout.split('\n')) {
-    const l = line.trim()
-    if (!l.startsWith('{')) continue
-    try { const v = asObj(JSON.parse(l)); if (v) last = v } catch { /* 继续 */ }
-  }
-  return last
-}
-
-const ui = {
-  card: {
-    border: '1px solid rgba(127,127,127,.25)', borderRadius: 10, padding: '8px 12px',
-    fontSize: 13, lineHeight: 1.6, margin: '2px 0',
-    // 长 JSON 参数/返回值是无断点长串，必须给断行规则并兜底裁剪，否则撑破卡片右缘
-    overflow: 'hidden', minWidth: 0, overflowWrap: 'anywhere' as const,
-  },
-  badge: (err: boolean, running: boolean) => ({
-    display: 'inline-block', padding: '0 8px', borderRadius: 6, fontSize: 12, fontWeight: 600,
-    color: running ? '#b45309' : err ? '#dc2626' : '#16a34a',
-    background: running ? 'rgba(180,83,9,.1)' : err ? 'rgba(220,38,38,.1)' : 'rgba(22,163,74,.1)',
-  }),
-  // 值列 minmax(0,1fr)：允许收缩到容器内，配合 break-all 让长 JSON 值折行而非溢出
-  kv: { display: 'grid', gridTemplateColumns: 'auto minmax(0, 1fr)', gap: '2px 14px', margin: '6px 0 0' },
-  k: { opacity: 0.6, whiteSpace: 'nowrap' as const },
-  v: { wordBreak: 'break-all' as const, minWidth: 0 },
-  raw: {
-    whiteSpace: 'pre-wrap' as const, overflowWrap: 'anywhere' as const,
-    fontFamily: 'ui-monospace, monospace', fontSize: 12,
-    background: 'rgba(127,127,127,.08)', borderRadius: 6, padding: 8, marginTop: 6,
-    maxHeight: 240, overflowY: 'auto' as const,
-  },
-}
-
-const FIELD_ORDER: Record<string, string[]> = {
-  forecast: ['task_id', 'status', 'result_content'],
-  regress: ['task_id', 'status', 'result_content'],
-  classify: ['task_id', 'status', 'result_content'],
-  health: ['status'],
-  check: ['allowed', 'api_key_permission', 'route_permission'],
-}
-
-/** 预测类任务优先露 任务ID/状态/结果，其余保持服务端顺序。 */
-function orderedEntries(obj: Record<string, unknown>, command?: unknown): Array<[string, unknown]> {
-  const all = Object.entries(obj)
-  const pref = FIELD_ORDER[String(command ?? '')]
-  if (!pref) return all
-  const rank = (k: string) => (pref.indexOf(k) >= 0 ? pref.indexOf(k) : 999)
-  return [...all].sort((a, b) => rank(a[0]) - rank(b[0]))
-}
-
-export function LimixToolCard({ block, inspect, cwd }: Props): JSX.Element {
+export function LimixToolCard({ callId, block, inspect, cwd, openFile }: Props): JSX.Element {
   const settled = !!block && 'kind' in block
   const [showRaw, setShowRaw] = useState(false)
-  const [kvExpanded, setKvExpanded] = useState(false)
+  const [showMetrics, setShowMetrics] = useState(false)
+  const fullscreen = useCardFullscreen()
 
   // 与原样例库（现 TryRunBridge 一脉）同因：宿主截断冒泡中的 click，React 根级委托收不到；
   // 在卡片容器上挂原生监听器，data-lx 委托区分"展开原始输出"与"检视调用"
-  const rootRef = useRef<HTMLDivElement | null>(null)
+  const rootRef = useRef<HTMLElement | null>(null)
   const inspectRef = useRef(inspect)
   inspectRef.current = inspect
+  const openFileRef = useRef(openFile)
+  openFileRef.current = openFile
   useEffect(() => {
     const el = rootRef.current
     if (!el) return
@@ -148,7 +110,9 @@ export function LimixToolCard({ block, inspect, cwd }: Props): JSX.Element {
       const hit = (e.target as HTMLElement).closest?.('[data-lx]') as HTMLElement | null
       if (!hit || !el.contains(hit)) return
       if (hit.dataset.lx === 'raw') setShowRaw(s => !s)
+      else if (hit.dataset.lx === 'metrics') setShowMetrics(s => !s)
       else if (hit.dataset.lx === 'inspect') inspectRef.current?.()
+      else if (hit.dataset.lx === 'file' && hit.dataset.path) openFileRef.current?.(hit.dataset.path)
     }
     el.addEventListener('click', onNativeClick)
     return () => el.removeEventListener('click', onNativeClick)
@@ -168,15 +132,11 @@ export function LimixToolCard({ block, inspect, cwd }: Props): JSX.Element {
     () => (block?.content ?? []).filter(c => c.type === 'text' && c.text).map(c => c.text).join('\n'),
     [block],
   )
-  const parsed = useMemo(() => parseCliJson(text), [text])
-  // limix-tool 的规范值不抛错（exitCode 非零也返回），isError 恒 false；
-  // 以"stdout 空 + stderr 有内容"启发式识别 CLI 失败（argparse 报错等）
-  const cliFailed = useMemo(() => {
-    if (!settled) return false
-    if (block?.isError) return true
-    const [stdout, stderr] = text.split('\n[stderr]\n')
-    return !stdout?.trim() && !!stderr?.trim()
-  }, [settled, block, text])
+  const result = useMemo(() => parseToolResult(text), [text])
+  const parsed = result.data
+  const cliFailed = settled && (block?.isError === true || result.failed)
+  const status = resultState(settled, cliFailed, parsed)
+  const metrics = metricEntries(parsed)
 
   // memo 化保证引用稳定——argList 进了 chartInfo 的依赖数组，
   // 每渲染新建数组会打穿 useMemo 导致取数 effect 无限重跑
@@ -208,22 +168,23 @@ export function LimixToolCard({ block, inspect, cwd }: Props): JSX.Element {
     if (!settled || block?.isError) return null
     if (args.command !== 'forecast' && args.command !== 'download') return null
     if (!savedCsv) return null
-    return { saved: savedCsv, train: flagValue('--train'), target: flagValue('--target') }
+    return { saved: savedCsv, train: flagValue('--train'), target: flagValue('--target'),
+      truth: flagValue('--truth'), date: flagValue('--date') }
   }, [settled, block, args, savedCsv, flagValue])
 
   // ── 分类/回归结果视图：混淆矩阵 / 预测vs真实散点 ──
-  // 两者都需要真值，而真值的位置取决于任务类型（平台结果文件契约）：
+  // 显式 --truth 优先于结果中的目标列；未提供时再按平台结果文件契约回取：
   //   回归 → 结果文件保留原预测数据列，真值同表，单次取数
   //   分类 → 结果文件只留 样本ID + pred_probs_N + pred_label，真值被丢弃，
   //          必须回取 --predict 输入文件并按行序对齐（平台默认对齐口径亦是行序）
-  // 故此处只要求 --target 必备；--predict 缺席时回归仍可成图、分类则降级无图。
+  // --target 必备，所有真值均按行序与预测对齐。
   const evalInfo = useMemo(() => {
     if (!settled || block?.isError || cliFailed) return null
     if (args.command !== 'classify' && args.command !== 'regress') return null
     if (!savedCsv) return null
     const target = flagValue('--target')
     if (!target) return null
-    return { kind: args.command, saved: savedCsv, target, predict: flagValue('--predict') }
+    return { kind: args.command, saved: savedCsv, target, truth: flagValue('--truth'), predict: flagValue('--predict') }
   }, [settled, block, cliFailed, args, savedCsv, flagValue])
 
   const [evalView, setEvalView] = useState<EvalView | null>(null)
@@ -235,9 +196,9 @@ export function LimixToolCard({ block, inspect, cwd }: Props): JSX.Element {
         const resultText = await fetchCsv(evalInfo.saved)
         const pred = pickPredLabel(resultText)
         if (!pred) return
-        // 真值优先在结果文件里找（回归路径）；找不到再回取预测输入文件（分类路径）
-        let truth = pickColumn(resultText, evalInfo.target)
-        if (!truth && evalInfo.predict) {
+        // 独立真值优先；未提供时才从结果或预测输入文件取真值。
+        let truth = evalInfo.truth ? pickColumn(await fetchCsv(evalInfo.truth), evalInfo.target) : pickColumn(resultText, evalInfo.target)
+        if (!evalInfo.truth && !truth && evalInfo.predict) {
           truth = pickColumn(await fetchCsv(evalInfo.predict), evalInfo.target)
         }
         // 无真值不是异常：预测集本就可以不带标签（纯推理场景），此时静默无图
@@ -257,7 +218,7 @@ export function LimixToolCard({ block, inspect, cwd }: Props): JSX.Element {
     let alive = true
     ;(async () => {
       try {
-        const series = parseForecastCsv(await fetchCsv(chartInfo.saved))
+        const series = parseForecastCsv(await fetchCsv(chartInfo.saved), chartInfo.target, chartInfo.date)
         if (!series) return
         // 历史尾部（可选增强）：取预测长度的 3 倍、至多 120 点；失败不影响预测段
         let hist: number[] = []
@@ -266,13 +227,18 @@ export function LimixToolCard({ block, inspect, cwd }: Props): JSX.Element {
         if (chartInfo.train && colTarget) {
           try {
             const tail = parseTrainTail(
-              await fetchCsv(chartInfo.train), colTarget, Math.min(3 * series.pred.length, 120))
+              await fetchCsv(chartInfo.train), colTarget, Math.min(3 * series.pred.length, 120), chartInfo.date)
             if (tail) { hist = tail.values; startLabel = tail.dates[0] }
           } catch { /* 历史段缺席可接受 */ }
         }
+        let truth: number[] | undefined
+        if (chartInfo.truth && colTarget && chartInfo.date) {
+          try { truth = parseForecastTruth(await fetchCsv(chartInfo.truth), colTarget, chartInfo.date, series.dates) }
+          catch { /* 无法读取真值不影响展示预测 */ }
+        }
         if (!alive) return
         setChart({
-          hist, pred: series.pred, p10: series.p10, p90: series.p90,
+          hist, pred: series.pred, p10: series.p10, p90: series.p90, truth,
           target: series.target,
           startLabel: startLabel ?? series.dates[0],
           endLabel: series.dates[series.dates.length - 1],
@@ -282,56 +248,83 @@ export function LimixToolCard({ block, inspect, cwd }: Props): JSX.Element {
     return () => { alive = false }
   }, [chartInfo])
 
+  const command = typeof args.command === 'string' ? args.command : ''
+  const benchmark = command === 'benchmark' && parsed?.kind === 'benchmark' && Array.isArray(parsed.datasets) && Array.isArray(parsed.runs) ? parsed : null
+  const explanation = command === 'explain' && !cliFailed ? parsed?.explanation : null
+  const target = explanation?.target_label ?? flagValue('--target')
+  const rows = parsed?.result_content?.rows ?? parsed?.rows
+  const sampleCount = parsed?.metrics?.n
+  const help = argList.some(arg => arg === '--help' || arg === '-h')
+  const prediction = !help && ['regress', 'classify', 'forecast'].includes(command)
+  const title = help ? '参数说明' : explanation && explanation.mode !== 'local' ? '因果关系探索' : COMMAND_LABELS[command] ?? '工具结果'
+  const file = typeof parsed?.saved_to === 'string' ? parsed.saved_to : null
+  const errorMessage = typeof result.error?.error === 'string' ? result.error.error : typeof result.error?.error_message === 'string' ? result.error.error_message : '请展开调用详情，查看失败原因。'
+  const hint = typeof result.error?.hint === 'string' ? result.error.hint : ''
+  const detailsId = `lx-result-details-${String(callId).replace(/[^a-zA-Z0-9_-]/g, '-')}`
+  const metricsId = `${detailsId}-metrics`
+
   return (
-    <div style={ui.card} ref={rootRef}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-        <span style={{ fontWeight: 700 }}>LimiX 开放平台</span>
-        <span style={ui.badge(cliFailed, !settled)}>
-          {!settled ? '运行中…' : cliFailed ? '失败' : '完成'}
-        </span>
-        <code style={{
-          fontSize: 12, opacity: 0.75,
-          flex: '1 1 auto', minWidth: 0, wordBreak: 'break-all' as const,
-        }}>{cmdLine}</code>
-        {inspect && (
-          <span data-lx="inspect" role="button"
-            style={{ fontSize: 12, opacity: 0.55, cursor: 'pointer', marginLeft: 'auto' }}>
-            检视调用 ↗
-          </span>
-        )}
+    <div className="lx-card-host" ref={fullscreen.hostRef}>
+    <dialog className="lx-fullscreen-dialog" ref={fullscreen.dialogRef} role={fullscreen.expanded ? 'dialog' : 'presentation'} aria-modal={fullscreen.expanded} aria-label={fullscreen.expanded ? `${title}${target ? ` · ${target}` : ''}` : undefined}>
+    <section className="lx-result" ref={rootRef} aria-label={`LimiX ${title}`}>
+      <style>{CSS + CARD_FULLSCREEN_CSS}</style>
+      <div className="lx-result-brand">LimiX</div>
+      <div className="lx-result-head">
+        <h3>{title}{target ? ` · ${target}` : ''}</h3>
+        <span className="lx-result-status" data-state={status.kind} role="status">{status.label}</span>
+        {(explanation || benchmark) && <button type="button" className="lx-fullscreen-button" data-lx-fullscreen aria-label={fullscreen.expanded ? '退出全屏查看' : benchmark ? '全屏查看模型比较' : '全屏查看解释'} title={fullscreen.expanded ? '退出全屏（Esc）' : benchmark ? '全屏查看模型比较' : '全屏查看解释'} aria-expanded={fullscreen.expanded}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={fullscreen.expanded ? 'M9 3v6H3M15 3v6h6M3 15h6v6M21 15h-6v6' : 'M8 3H3v5M16 3h5v5M3 16v5h5M21 16v5h-5'} /></svg>
+        </button>}
       </div>
-
-      {chart && <ForecastChart {...chart} />}
-      {evalView?.kind === 'cls' && <ConfusionMatrix data={evalView.data} />}
-      {evalView?.kind === 'reg' && <ScatterChart data={evalView.data} />}
-
-      {settled && parsed && (
-        <div style={ui.kv}>
-          {orderedEntries(parsed, args.command).slice(0, kvExpanded ? 20 : 3).map(([k, v]) => (
-            <span key={k} style={{ display: 'contents' }}>
-              <span style={ui.k}>{KEY_LABELS[k] ?? k}</span>
-              <span style={ui.v}>{typeof v === 'object' ? JSON.stringify(v) : String(v)}</span>
-            </span>
-          ))}
-        </div>
-      )}
-
-      {settled && text && (
-        <div>
-          <span
-            style={{ fontSize: 12, opacity: 0.6, cursor: 'pointer', userSelect: 'none' }}
-            data-lx="raw"
-          >
-            {Object.keys(parsed).length > 3 && (
-              <span onClick={() => setKvExpanded((v) => !v)} style={{ marginRight: 12 }}>
-                {kvExpanded ? '▲ 收起字段' : `▼ 还有 ${Object.keys(parsed).length - 3} 个字段`}
-              </span>
-            )}
-            {showRaw ? '▲ 收起原始输出' : '▼ 原始输出'}
-          </span>
-          {showRaw && <div style={ui.raw} data-lx="rawbox">{text}</div>}
-        </div>
-      )}
+      {fullscreen.error && <p className="lx-result-note" role="alert">{fullscreen.error}</p>}
+      <p className="lx-result-meta">
+        {typeof rows === 'number' && Number.isFinite(rows) ? `${rows} 行预测结果` : ''}
+        {typeof sampleCount === 'number' && Number.isFinite(sampleCount) ? `${typeof rows === 'number' ? ' · ' : ''}${sampleCount} 个样本参与评估` : ''}
+        {!prediction && command === 'health' && status.kind === 'done' ? 'LimiX 服务连接正常' : ''}
+      </p>
+      {benchmark && <BenchmarkView data={benchmark as any} />}
+      {cliFailed ? <p className="lx-result-note" role="alert">{errorMessage}{hint && <><br />{hint}</>}</p> : <>
+        {status.kind === 'warning' && !benchmark && <p className="lx-result-note" role="alert">本次解释存在限制，请结合返回说明使用结果。</p>}
+        {explanation && <ExplanationView data={explanation} />}
+        {command === 'explain' && !settled && <p className="lx-result-note">正在分析变量贡献与关系…</p>}
+        {metrics.length > 0 && <dl className="lx-result-metrics">
+          {metrics.map(metric => <div key={metric.key}><dt>{metric.label}</dt><dd>{metric.value}</dd></div>)}
+        </dl>}
+        {prediction && !settled && <p className="lx-result-note">正在提交数据并等待预测结果…</p>}
+        {prediction && settled && status.kind === 'done' && metrics.length === 0 && <p className="lx-result-note">预测已完成；本次未返回评估指标。</p>}
+        {chart && <ForecastChart {...chart} />}
+        {evalView?.kind === 'cls' && <ConfusionMatrix data={evalView.data} />}
+        {evalView?.kind === 'reg' && <ScatterChart data={evalView.data} />}
+      </>}
+      {(text || file || inspect) && <div className="lx-result-actions">
+        {benchmark && typeof parsed?.csv_path === 'string' && <a href={'/limix-ui/artifact?path=' + encodeURIComponent(parsed.csv_path)} download>下载比较 CSV ↓</a>}
+        {benchmark && file && <a href={'/limix-ui/artifact?path=' + encodeURIComponent(file)} download>下载比较 JSON ↓</a>}
+        {benchmark && typeof parsed?.report_path === 'string' && openFile && <button type="button" data-lx="file" data-path={parsed.report_path}>打开完整报告 ↗</button>}
+        {explanation && typeof parsed?.csv_path === 'string' && <a href={'/limix-ui/artifact?path=' + encodeURIComponent(parsed.csv_path)} download>下载{explanation.mode === 'local' ? '贡献' : '关系'} CSV ↓</a>}
+        {explanation && file && <a href={'/limix-ui/artifact?path=' + encodeURIComponent(file)} download>下载原始 JSON ↓</a>}
+        {savedCsv && <a href={'/limix-ui/csv?path=' + encodeURIComponent(savedCsv) + '&download=1'} download={savedCsv.split('/').pop()}>下载 CSV ↓</a>}
+        {file && (openFile
+          ? <button type="button" data-lx="file" data-path={file}>打开结果 · {file.split('/').pop()} ↗</button>
+          : <span className="lx-result-meta">已保存 · {file.split('/').pop()}</span>)}
+        {text && <button type="button" data-lx="raw" aria-expanded={showRaw} aria-controls={detailsId}>
+          {showRaw ? '收起详情 ↑' : '调用详情 ↓'}
+        </button>}
+        {metrics.length > 0 && <button type="button" data-lx="metrics" aria-expanded={showMetrics} aria-controls={metricsId}>
+          {showMetrics ? '收起指标说明 ↑' : '指标说明 ↓'}
+        </button>}
+        {showRaw && inspect && <button type="button" data-lx="inspect">检视调用 ↗</button>}
+      </div>}
+      {showMetrics && <dl id={metricsId} className="lx-result-note">
+        {metrics.map(metric => <div key={metric.key} style={{ marginTop: 8 }}>
+          <dt>{metric.label}</dt><dd style={{ margin: 0 }}>{metric.description}</dd>
+        </div>)}
+      </dl>}
+      {showRaw && <div id={detailsId}>
+        <p className="lx-result-command">{cmdLine}</p>
+        <pre className="lx-result-raw">{text}</pre>
+      </div>}
+    </section>
+    </dialog>
     </div>
   )
 }

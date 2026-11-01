@@ -1,8 +1,7 @@
 # dsh-limix-agent bundle patch
 #
-# One row carries both halves: the host half registers the `limix` tool plus the
-# read-only CSV route, and `dsh.client` ships the browser half (tool card +
-# 「分析过程」view) through the `./client` export.
+# 单行保留客户端扫描入口。工具、命令和文件路由由 preset 中的 tool 包注册。
+# dsh.client 通过 ./client 提供结果卡与「分析过程」视图。
 - insert:
     - id: limix-agent
       name: 'dsh-limix-agent'

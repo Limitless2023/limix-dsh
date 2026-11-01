@@ -1,7 +1,7 @@
 /**
  * [INPUT]: 无外部依赖；输入为 limix CLI 的结果/训练 CSV 文本
  * [OUTPUT]: 对外提供 parseForecastCsv（结果文件 → 预测/分位序列）、
- *           parseTrainTail（训练文件 → 历史尾部序列）两个纯函数，
+ *           parseTrainTail（历史尾部）、parseForecastTruth（日期对齐的本地真值），
  *           以及 splitCsvLine（供 eval-csv.ts 复用，CSV 切分只此一份实现）
  * [POS]: limix-ui 图表数据层的**时序分支**；分类/回归分支在 eval-csv.ts。
  *        列名契约来自 LimiX 平台结果文件实测
@@ -35,7 +35,7 @@ export function splitCsvLine(line: string): string[] {
 }
 
 function toNums(rows: string[][], idx: number): number[] {
-  return rows.map(r => Number(r[idx]))
+  return rows.map(r => r[idx]?.trim() ? Number(r[idx]) : NaN)
 }
 
 /**
@@ -45,25 +45,27 @@ function toNums(rows: string[][], idx: number): number[] {
  * 时序是 `pred_{目标列}`，分类与回归都是字面 `pred_label`。若不区分，
  * `limix download` 一个分类结果（标签为 0/1 等数值）会被画成一条按行序连点的
  * 折线，而分类结果的行序不含时间语义，那条线纯属无中生有。
- * 两条判据：① 出现 pred_probs_ 概率列 → 必为分类；② 预测列字面等于 pred_label
- * → 必为分类或回归。代价是目标列恰好取名 "label" 的时序会丢图——
- * 宁可少画一张，不可画错一张。
+ * 出现 pred_probs_ 概率列时拒绝作时序图。未指定时序目标时，
+ * pred_label 也按分类或回归拒绝；明确指定目标 label 的时序仍可绘制。
  */
-export function parseForecastCsv(text: string): ForecastSeries | null {
+export function parseForecastCsv(text: string, target?: string, dateColumn?: string): ForecastSeries | null {
   const lines = text.trim().split(/\r?\n/)
   if (lines.length < 2) return null
-  const header = splitCsvLine(lines[0])
+  const header = splitCsvLine(lines[0].replace(/^\uFEFF/, ''))
   if (header.some(h => h.startsWith('pred_probs_'))) return null
-  const predIdx = header.findIndex(h => h.startsWith('pred_') && !h.startsWith('pred_q'))
-  if (predIdx < 0 || header[predIdx] === 'pred_label') return null
-  const q10Idx = header.findIndex(h => h.startsWith('pred_q10_'))
-  const q90Idx = header.findIndex(h => h.startsWith('pred_q90_'))
+  const predIdx = target ? header.indexOf(`pred_${target}`) : header.findIndex(h => h.startsWith('pred_') && !h.startsWith('pred_q'))
+  if (predIdx < 0 || (!target && header[predIdx] === 'pred_label')) return null
+  const resolvedTarget = header[predIdx].slice('pred_'.length)
+  const q10Idx = header.indexOf(`pred_q10_${resolvedTarget}`)
+  const q90Idx = header.indexOf(`pred_q90_${resolvedTarget}`)
+  const dateIdx = dateColumn ? header.indexOf(dateColumn) : 0
+  if (dateIdx < 0) return null
   const rows = lines.slice(1).map(splitCsvLine).filter(r => r.length === header.length)
   if (!rows.length) return null
   const pred = toNums(rows, predIdx)
   if (pred.some(v => !Number.isFinite(v))) return null
   const series: ForecastSeries = {
-    dates: rows.map(r => r[0]),
+    dates: rows.map(r => r[dateIdx]),
     pred,
     target: header[predIdx].slice('pred_'.length),
   }
@@ -79,14 +81,27 @@ export function parseForecastCsv(text: string): ForecastSeries | null {
 }
 
 /** 从训练 CSV 取目标列尾部 n 点作图表历史段；列缺失/不可数值化返回 null */
-export function parseTrainTail(text: string, colTarget: string, n: number): { dates: string[]; values: number[] } | null {
+export function parseTrainTail(text: string, colTarget: string, n: number, dateColumn?: string): { dates: string[]; values: number[] } | null {
   const lines = text.trim().split(/\r?\n/)
   if (lines.length < 2) return null
-  const header = splitCsvLine(lines[0])
+  const header = splitCsvLine(lines[0].replace(/^\uFEFF/, ''))
   const idx = header.indexOf(colTarget)
   if (idx < 0) return null
   const rows = lines.slice(Math.max(1, lines.length - n)).map(splitCsvLine).filter(r => r.length === header.length)
   const values = toNums(rows, idx)
   if (!values.length || values.some(v => !Number.isFinite(v))) return null
-  return { dates: rows.map(r => r[0]), values }
+  const dateIdx = dateColumn ? header.indexOf(dateColumn) : 0
+  return { dates: rows.map(r => r[dateIdx] ?? ''), values }
+}
+
+/** 真值仅在日期顺序与预测完全一致时叠加，禁止错位比较。 */
+export function parseForecastTruth(text: string, target: string, date: string, dates: string[]): number[] | undefined {
+  const lines = text.trim().split(/\r?\n/)
+  const header = splitCsvLine(lines[0].replace(/^\uFEFF/, ''))
+  const targetIdx = header.indexOf(target), dateIdx = header.indexOf(date)
+  if (targetIdx < 0 || dateIdx < 0) return undefined
+  const rows = lines.slice(1).map(splitCsvLine)
+  if (rows.length !== dates.length || rows.some((r, i) => r[dateIdx]?.trim() !== dates[i]?.trim())) return undefined
+  const values = toNums(rows, targetIdx)
+  return values.every(Number.isFinite) ? values : undefined
 }

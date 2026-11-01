@@ -1,8 +1,8 @@
 {
   "name": "dsh-limix-tool",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
-  "description": "LimiX 工具宿主半：limix 工具 + /limix-ui/csv 只读路由（挂在 LimiX Agent preset 下）",
+  "description": "LimiX 工具：预测、解释、多模型比较与受控结果下载；限于 LimiX Agent preset",
   "type": "module",
   "main": "lib/index.js",
   "exports": {
@@ -16,7 +16,7 @@
   "files": [
     "lib/index.js",
     "cordis.patch.yml",
-    "assets/limix.py",
+    "assets/limix*.py",
     "assets/icon.png",
     "locale/*.json",
     "src",

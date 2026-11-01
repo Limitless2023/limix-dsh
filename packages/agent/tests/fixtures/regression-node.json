@@ -1,0 +1,14 @@
+{
+  "seq": 36,
+  "call": {
+    "name": "limix",
+    "argsRaw": "{\"command\":\"regress\"}"
+  },
+  "isError": false,
+  "content": [
+    {
+      "type": "text",
+      "text": "{\"task_id\": \"test-regression\", \"status\": \"finished\", \"is_ready\": true, \"result_content\": {\"rows\": 40, \"success\": true}, \"metrics\": {\"n\": 40, \"mae\": 12.6473, \"rmse\": 14.6387, \"r2\": 0.9992, \"mape\": 0.755}}\n[stderr]\n任务 test-regression: finished\n"
+    }
+  ]
+}

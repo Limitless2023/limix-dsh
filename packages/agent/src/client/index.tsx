@@ -3,11 +3,13 @@
  * [OUTPUT]: 浏览器半 Cordis 插件（inject + apply）：
  *           ① tool.call.toolview 以 key='limix' 认领自家工具的结果卡片
  *           ② conversation.view 挂「分析过程」标签（分轮 LimiX 调用管线）
- * [POS]: dsh-limix-agent 的浏览器入口。品牌层由 dsh-limix-cover 负责，案例库由分发范围裁掉
+ * [POS]: dsh-limix-agent 的浏览器入口。品牌层由 dsh-limix-cover 负责。
+ * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
 import { LimixToolCard } from './LimixToolCard.tsx'
 import { LimixPipelineView } from './LimixPipelineView.tsx'
 import { LimixTurnStack } from './LimixTurnStack.tsx'
+import { LimixWelcome } from './LimixWelcome.tsx'
 
 export const inject = ['slots', 'locale']
 
@@ -18,6 +20,10 @@ export function apply(ctx: any): void {
   }), 'limix-agent: dictionaries')
 
   const t = ctx.locale.bind('limix-agent')
+
+  // 输入区已有 session 与 inputActions；组件自行隔离空白 LimiX 会话。
+  ctx.slots.inject('conversation.input.dock', () =>
+    ctx.slots.register({ name: 'conversation.input.dock', id: 'limix-welcome', order: -10 }, LimixWelcome))
 
   // keyed 分派：注册自家 wire 工具名；未认领的工具仍走通用卡片
   ctx.slots.inject('tool.call.toolview', () =>

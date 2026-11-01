@@ -1,0 +1,247 @@
+{
+  "mode": "directed",
+  "target": "vis_3",
+  "labels": {
+    "red": "红光设置",
+    "green": "绿光设置",
+    "blue": "蓝光设置",
+    "current": "电流读数",
+    "pol_1": "偏振片 1 设置",
+    "pol_2": "偏振片 2 设置",
+    "angle_1": "角度 1 读数",
+    "angle_2": "角度 2 读数",
+    "l_11": "控制量 L11",
+    "l_12": "控制量 L12",
+    "l_21": "控制量 L21",
+    "l_22": "控制量 L22",
+    "l_31": "控制量 L31",
+    "l_32": "控制量 L32",
+    "ir_1": "红外 1 读数",
+    "ir_2": "红外 2 读数",
+    "ir_3": "红外 3 读数",
+    "vis_1": "可见光 1 读数",
+    "vis_2": "可见光 2 读数",
+    "vis_3": "可见光 3 读数"
+  },
+  "risks": [],
+  "nodes": [
+    "vis_3",
+    "red",
+    "green",
+    "blue",
+    "pol_1",
+    "pol_2",
+    "l_11",
+    "l_12",
+    "l_21",
+    "l_22",
+    "l_31",
+    "l_32",
+    "current",
+    "angle_1",
+    "angle_2",
+    "ir_1",
+    "vis_1",
+    "ir_2",
+    "vis_2",
+    "ir_3"
+  ],
+  "edges": [
+    {
+      "source": "blue",
+      "target": "vis_2",
+      "source_index": 3,
+      "target_index": 18,
+      "weight": 0.9940797448467819
+    },
+    {
+      "source": "red",
+      "target": "ir_2",
+      "source_index": 1,
+      "target_index": 17,
+      "weight": 0.9934793419164437
+    },
+    {
+      "source": "blue",
+      "target": "vis_3",
+      "source_index": 3,
+      "target_index": 0,
+      "weight": 0.9921748798524244
+    },
+    {
+      "source": "blue",
+      "target": "ir_1",
+      "source_index": 3,
+      "target_index": 15,
+      "weight": 0.9921518524976466
+    },
+    {
+      "source": "blue",
+      "target": "vis_1",
+      "source_index": 3,
+      "target_index": 16,
+      "weight": 0.9916150359815454
+    },
+    {
+      "source": "blue",
+      "target": "ir_2",
+      "source_index": 3,
+      "target_index": 17,
+      "weight": 0.9898798445533398
+    },
+    {
+      "source": "green",
+      "target": "ir_2",
+      "source_index": 2,
+      "target_index": 17,
+      "weight": 0.989511220530437
+    },
+    {
+      "source": "green",
+      "target": "ir_1",
+      "source_index": 2,
+      "target_index": 15,
+      "weight": 0.9884010693527497
+    },
+    {
+      "source": "red",
+      "target": "ir_1",
+      "source_index": 1,
+      "target_index": 15,
+      "weight": 0.986640817568773
+    },
+    {
+      "source": "green",
+      "target": "vis_2",
+      "source_index": 2,
+      "target_index": 18,
+      "weight": 0.9865620197557898
+    },
+    {
+      "source": "green",
+      "target": "current",
+      "source_index": 2,
+      "target_index": 12,
+      "weight": 0.9811638740650314
+    },
+    {
+      "source": "angle_1",
+      "target": "vis_3",
+      "source_index": 13,
+      "target_index": 0,
+      "weight": 0.9775166105118898
+    },
+    {
+      "source": "pol_2",
+      "target": "angle_2",
+      "source_index": 5,
+      "target_index": 14,
+      "weight": 0.9765033298699817
+    },
+    {
+      "source": "pol_1",
+      "target": "vis_3",
+      "source_index": 4,
+      "target_index": 0,
+      "weight": 0.9748911872004652
+    },
+    {
+      "source": "green",
+      "target": "vis_1",
+      "source_index": 2,
+      "target_index": 16,
+      "weight": 0.9718203265754153
+    },
+    {
+      "source": "blue",
+      "target": "ir_3",
+      "source_index": 3,
+      "target_index": 19,
+      "weight": 0.9716198363154711
+    },
+    {
+      "source": "green",
+      "target": "vis_3",
+      "source_index": 2,
+      "target_index": 0,
+      "weight": 0.9696930604560171
+    },
+    {
+      "source": "blue",
+      "target": "current",
+      "source_index": 3,
+      "target_index": 12,
+      "weight": 0.9691079052351849
+    },
+    {
+      "source": "green",
+      "target": "ir_3",
+      "source_index": 2,
+      "target_index": 19,
+      "weight": 0.9689568358041535
+    },
+    {
+      "source": "red",
+      "target": "ir_3",
+      "source_index": 1,
+      "target_index": 19,
+      "weight": 0.9686096552135692
+    },
+    {
+      "source": "red",
+      "target": "vis_2",
+      "source_index": 1,
+      "target_index": 18,
+      "weight": 0.9668814374715516
+    },
+    {
+      "source": "red",
+      "target": "current",
+      "source_index": 1,
+      "target_index": 12,
+      "weight": 0.9417917832173387
+    },
+    {
+      "source": "pol_1",
+      "target": "ir_3",
+      "source_index": 4,
+      "target_index": 19,
+      "weight": 0.9341953087073266
+    },
+    {
+      "source": "pol_1",
+      "target": "angle_1",
+      "source_index": 4,
+      "target_index": 13,
+      "weight": 0.9325990939258253
+    },
+    {
+      "source": "angle_1",
+      "target": "ir_3",
+      "source_index": 13,
+      "target_index": 19,
+      "weight": 0.931677702753277
+    },
+    {
+      "source": "red",
+      "target": "vis_1",
+      "source_index": 1,
+      "target_index": 16,
+      "weight": 0.9302070857356384
+    },
+    {
+      "source": "angle_1",
+      "target": "pol_1",
+      "source_index": 13,
+      "target_index": 4,
+      "weight": 0.9036707854534963
+    },
+    {
+      "source": "red",
+      "target": "vis_3",
+      "source_index": 1,
+      "target_index": 0,
+      "weight": 0.8972853740948007
+    }
+  ]
+}

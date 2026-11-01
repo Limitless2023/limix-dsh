@@ -1,7 +1,7 @@
 /**
- * [INPUT]: 依赖宿主服务 tools（工具注册表）与 webServer（HTTP 路由）；核心逻辑在 ./core/*
+ * [INPUT]: 依赖全局 webServer；注册工厂接收 preset 的 tools 上下文；核心逻辑在 ./core/*
  *          （guard 安全阀 / drivers 双驱动 / materialize 取数出口——自 Next.js 版逐字迁移）
- * [OUTPUT]: ① 注册 `datasource` 工具（list/inspect/query 子命令，preview/materialize 两模式）
+ * [OUTPUT]: ① 发布 limixDatasource.register；只在调用方上下文注册 datasource 工具
  *           ② 同源路由 /limix-datasource/config (GET/POST) 与 /limix-datasource/test (POST)——设置页后端
  * [POS]: LimiX Agent 的数据源接入插件 Node 半。安全三闸：guard 语句白名单 →
  *        驱动会话级只读+语句超时 → 用户侧只读账号约定。materialize 落 CSV 进会话工作目录，
@@ -19,7 +19,7 @@ import {
 } from "./core/store.ts";
 import { DATA_SOURCE_KINDS } from "./core/types.ts";
 
-export const inject = ["tools", "webServer"];
+export const inject = ["webServer"];
 
 /** 无 Date.now 顾虑（Node 半普通运行时）；文件名时间戳与原版口径一致 */
 function stamp(): string {
@@ -36,9 +36,7 @@ const DESCRIPTION = `连接客户数据库取数（数据的第二个来源，�
 工作流（铁律）：list → 对要用的每张表 inspect 看结构与注释 → **生成的 SQL 必须先在回复里用代码块展示给用户并用一句中文解释取的是什么（可见/可确认/可纠正），不要偷偷执行** → query mode=preview 自查（≤100行）→ 确认无误再 mode=materialize 落 CSV 进文件区 → 照常用 limix 工具预测。
 **多表 JOIN 拼成一张宽表是本工具的核心用法**（如电价+气象+预测按省份和时间拼宽表）。只允许单条只读查询，写操作会被安全阀拒绝。materialize 上限 50 万行。`;
 
-export function apply(ctx: any): void {
-  ensureConfigFile();
-
+export function registerDatasourceTool(ctx: any): void {
   // ── datasource 工具 ──────────────────────────────────────────────────────
   ctx.tools.register(defineTool({
     name: "datasource",
@@ -129,6 +127,13 @@ export function apply(ctx: any): void {
       }
     },
   }));
+
+}
+
+export function apply(ctx: any): void {
+  ensureConfigFile();
+  // 全局只发布工厂；由 preset 的工具插件传入其会话上下文。
+  ctx.provide("limixDatasource", { register: registerDatasourceTool });
 
   // ── 设置页后端：同源只读/写路由（与 /limix-ui/csv 同款手法） ─────────────
   const readBody = (req: any): Promise<string> => new Promise((res, rej) => {

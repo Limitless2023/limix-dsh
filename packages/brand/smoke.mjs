@@ -1,4 +1,9 @@
 /**
+ * [INPUT]: 品牌构建产物与宿主 React。
+ * [OUTPUT]: 品牌槽位注册与静态渲染检查。
+ * [POS]: 品牌包的本地烟测；不操作宿主设置。
+ * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
+ *
  * Smoke test for the browser half: run the bundle outside a browser with a
  * stubbed module loader and slot/locale services, then render each registered
  * occupant to static markup.
@@ -90,7 +95,7 @@ console.log(`sidebar mark: ${markHtml.slice(0, 130)}...`);
 check('sidebar mark honours the slot size', /height:24px/.test(markHtml));
 
 const nameHtml = renderToStaticMarkup(React.createElement(byName['sidebar.brand.name'], {}));
-console.log(`sidebar name: ${nameHtml}`);
+console.log(`sidebar name: ${nameHtml.slice(0, 130)}...`);
 check('sidebar name renders', nameHtml.includes('LimiX') && nameHtml.includes('limix-sidebar-name'));
 
 for (const { dispose } of [...styles, ...dictionaries]) {

@@ -1,3 +1,4 @@
-# 只在 LimiX Agent preset 下挂载（工具 + 设置页路由）。
-# profile 层不再挂行：与 dsh-limix-tool 同样的原因，避免同一包在两个层各注册一次。
-[]
+# 全局设置页与路由；不在全局注册 datasource 工具。
+- insert:
+    - id: limix-data-settings
+      name: dsh-limix-data

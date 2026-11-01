@@ -1,34 +1,33 @@
-# 给同事的安装说明（可以直接发给他的 agent）
+# 安装 LimiX Agent 0.3.0
 
-把下面整段粘给你的 DSH agent 即可。它会装两个包（品牌包可选），装完让你重启或刷新。
+从 [GitHub Releases](https://github.com/Limitless2023/limix-dsh/releases) 下载 0.3.0 的插件文件。请保留现有 profile，按顺序安装或更新：
 
----
+1. `dsh-limix-data-0.3.0.tgz`
+2. `dsh-limix-tool-0.3.0.tgz`
+3. `dsh-limix-agent-0.3.0.tgz`
+4. `dsh-limix-preset-0.3.0.tgz`
+5. 可选品牌外观：`dsh-limix-cover-0.3.0.tgz`
 
-请在这个 DSH profile 里安装 LimiX 插件，用 `plugin_manager` 工具的 `install_bundle`：
+在 DeepSeek Harness 的“插件 → 添加插件”中选择文件；也可让 DSH Agent 使用 `plugin_manager` 的 `install_bundle`，`target` 传 tarball 的绝对路径。升级时使用同名包的新版，无需手动删配置。
 
-1. `target` = `https://github.com/Limitless2023/limix-dsh/releases/download/v0.1.3/dsh-limix-agent-0.1.3.tgz`
-2. `target` = `https://github.com/Limitless2023/limix-dsh/releases/download/v0.1.3/dsh-limix-cover-0.2.3.tgz`
-3. （可选，要连自家库时才装）`target` = `https://github.com/Limitless2023/limix-dsh/releases/download/v0.1.3/dsh-limix-data-0.1.3.tgz`
-4. 以上动作都授权后，读返回里的 `application` 字段：`applied` 才算生效；`restart-required` 就提示我重启 DSH。
+安装器返回 `application: applied` 表示已生效；返回 `restart-required` 时重启 DeepSeek Harness。不要修改 app.asar。单独安装界面包不会提供预测工具。
 
-装完请检查并告诉我：
+## 凭据与 Python
 
-- 插件页里是否有 `LimiX Agent` 与 `LimiX 品牌封面` 两项、开关是否打开
-- 新会话里说一句「用 limix 做一次健康检查」，是否出现一张 limix 工具卡（这验证 `limix` 工具 + CLI 都通了）
-- 会话视图栏是否有「分析过程」标签
+确认 `python3` 可用，并沿用已有 LimiX 配置。可以使用 `LIMIX_API_KEY` 环境变量或 `~/.limix/config.json`。凭据只在本机配置，不要发到聊天或写入代码仓库。
 
-如果工具卡报“limix CLI 未找到”，说明包内 `assets/limix.py` 没跟上，用 `LIMIX_CLI_PATH` 指一个 `scripts/limix.py` 覆盖。
+预测和解释不需要额外 pip 包。要比较 XGBoost，请按 [benchmarks/README.md](benchmarks/README.md) 创建独立环境，通过比较命令的 `--python` 使用它；不向宿主 Python 安装额外依赖。
 
-还需要我先确认的两件事：
+## 安装后验证
 
-- `python3` 可用（`limix.py` 只用标准库，不需要 pip 装东西）
-- LimiX 凭据在 `~/.limix/config.json`（没有的话先跑一次 `python3 <包>/assets/limix.py config`，或设 `LIMIX_API_KEY`）
+1. 新建会话，选择 **LimiX Agent**，输入“用 LimiX 检查服务连接”。
+2. 确认出现服务连接卡片，以及“分析过程”页签。
+3. 输入 `/limix-predict`、`/limix-explain`、`/limix-compare`，确认命令存在。
+4. 用公开演示数据执行一次预测与解释，确认图表、全屏与下载可用。
+5. 新建标准模式会话，确认其首屏和工具组合保持标准模式。
 
-数据源那个包（`dsh-limix-data`）只有在你需要连自己的数据库时再装，它会额外拉 `pg` / `mysql2`。
+如提示 CLI 缺失，先检查 tool 包是否完整安装并与其他包版本一致。不要用历史 agent 包内的旧 CLI 覆盖新版 tool 包。
 
----
+## 本地开发
 
-## 为什么用 tarball 而不是 npm / github:
-
-- 三个包各自零构建、零私有 registry，内网也能装
-- `github:owner/repo` 只能装仓库根的那个包，而且要在装机时构建
+插件安装器可将 `packages/data`、`packages/tool`、`packages/agent`、`packages/preset`、`packages/brand` 作为目录安装。界面修改后重建 agent 包；宿主命令修改后重建 tool 包并重新加载插件。GitHub Release 使用构建后的 tarball，用户无需构建。

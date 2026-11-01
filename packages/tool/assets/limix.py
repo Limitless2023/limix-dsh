@@ -5,14 +5,20 @@
          凭证取自 CLI 参数 > 环境变量 LIMIX_API_KEY / LIMIX_BASE_URL > ~/.limix/config.json
 [OUTPUT]: 对外提供 limix 命令行工具，子命令：
           config / health / check / upload / classify / regress / forecast /
-          task / tasks / cancel / result / download / data / api / docs / doctor
-[POS]: limix-api skill 的执行核心（"手"）；SKILL.md 与 references/*.md 是教 agent 的"脑"。
-       零第三方依赖；docs 子命令读取 Mintlify Markdown，无需凭证。
+          task / tasks / cancel / result / download / data / api / docs / doctor / explain / benchmark
+[POS]: dsh-limix-tool 的 CLI；指标计算由同目录 limix_metrics 提供；解释由 limix_explain 编排。
+       本地真值校验失败使用统一错误出口。
+       预测与解释零第三方依赖；benchmark 的本地模型依赖独立 Python 环境；docs 子命令读取 Mintlify Markdown，无需凭证。
        文档 https://limix.mintlify.site/api/overview，2026-09-14 核对（54 主线 + 3 按需端点）。
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 """
 
+from limix_metrics import compute_metrics, inference_metrics_context
+from limix_explain import add_parser as add_explain_parser
+from limix_benchmark import add_parser as add_benchmark_parser
+
 import argparse
+import csv
 import json
 import os
 import re
@@ -286,77 +292,6 @@ def download_result(cfg, download_id, out_path):
 
 
 
-def _read_csv_rows(path):
-    import csv
-    with open(path, newline="", encoding="utf-8-sig") as f:
-        return list(csv.DictReader(f))
-
-
-def compute_metrics(kind, predict_path, target, result_path):
-    """结果 CSV 落地后顺带算指标：卡片和报告都需要它，算不出来就返回 None，绝不影响主流程。"""
-    try:
-        if not predict_path or not target or not result_path:
-            return None
-        truth = _read_csv_rows(predict_path)
-        preds = _read_csv_rows(result_path)
-        if not truth or not preds:
-            return None
-        cols = list(preds[0].keys())
-        low = {c.lower(): c for c in cols}
-        pred_col = low.get(target.lower())
-        if pred_col is None:
-            for cand in ("pred_label", "prediction", "predict", "y_pred", "pred", "value", "forecast"):
-                if cand in low:
-                    pred_col = low[cand]
-                    break
-        if pred_col is None:
-            for c in cols:
-                if c.lower().startswith(target.lower()):
-                    pred_col = c
-                    break
-        if pred_col is None:
-            return None
-
-        n = min(len(truth), len(preds))
-        if kind == "classification":
-            hit = 0
-            for i in range(n):
-                a, b = truth[i].get(target), preds[i].get(pred_col)
-                if a is None or b is None:
-                    continue
-                if str(a).strip() == str(b).strip():
-                    hit += 1
-            return {"accuracy": round(hit / n, 4), "n": n}
-
-        pairs = []
-        for i in range(n):
-            try:
-                pairs.append((float(truth[i][target]), float(preds[i][pred_col])))
-            except (KeyError, TypeError, ValueError):
-                continue
-        if len(pairs) < 2:
-            return None
-        m = len(pairs)
-        ys = [a for a, _ in pairs]
-        errs = [a - b for a, b in pairs]
-        mean = sum(ys) / m
-        sst = sum((a - mean) ** 2 for a in ys)
-        sse = sum(e * e for e in errs)
-        out = {
-            "n": m,
-            "mae": round(sum(abs(e) for e in errs) / m, 4),
-            "rmse": round((sse / m) ** 0.5, 4),
-        }
-        if sst:
-            out["r2"] = round(1 - sse / sst, 4)
-        mapes = [abs((a - b) / a) for a, b in pairs if a != 0]
-        if mapes:
-            out["mape"] = round(sum(mapes) / len(mapes) * 100, 3)
-        return out
-    except Exception:
-        return None
-
-
 def run_inference(cfg, kind, payload, sync, no_wait, out_path, wait_seconds, metrics_ctx=None):
     """
     预测统一编排：同步 predict 或 异步 tasks+轮询；成功后可选下载结果。
@@ -387,14 +322,14 @@ def run_inference(cfg, kind, payload, sync, no_wait, out_path, wait_seconds, met
     metrics = None
     if out_path:
         result["saved_to"] = download_result(cfg, data["result_version_id"], out_path)
-        metrics = compute_metrics(kind, ctxm.get("predict_path"), ctxm.get("target"), result["saved_to"])
+        metrics = compute_metrics(kind, ctxm.get("predict_path"), ctxm.get("target"), result["saved_to"], ctxm.get("date"))
     else:
         log(f"结果版本 {data['result_version_id']}（用 download 子命令可取 CSV）")
         # 没要输出文件时也落一份临时 CSV 算指标，算完即删：指标不能取决于用户是否传 -o
         try:
             with tempfile.TemporaryDirectory() as tmpdir:
                 tmp_csv = download_result(cfg, data["result_version_id"], f"{tmpdir}/result.csv")
-                metrics = compute_metrics(kind, ctxm.get("predict_path"), ctxm.get("target"), tmp_csv)
+                metrics = compute_metrics(kind, ctxm.get("predict_path"), ctxm.get("target"), tmp_csv, ctxm.get("date"))
         except Exception:
             metrics = None
     if metrics:
@@ -549,7 +484,15 @@ def cmd_upload(cfg, args):
     emit(upload_file(cfg, args.file, args.sheet, args.encoding, args.delimiter))
 
 
+def local_metrics_context(args):
+    try:
+        return inference_metrics_context(args)
+    except (OSError, ValueError, csv.Error) as exc:
+        die(f"无法读取评估真实值：{exc}", exit_code=2)
+
+
 def cmd_classify(cfg, args):
+    metrics_ctx = local_metrics_context(args)
     if args.oof_search and not args.task_name:
         die("--oof-search 必须同时传 --task-name（服务端按 client_id+task_name 缓存阈值）", exit_code=2)
     if args.oof_search and args.threshold is not None:
@@ -566,10 +509,11 @@ def cmd_classify(cfg, args):
         "timeout_seconds": args.timeout,
     }
     run_inference(cfg, "classification", payload, args.sync, args.no_wait, args.output, args.timeout,
-                  {"predict_path": args.predict, "target": args.target})
+                  metrics_ctx)
 
 
 def cmd_regress(cfg, args):
+    metrics_ctx = local_metrics_context(args)
     payload = {
         "train_data_version_id": resolve_data_ref(cfg, args.train, "训练集"),
         "predict_data_version_id": resolve_data_ref(cfg, args.predict, "预测集"),
@@ -581,10 +525,11 @@ def cmd_regress(cfg, args):
         "timeout_seconds": args.timeout,
     }
     run_inference(cfg, "regression", payload, args.sync, args.no_wait, args.output, args.timeout,
-                  {"predict_path": args.predict, "target": args.target})
+                  metrics_ctx)
 
 
 def cmd_forecast(cfg, args):
+    metrics_ctx = local_metrics_context(args)
     if not args.target:
         die("时序预测必须指定 --target（col_target 目标列名）", exit_code=2)
     covariates = [c.strip() for c in args.covariates.split(",")] if args.covariates else None
@@ -609,7 +554,7 @@ def cmd_forecast(cfg, args):
         "timeout_seconds": args.timeout,
     }
     run_inference(cfg, "timeseries", payload, args.sync, args.no_wait, args.output, args.timeout,
-                  {"predict_path": getattr(args, "predict", None), "target": args.target})
+                  metrics_ctx)
 
 
 def cmd_task(cfg, args):
@@ -685,6 +630,7 @@ def add_common_infer_args(p, default_target):
     p.add_argument("--no-wait", action="store_true", help="异步提交后立即返回 task_id，不轮询")
     p.add_argument("--timeout", type=int, default=DEFAULT_WAIT, help="任务超时秒数，同时作为轮询等待上限（默认 1800）")
     p.add_argument("-o", "--output", default=None, help="成功后把结果 CSV 下载到该路径")
+    p.add_argument("--truth", default=None, help="仅供本地评估的真实值 CSV，不上传、不参与预测")
 
 
 def build_parser():
@@ -803,6 +749,8 @@ def build_parser():
     p.add_argument("-o", "--output", default=None, help="按文件流下载并保存（下载类端点用）")
     p.set_defaults(fn=cmd_api)
 
+    add_explain_parser(sub, sys.modules[__name__])
+    add_benchmark_parser(sub, sys.modules[__name__])
     return ap
 
 
@@ -811,7 +759,7 @@ def main():
     argv = sys.argv[1:]
     known_cmds = {
         "config", "health", "check", "upload", "classify", "regress", "forecast",
-        "task", "tasks", "cancel", "result", "download", "data", "api", "docs", "doctor",
+        "task", "tasks", "cancel", "result", "download", "data", "api", "docs", "doctor", "explain", "benchmark",
     }
     cmd_idx = next((i for i, a in enumerate(argv) if a in known_cmds), None)
     if cmd_idx is not None and argv[cmd_idx] != "config":

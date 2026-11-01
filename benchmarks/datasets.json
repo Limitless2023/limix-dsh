@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "seed": 42,
+  "license": "CC BY 4.0",
+  "license_url": "https://creativecommons.org/licenses/by/4.0/",
+  "datasets": [
+    {
+      "id": "concrete", "name": "混凝土抗压强度", "task_type": "regression", "target": "strength_mpa", "unit": "MPa",
+      "source_url": "https://archive.ics.uci.edu/dataset/165/concrete+compressive+strength",
+      "download_url": "https://archive.ics.uci.edu/static/public/165/concrete+compressive+strength.zip",
+      "raw_sha256": "dad85d14de8aee4e07479daa774e6b569a313715b71a3b92c95a07cf91c2c9a7", "expected_rows": 1030,
+      "citation": "Yeh, I. (1998). Concrete Compressive Strength. UCI. DOI: 10.24432/C5PK67.",
+      "business": "试验室用配合比和养护龄期预估抗压强度，筛选值得做实体试验的混凝土配方。",
+      "prompt": "帮我预测这批混凝土的抗压强度，看看误差有多大，再解释前 10 个样本受哪些因素影响。",
+      "fields": {"cement":"水泥 (kg/m³)","slag":"高炉矿渣 (kg/m³)","fly_ash":"粉煤灰 (kg/m³)","water":"水 (kg/m³)","superplasticizer":"减水剂 (kg/m³)","coarse_aggregate":"粗骨料 (kg/m³)","fine_aggregate":"细骨料 (kg/m³)","age_days":"养护龄期 (天)","strength_mpa":"抗压强度"},
+      "boundary": "观测实验数据的预测归因，不等于改变某一配料后的因果收益。"
+    },
+    {
+      "id": "wine_quality", "name": "红葡萄酒质量分级", "task_type": "classification", "target": "quality_pass", "unit": "",
+      "source_url": "https://archive.ics.uci.edu/dataset/186/wine+quality",
+      "download_url": "https://archive.ics.uci.edu/static/public/186/wine+quality.zip",
+      "raw_sha256": "3ed56667f4b828242bd732d7d1dd7f2861e54432239d7fa63877014cbb0304d4", "expected_rows": 1599,
+      "citation": "Cortez, P., Cerdeira, A., Almeida, F., Matos, T., & Reis, J. (2009). Wine Quality. UCI. DOI: 10.24432/C56S3T.",
+      "business": "酒厂用理化检测初筛需要优先复核的批次；演示将感官评分 ≥6 定义为 1，低于 6 定义为 0。这个阈值是演示定义，不是行业合格标准。",
+      "prompt": "根据理化检测结果预测这批红葡萄酒的质量等级，评估分类效果，再解释前 10 个样本的判断依据。",
+      "fields": {"fixed_acidity":"固定酸度","volatile_acidity":"挥发酸度","citric_acid":"柠檬酸","residual_sugar":"残糖","chlorides":"氯化物","free_sulfur_dioxide":"游离二氧化硫","total_sulfur_dioxide":"总二氧化硫","density":"密度","pH":"pH","sulphates":"硫酸盐","alcohol":"酒精度","quality_pass":"质量等级"},
+      "boundary": "原始 quality 分数仅用于生成目标，不进入任何模型特征；只使用红葡萄酒子集。"
+    },
+    {
+      "id": "energy_efficiency", "name": "建筑采暖负荷", "task_type": "regression", "target": "heating_load", "unit": "",
+      "source_url": "https://archive.ics.uci.edu/dataset/242/energy+efficiency",
+      "download_url": "https://archive.ics.uci.edu/static/public/242/energy+efficiency.zip",
+      "raw_sha256": "499441eee27929a4b00417f58fd8c63c9cc14b8a71520cd0dd27fcb626738351", "expected_rows": 768,
+      "citation": "Tsanas, A. & Xifara, A. (2012). Energy Efficiency. UCI. DOI: 10.24432/C51307.",
+      "business": "设计阶段根据建筑几何参数、朝向和玻璃面积预估采暖负荷；数据来自建筑仿真，不是实际电表测量。",
+      "prompt": "帮我预测这些建筑方案的采暖负荷，评估预测误差，再用热力图解释全部测试方案的影响因素。",
+      "fields": {"relative_compactness":"相对紧凑度","surface_area":"表面积","wall_area":"墙面积","roof_area":"屋顶面积","overall_height":"建筑高度","orientation":"朝向编码","glazing_area":"玻璃面积比例","glazing_distribution":"玻璃分布编码","heating_load":"采暖负荷"},
+      "boundary": "冷却负荷 Y2 完全排除；该演示衡量既有仿真设计空间内的留出预测，不代表新气候或新建筑类型。"
+    },
+    {
+      "id": "bike_daily", "name": "共享单车日需求", "task_type": "timeseries", "target": "cnt", "unit": "次",
+      "source_url": "https://archive.ics.uci.edu/dataset/275/bike+sharing+dataset",
+      "download_url": "https://archive.ics.uci.edu/static/public/275/bike+sharing+dataset.zip",
+      "raw_sha256": "b70182d0d0508e9abbb79306ce5c0cec34869000f8220175ac83d11dbe845401", "expected_rows": 731,
+      "citation": "Fanaee-T, H. (2013). Bike Sharing. UCI. DOI: 10.24432/C5W894.",
+      "business": "运营团队预测未来两周日租赁需求，用于排班和调度准备。",
+      "prompt": "预测未来两周每天的租车需求，和真实需求比较误差，再解释这些预测主要受什么影响。",
+      "fields": {"dteday":"日期","season":"季节编码","mnth":"月份","weekday":"星期编码","holiday":"是否节假日","workingday":"是否工作日","cnt":"日租赁次数"},
+      "boundary": "严格按日期留出最后 14 天；仅使用未来已知日历，不使用未来真实天气、casual 或 registered。",
+      "forecast": {"date":"dteday","context":90,"horizon":14,"covariates":["season","mnth","weekday","holiday","workingday"]}
+    }
+  ]
+}

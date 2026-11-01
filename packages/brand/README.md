@@ -4,7 +4,7 @@
 
 ```
 封面：  [ 小鱼图标 ] 探索未至之境 [预览版]   →   [ LimiX 三角标 ] LimiX 智能预测Agent [预览版]
-侧边栏：[ 小鱼 ] deepseek HARNESS           →   [ LimiX 三角标 ] LimiX
+侧边栏：[ 小鱼 ] deepseek HARNESS           →   [LimiX 官网原始完整标志]
 ```
 
 ## 它怎么做到的
@@ -45,6 +45,10 @@ entry」，priority 相同则保留注册顺序**，所以这里用 `priority: -
 
 同一个标还会出现在折叠护栏（`span.railMark`）里，复用同一个 occupant。
 
+宿主的 `brandIdentity` 和 `brandName` 固定为 24px 高。插件将包含
+`.limix-sidebar-name` 的这两个容器改为自动高度，让 32px Logo 完整显示。
+不修改原图，也不移除侧栏整体的溢出保护。
+
 ### 文案
 
 文案走客户端 locale 服务：插件注册自己的命名空间 `limix-cover`（zh + en），
@@ -60,8 +64,10 @@ entry」，priority 相同则保留注册顺序**，所以这里用 `priority: -
 | `src/client.js` | 浏览器半边源码（文案字典、样式、三个 slot 占用），要改就改这里 |
 | `src/index.js` | 宿主半边（空的 `apply`，给 Loader 一个宿主行） |
 | `locale/zh.json`、`locale/en.json` | 插件页显示用的标题/描述（不是运行时文案） |
-| `assets/limix-mark.png` | 标志图，构建时内联成 data URI |
-| `assets/limix-icon.png` | 插件页图标（256×256 透明底） |
+| `assets/limix-mark.png` | 官网原始图标，构建时内联成 data URI |
+| `assets/limix-logo.png` | 官网原始完整标志，供展开侧栏使用 |
+| `assets/SOURCES.md` | 官方文件地址与 SHA-256 校验值 |
+| `assets/limix-icon.png` | 官网原始图标，供插件列表使用 |
 | `build.mjs` | 把 `src/*` 和标志图合成 `lib/client.js` / `lib/index.js` |
 | `lib/` | 构建产物，插件实际加载的就是这里 |
 | `smoke.mjs` | 不装插件也能跑的自测（stub loader + 渲染成静态 HTML） |
@@ -80,15 +86,16 @@ entry」，priority 相同则保留注册顺序**，所以这里用 `priority: -
 
    `hero.badge` 设成 `''` 就不显示徽标。插件页里显示的名字/描述在 `locale/*.json`。
 
-2. 换图：替换 `assets/limix-mark.png`（透明底 PNG）；插件页图标换
-   `assets/limix-icon.png`。
+2. 品牌图只使用官方原始文件，禁止 AI 重绘或去纹理。来源与校验值见
+   `assets/SOURCES.md`。图标为 `assets/limix-mark.png` 和 `assets/limix-icon.png`；完整标志为 `assets/limix-logo.png`。
 3. 重新构建并自测：
 
    ```bash
    node build.mjs && node smoke.mjs
    ```
 
-4. 页面刷新一下（client 插件走 HMR 时会自己重载）。
+4. 完全退出并重新打开桌面应用，再核对原图纹理和边缘。当前桌面版的
+   Cmd+R 未重新加载品牌插件，不能据此判断构建已生效。
 
 ## 安装 / 卸载
 
@@ -102,6 +109,6 @@ entry」，priority 相同则保留注册顺序**，所以这里用 `priority: -
 
 - 隐藏原标题用的是结构性选择器（`fishHitbox` + `titleGroup` 这对相邻关系）。
   DSH 若重构 hero 结构，这段 CSS 要跟着调；失效表现是标题重复出现，不会白屏。
-- 侧边栏名字是纯文本、跟随主题色；标志本身是品牌蓝，亮/暗底都验过。
+- 侧边栏图形与字标均为透明底品牌蓝 PNG，字标保留官方字形。
 - 英文词条是按中文意译的（`LimiX Prediction Agent` / `Preview`），如需固定说法改
   `MESSAGES.en` 即可。

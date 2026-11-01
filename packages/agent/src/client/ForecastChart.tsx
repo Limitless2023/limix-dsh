@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 依赖 react（宿主 external）；纯展示组件，数据由调用方喂入
- * [OUTPUT]: 对外提供 ForecastChart 组件——纯 SVG 时序预测图（可选 truth 叠预测段真值线，案例回放场景用）：
+ * [OUTPUT]: ForecastChart，时序预测图；本地评估可叠加日期对齐的真值。
  *           历史尾部实线 + 预测虚线 + P10-P90 半透明区间带 + 首尾刻度
  * [POS]: limix-ui 的图表原子（对位 Next.js 版 TimeseriesChart 的零依赖形态；
  *        不引 echarts 是刻意取舍——bundle 体积与外部依赖面为零）
@@ -15,7 +15,7 @@ export interface ForecastChartData {
   /** 分位下界/上界（与 pred 等长；缺省不画区间带，零回归） */
   p10?: number[]
   p90?: number[]
-  /** 预测段真值（与 pred 等长；缺省不画——对话卡片实时场景本就无真值，案例回放场景有） */
+  /** 本地评估真值，与 pred 等长且日期已对齐。 */
   truth?: number[]
   /** 首/尾时间标签（可选，只标两端不标满轴） */
   startLabel?: string
@@ -63,6 +63,13 @@ export function ForecastChart({ hist, pred, p10, p90, truth, startLabel, endLabe
   const fmt = (v: number) => Math.abs(v) >= 1000 ? v.toFixed(0) : v.toPrecision(3)
 
   return (
+    <div style={{ marginTop: 12 }}>
+    <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', fontSize: 12, color: 'var(--dsw-alias-label-secondary)' }}>
+      {hist.length > 0 && <span>━ 历史</span>}
+      <span style={{ color: '#2563eb' }}>┄ 预测</span>
+      {!!truth?.length && <span>━ 实际</span>}
+      {hasBand && <span>▰ P10–P90 区间</span>}
+    </div>
     <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', maxWidth: W, display: 'block', marginTop: 8 }}
       role="img" aria-label={`${target ?? '目标'} 时序预测图`}>
       {/* y 轴两端刻度 */}
@@ -93,21 +100,7 @@ export function ForecastChart({ hist, pred, p10, p90, truth, startLabel, endLabe
       {predWithBridge.length > 1 && (
         <polyline points={toPoints(predWithBridge, predStart, n, min, max)} fill="none" stroke="#2563eb" strokeWidth="1.8" strokeDasharray="5,3" />
       )}
-      {/* 图例 */}
-      <g fontSize="10" fill="currentColor">
-        <line x1={PAD.left} y1={6} x2={PAD.left + 16} y2={6} stroke="currentColor" strokeWidth="1.5" opacity="0.65" />
-        <text x={PAD.left + 20} y={9} opacity="0.65">历史</text>
-        <line x1={PAD.left + 52} y1={6} x2={PAD.left + 68} y2={6} stroke="#2563eb" strokeWidth="1.8" strokeDasharray="5,3" />
-        <text x={PAD.left + 72} y={9} opacity="0.65">预测{target ? `（${target}）` : ''}</text>
-        {!!truth?.length && <>
-          <line x1={PAD.left + 130} y1={6} x2={PAD.left + 146} y2={6} stroke="currentColor" strokeWidth="1.3" opacity="0.45" />
-          <text x={PAD.left + 150} y={9} opacity="0.65">真值</text>
-        </>}
-        {hasBand && <>
-          <rect x={PAD.left + (truth?.length ? 186 : 120)} y={2} width={16} height={8} fill="#2563eb" opacity="0.13" />
-          <text x={PAD.left + (truth?.length ? 206 : 140)} y={9} opacity="0.65">P10–P90</text>
-        </>}
-      </g>
     </svg>
+    </div>
   )
 }

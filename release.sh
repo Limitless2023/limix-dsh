@@ -1,12 +1,9 @@
 #!/bin/sh
-# 打包三个包的 tarball 到 dist/，用于 GitHub Release。
+# [INPUT]: Node.js、npm 与已安装的构建依赖。
+# [OUTPUT]: 五个插件 tarball、版本清单和 SHA256 校验值。
+# [POS]: 发布入口；scripts/release.mjs 负责构建与完整性检查，不上传。
+# [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 # 用法: ./release.sh
-set -e
+set -eu
 cd "$(dirname "$0")"
-rm -rf dist && mkdir -p dist
-for pkg in agent data brand; do
-  [ -d "packages/$pkg" ] || continue
-  (cd "packages/$pkg" && pnpm pack --pack-destination "$OLDPWD/dist" >/dev/null)
-  echo "packed packages/$pkg"
-done
-ls -la dist
+exec node scripts/release.mjs

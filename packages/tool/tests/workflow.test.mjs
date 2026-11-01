@@ -1,0 +1,139 @@
+/**
+ * [INPUT]: node:test；预测命令与 CSV 读取边界。
+ * [OUTPUT]: 附件传递、取消、历史读取与越界回归验证。
+ * [POS]: tool 宿主契约测试，不调用生产 API。
+ * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
+ */
+import test from 'node:test'
+import assert from 'node:assert/strict'
+import { mkdtemp, mkdir, writeFile, symlink, unlink, rm, realpath, truncate } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { registerPredictCommand } from '../src/host/predict-command.js'
+import { createCsvAccess } from '../src/host/csv-access.js'
+import { registerExplainCommand } from '../src/host/explain-command.js'
+
+test('解释入口保留附件且只排入一条消息', () => {
+  let definition
+  const messages = []
+  registerExplainCommand({ commands: { register: d => { definition = d } }, systemPrompt: { section() {} } })
+  const file = { type: 'file', path: '/data/input.csv' }
+  definition.handler({ agent: { followup: m => messages.push(m) }, rawInput: '解释第一条', attachments: [file] })
+  assert.equal(definition.name, 'limix-explain')
+  assert.equal(messages.length, 1)
+  assert.equal(messages[0].content[0], file)
+  assert.match(messages[0].content[1].text, /解释第一条/)
+})
+
+test('解释下载只开放已登记 JSON/CSV，不因位于工作区而放行', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'limix-artifacts-'))
+  try {
+    const result = join(root, 'result.json'), secret = join(root, 'config.json'), html = join(root, 'report.html')
+    await writeFile(result, '{"task_status":"succeeded"}'); await writeFile(secret, '{"key":"private"}'); await writeFile(html, '<script/>')
+    const receipt = join(root, 'receipts.json')
+    const access = createCsvAccess([root], receipt, { extensions: ['.json', '.csv'], registeredOnly: true })
+    assert.equal(await access.resolve(result), null)
+    await access.remember([result, html], root)
+    assert.equal(await access.resolve(result), await realpath(result))
+    assert.equal(await access.resolve(secret), null)
+    assert.equal(await access.resolve(html), null)
+    assert.equal(await createCsvAccess([root], receipt).resolve(result), null)
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
+function command() {
+  let definition
+  registerPredictCommand({ commands: { register: d => { definition = d } }, systemPrompt: { section() {} } })
+  return definition
+}
+
+test('预测命令保留输入与已接纳附件，每次只排入一条消息', () => {
+  const messages = []
+  const file = Object.freeze({ type: 'file', path: '/data/with space.csv' })
+  const definition = command()
+  assert.equal(definition.input.attachments, true)
+  const result = definition.handler({ agent: { followup: m => messages.push(m) }, rawInput: '  预测 price  ', attachments: [file] })
+  assert.equal(result.kind, 'success')
+  assert.equal(messages.length, 1)
+  assert.equal(messages[0].role, 'user')
+  assert.equal(messages[0].content[0], file)
+  assert.match(messages[0].content[1].text, /预测 price$/)
+  assert.match(messages[0].id, /^[0-9a-f-]{36}$/)
+  assert.ok(Object.isFrozen(messages[0].content))
+})
+
+test('空命令进入引导；取消的命令不开始预测', () => {
+  const messages = []
+  const invocation = { agent: { followup: m => messages.push(m) }, rawInput: '' }
+  command().handler(invocation)
+  assert.match(messages[0].content[0].text, /明确需要的数据和预测目标/)
+  assert.throws(() => command().handler({ ...invocation, signal: AbortSignal.abort() }))
+  assert.equal(messages.length, 1)
+})
+
+test('仅已登记的外部 CSV 可读，重载可恢复；相邻文件与链接越界被拒绝', async () => {
+  const temp = await mkdtemp(join(tmpdir(), 'limix-csv-'))
+  try {
+    const root = join(temp, 'root'), outside = join(temp, 'outside')
+    await mkdir(root); await mkdir(outside)
+    const result = join(outside, 'result.csv'), secret = join(outside, 'private.csv')
+    await writeFile(result, 'pred_label\n1\n'); await writeFile(secret, 'secret\n2\n')
+    const receipt = join(temp, 'state', 'files.json')
+    const access = createCsvAccess([root], receipt)
+    assert.equal(await access.resolve(result), null)
+    await access.remember([result], outside)
+    const restored = createCsvAccess([root], receipt)
+    assert.equal(await restored.resolve(result), await realpath(result))
+    assert.equal(await restored.resolve(secret), null)
+    await symlink(secret, join(root, 'escape.csv'))
+    assert.equal(await restored.resolve(join(root, 'escape.csv')), null)
+    await unlink(result); await symlink(secret, result)
+    assert.equal(await restored.resolve(result), null)
+  } finally { await rm(temp, { recursive: true, force: true }) }
+})
+
+test('并发登记合并记录，超大文件与非 CSV 不公开', async () => {
+  const temp = await mkdtemp(join(tmpdir(), 'limix-csv-'))
+  try {
+    const root = join(temp, 'root'); await mkdir(root)
+    const files = ['a.csv', 'b.csv', 'large.csv', 'note.txt'].map(p => join(temp, p))
+    await Promise.all(files.map(p => writeFile(p, p.endsWith('large.csv') ? '0'.repeat(5_000_001) : 'x')))
+    const access = createCsvAccess([root], join(temp, 'files.json'))
+    await Promise.all(files.map(p => access.remember([p], temp)))
+    assert.equal(await access.resolve(files[0]), await realpath(files[0]))
+    assert.equal(await access.resolve(files[1]), await realpath(files[1]))
+    assert.equal(await access.resolve(files[2]), null)
+    assert.equal(await access.resolve(files[3]), null)
+  } finally { await rm(temp, { recursive: true, force: true }) }
+})
+
+test('模型比较命令保留附件、可取消且不自动扫描工作区', async () => {
+  const { registerBenchmarkCommand } = await import('../src/host/benchmark-command.js')
+  let definition
+  const messages = []
+  registerBenchmarkCommand({ commands: { register: d => { definition = d } }, systemPrompt: { section() {} } })
+  const file = { type: 'file', path: '/data/test.csv' }
+  definition.handler({ agent: { followup: m => messages.push(m) }, rawInput: '比较这份数据', attachments: [file] })
+  assert.equal(definition.name, 'limix-compare')
+  assert.equal(messages[0].content[0], file)
+  assert.match(messages[0].content[1].text, /比较这份数据/)
+  assert.throws(() => definition.handler({ signal: AbortSignal.abort(), rawInput: '' }))
+})
+
+
+test('已登记的大型时序原始 JSON 可下载，普通 CSV 与超限文件仍拒绝', async () => {
+  const temp = await mkdtemp(join(tmpdir(), 'limix-large-artifacts-'))
+  try {
+    const largeJson = join(temp, 'raw.json'), tooLarge = join(temp, 'oversized.json'), csv = join(temp, 'large.csv')
+    await Promise.all([largeJson, tooLarge, csv].map(file => writeFile(file, '{}')))
+    await truncate(largeJson, 10_000_000); await truncate(tooLarge, 50_000_001); await truncate(csv, 6_000_000)
+    const receipt = join(temp, 'receipt.json')
+    const access = createCsvAccess([temp], receipt, { extensions: ['.json', '.csv'], registeredOnly: true, maxBytes: 50_000_000 })
+    assert.equal(await access.resolve(largeJson), null)
+    await access.remember([largeJson, tooLarge, csv], temp)
+    assert.equal(await access.resolve(largeJson), await realpath(largeJson))
+    assert.equal(await access.resolve(tooLarge), null)
+    assert.equal(await createCsvAccess([temp], receipt).resolve(csv), null)
+    assert.throws(() => createCsvAccess([temp], receipt, { maxBytes: -1 }))
+  } finally { await rm(temp, { recursive: true, force: true }) }
+})

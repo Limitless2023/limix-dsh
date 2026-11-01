@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 依赖 react（宿主 external）与 ./eval-csv.ts 的 ConfusionData 类型（仅 import type）
- * [OUTPUT]: 对外提供 ConfusionMatrix 组件——纯 SVG 混淆矩阵热力图 + 逐类指标表
+ * [OUTPUT]: ConfusionMatrix，混淆矩阵与默认折叠的逐类指标表。
  * [POS]: limix-ui 的图表原子，分类任务对位 ForecastChart（时序）；
  *        与 ScatterChart（回归）并列，三者共用"零依赖纯 SVG"取舍
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
@@ -28,7 +28,7 @@ export function ConfusionMatrix({ data }: { data: ConfusionData }): JSX.Element 
   const LEFT = 78
   const TOP = 40
   const W = LEFT + k * cs + 14
-  // 底部只留刻度余量：图注不进 SVG（见下），故无须为文字预留宽度
+  // 类别明细放在 HTML 中，SVG 只保留矩阵与轴标签。
   const H = TOP + k * cs + 8
 
   // 行归一化着色：深浅表示"该真实类别中有多大比例被预测成了这一格"，
@@ -41,10 +41,7 @@ export function ConfusionMatrix({ data }: { data: ConfusionData }): JSX.Element 
     <div style={{ marginTop: 8 }}>
       <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 4 }}>
         混淆矩阵 · 共 {n} 个样本 · 准确率 <b>{pct(accuracy)}</b>
-        <span style={{ opacity: 0.75 }}>
-          （多数类基线 {pct(majorityBaseline)}——把所有样本都猜成最大类别能拿到的分数，
-          准确率须高过它才说明模型学到了东西）
-        </span>
+        <span> · 多数类基线 {pct(majorityBaseline)}</span>
       </div>
 
       <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', maxWidth: W, display: 'block' }}
@@ -86,13 +83,9 @@ export function ConfusionMatrix({ data }: { data: ConfusionData }): JSX.Element 
 
       </svg>
 
-      {/* 图注不放进 SVG：SVG 宽度由类别数决定（2 类时仅约 216px），
-          而这行字需要约 250px，放进去会被视框裁掉后半句（2026-08-21 实测踩到）。
-          放在 HTML 里既不受矩阵几何约束，窄容器下还能自动折行。 */}
-      <div style={{ fontSize: 10, opacity: 0.5, marginTop: 2 }}>
-        深浅按行归一 · 描边格为预测正确 · 对角线越亮越好
-      </div>
-
+      {/* 明细默认折叠，HTML 布局不受 SVG 类别数限制。 */}
+      <details style={{ marginTop: 10, fontSize: 12 }}>
+      <summary style={{ cursor: 'pointer', color: 'var(--dsw-alias-label-secondary)' }}>各类别表现</summary>
       <div style={{
         display: 'grid', gridTemplateColumns: 'auto repeat(4, minmax(0,1fr))',
         gap: '2px 12px', fontSize: 12, marginTop: 8,
@@ -112,10 +105,7 @@ export function ConfusionMatrix({ data }: { data: ConfusionData }): JSX.Element 
           </span>
         ))}
       </div>
-      <div style={{ fontSize: 11, opacity: 0.5, marginTop: 4, lineHeight: 1.5 }}>
-        精确率 = 判成这一类的样本里有多少判对了（少冤枉）；
-        召回率 = 这一类的真实样本里有多少被找了出来（少漏掉）；F1 = 两者的调和平均。
-      </div>
+      </details>
     </div>
   )
 }

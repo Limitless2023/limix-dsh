@@ -1,4 +1,9 @@
 /**
+ * [INPUT]: slots、locale、LimiX 官网原始图标和完整 Logo；文件未经修改。
+ * [OUTPUT]: 会话封面与侧栏品牌组件；侧栏容器随原图高度撑开。
+ * [POS]: 品牌层；不承载预测引导或改变模式。
+ * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
+ *
  * LimiX cover — browser half.
  *
  * One brand on two shipped surfaces:
@@ -20,12 +25,13 @@
  */
 
 const MARK = {
-  /** Hero mark height in px; the source PNG is 144x132. */
+  /** 封面图标高度；只等比缩放官方原图。 */
   heroHeight: 32,
   /** Edge used when the sidebar slot passes no size. */
   sidebarSize: 24,
   /** Filled in by build.mjs from assets/limix-mark.png. */
   dataUri: '__LIMIX_MARK_DATA_URI__',
+  logoUri: '__LIMIX_LOGO_DATA_URI__',
 };
 
 /** Own namespace: no shipped namespace is overwritten, and both locales ship. */
@@ -84,6 +90,11 @@ const STYLES = `
 	font-weight: 500;
 	line-height: 18px;
 }
+/* 展开态使用完整标志；折叠栏仍保留独立图标。 */
+[class*="brandMark"]:has(.limix-sidebar-mark) { display: none; }
+/* 宿主字标容器固定 24px，会裁掉 32px 原图；只放开本插件的容器高度。 */
+[class*="brandIdentity"]:has(.limix-sidebar-name),
+[class*="brandName"]:has(.limix-sidebar-name) { height: auto; }
 .limix-sidebar-name {
 	color: inherit;
 	white-space: nowrap;
@@ -129,9 +140,10 @@ window.__ModuleLoader__.load({
 			return markImage('limix-sidebar-mark', size);
 		}
 
-		/** Sidebar name, beside the mark in the expanded brand row. */
+		/** 展开态完整官方标志；同一行的独立图标由样式隐藏。 */
 		function LimixSidebarName() {
-			return h('span', { className: 'limix-sidebar-name' }, t('sidebar.name'));
+			return h('img', { className: 'limix-sidebar-name', src: MARK.logoUri,
+				alt: t('sidebar.name'), draggable: false, style: { height: 32, width: 100, objectFit: 'contain', display: 'block' } });
 		}
 
 		return {

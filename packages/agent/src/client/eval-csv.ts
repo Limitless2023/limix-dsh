@@ -57,8 +57,9 @@ const MAX_POINTS = 1500
 function rows(text: string): { header: string[]; body: string[][] } | null {
   const lines = text.trim().split(/\r?\n/)
   if (lines.length < 2) return null
-  const header = splitCsvLine(lines[0])
-  const body = lines.slice(1).map(splitCsvLine).filter(r => r.length === header.length)
+  const header = splitCsvLine(lines[0].replace(/^\uFEFF/, ''))
+  const body = lines.slice(1).map(splitCsvLine)
+  if (body.some(r => r.length !== header.length)) return null
   return body.length ? { header, body } : null
 }
 
@@ -147,6 +148,7 @@ export function buildScatter(truthRaw: string[], predRaw: string[]): ScatterData
   if (truthRaw.length !== predRaw.length || !truthRaw.length) return null
   const all: Array<{ t: number; p: number }> = []
   for (let i = 0; i < truthRaw.length; i++) {
+    if (!norm(truthRaw[i]) || !norm(predRaw[i])) continue
     const t = Number(norm(truthRaw[i]))
     const p = Number(norm(predRaw[i]))
     if (Number.isFinite(t) && Number.isFinite(p)) all.push({ t, p })

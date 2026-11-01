@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 依赖 react（宿主 external）与 ./eval-csv.ts 的 ScatterData 类型（仅 import type）
- * [OUTPUT]: 对外提供 ScatterChart 组件——纯 SVG 预测 vs 真实散点图 + y=x 理想线 + 误差指标
+ * [OUTPUT]: ScatterChart，预测与真实值散点图；指标与说明由结果卡统一展示。
  * [POS]: limix-ui 的图表原子，回归任务对位 ForecastChart（时序）；
  *        与 ConfusionMatrix（分类）并列，三者共用"零依赖纯 SVG"取舍
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
@@ -13,11 +13,10 @@ const H = 300
 const PAD = { top: 14, right: 12, bottom: 34, left: 52 }
 
 export function ScatterChart({ data }: { data: ScatterData }): JSX.Element | null {
-  const { points, n, shown, mae, rmse, r2, min, max } = data
+  const { points, n, shown, min, max } = data
   if (!points.length) return null
 
-  // 两轴同尺度是本图的要害：只有正方形坐标系里，y=x 才是 45° 线，
-  // "点贴不贴线"才等价于"预测准不准"。分轴自适应会把偏差拉平成假象。
+  // 两轴共用数值范围，避免各自缩放后掩盖偏差；虚线表示预测等于真实。
   const span = max - min || 1
   const lo = min - span * 0.05
   const hi = max + span * 0.05
@@ -67,19 +66,6 @@ export function ScatterChart({ data }: { data: ScatterData }): JSX.Element | nul
         </g>
       </svg>
 
-      <div style={{ display: 'flex', gap: 18, fontSize: 12, marginTop: 6, flexWrap: 'wrap' }}>
-        <span><span style={{ opacity: 0.55 }}>MAE </span><b>{fmt(mae)}</b></span>
-        <span><span style={{ opacity: 0.55 }}>RMSE </span><b>{fmt(rmse)}</b></span>
-        <span>
-          <span style={{ opacity: 0.55 }}>R² </span>
-          <b>{r2 === null ? '—' : r2.toFixed(4)}</b>
-        </span>
-      </div>
-      <div style={{ fontSize: 11, opacity: 0.5, marginTop: 4, lineHeight: 1.5 }}>
-        MAE = 平均绝对误差（平均差多少）；RMSE = 均方根误差（对大错更敏感，恒 ≥ MAE，
-        两者差距大说明存在少数离谱错例）；R² = 相对"直接猜平均值"好多少，1 为完美、0 为等同猜均值、可为负。
-        {r2 === null && '本次真实值无波动，R² 无定义故不显示。'}
-      </div>
     </div>
   )
 }

@@ -1,6 +1,6 @@
 {
   "name": "dsh-limix-agent",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "description": "LimiX 界面半：工具结果卡片 + 「分析过程」视图",
   "type": "module",
@@ -20,7 +20,6 @@
     "lib/index.js",
     "lib/client.js",
     "cordis.patch.yml",
-    "assets/limix.py",
     "assets/icon.png",
     "locale/*.json",
     "src",
@@ -45,6 +44,7 @@
   },
   "devDependencies": {
     "@types/react": "~18.3.1",
+    "@types/react-dom": "~18.3.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "tsdown": "^0.15.7",

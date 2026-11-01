@@ -564,7 +564,7 @@ const DATA_SOURCE_KINDS = ["postgres", "mysql"];
 
 //#endregion
 //#region src/index.ts
-const inject = ["tools", "webServer"];
+const inject = ["webServer"];
 /** 无 Date.now 顾虑（Node 半普通运行时）；文件名时间戳与原版口径一致 */
 function stamp() {
 	return (/* @__PURE__ */ new Date()).toISOString().replace(/[-:T]/g, "").slice(0, 14);
@@ -584,8 +584,7 @@ const DESCRIPTION = `连接客户数据库取数（数据的第二个来源，�
 子命令：list（列出已配置数据源）；inspect --source <id> [--table 表名]（不传 table 回表清单，传了回列结构+中文注释+采样5行）；query --source <id> --sql <单条SELECT/WITH> [--mode preview|materialize] [--file-name 名.csv] [--workdir 目录]。
 工作流（铁律）：list → 对要用的每张表 inspect 看结构与注释 → **生成的 SQL 必须先在回复里用代码块展示给用户并用一句中文解释取的是什么（可见/可确认/可纠正），不要偷偷执行** → query mode=preview 自查（≤100行）→ 确认无误再 mode=materialize 落 CSV 进文件区 → 照常用 limix 工具预测。
 **多表 JOIN 拼成一张宽表是本工具的核心用法**（如电价+气象+预测按省份和时间拼宽表）。只允许单条只读查询，写操作会被安全阀拒绝。materialize 上限 50 万行。`;
-function apply(ctx) {
-	ensureConfigFile();
+function registerDatasourceTool(ctx) {
 	ctx.tools.register(defineTool({
 		name: "datasource",
 		description: DESCRIPTION,
@@ -757,6 +756,10 @@ function apply(ctx) {
 			}
 		}
 	}));
+}
+function apply(ctx) {
+	ensureConfigFile();
+	ctx.provide("limixDatasource", { register: registerDatasourceTool });
 	const readBody = (req) => new Promise((res, rej) => {
 		let b = "";
 		req.on("data", (c) => {
@@ -834,4 +837,4 @@ function apply(ctx) {
 }
 
 //#endregion
-export { apply, inject };
+export { apply, inject, registerDatasourceTool };

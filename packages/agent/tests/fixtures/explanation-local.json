@@ -1,0 +1,110 @@
+{
+  "task_status": "succeeded",
+  "explanation": {
+    "mode": "local",
+    "target": "tensile_strength_mpa",
+    "target_label": "抗拉强度",
+    "unit": "MPa",
+    "labels": {
+      "c": "碳",
+      "mn": "锰",
+      "si": "硅",
+      "cr": "铬",
+      "ni": "镍",
+      "mo": "钼",
+      "v": "钒",
+      "n": "氮",
+      "nb": "铌",
+      "co": "钴",
+      "w": "钨",
+      "al": "铝",
+      "ti": "钛"
+    },
+    "row_number": 1,
+    "prior_prediction": 1087.6814,
+    "input_rows": 3,
+    "risks": [],
+    "prediction": 1090.677001953125,
+    "features": [
+      {
+        "name": "al",
+        "label": "铝",
+        "score": 0.16943359375,
+        "direction": -1
+      },
+      {
+        "name": "ti",
+        "label": "钛",
+        "score": 0.1279296875,
+        "direction": -1
+      },
+      {
+        "name": "co",
+        "label": "钴",
+        "score": 0.08282470703125,
+        "direction": -1
+      },
+      {
+        "name": "ni",
+        "label": "镍",
+        "score": 0.06549072265625,
+        "direction": 1
+      },
+      {
+        "name": "si",
+        "label": "硅",
+        "score": 0.053192138671875,
+        "direction": -1
+      },
+      {
+        "name": "cr",
+        "label": "铬",
+        "score": 0.04351806640625,
+        "direction": 1
+      },
+      {
+        "name": "c",
+        "label": "碳",
+        "score": 0.037200927734375,
+        "direction": -1
+      },
+      {
+        "name": "mo",
+        "label": "钼",
+        "score": 0.0328369140625,
+        "direction": -1
+      },
+      {
+        "name": "mn",
+        "label": "锰",
+        "score": 0.02301025390625,
+        "direction": 1
+      },
+      {
+        "name": "v",
+        "label": "钒",
+        "score": 0.01788330078125,
+        "direction": -1
+      },
+      {
+        "name": "w",
+        "label": "钨",
+        "score": 0.01352691650390625,
+        "direction": -1
+      },
+      {
+        "name": "nb",
+        "label": "铌",
+        "score": 0.00653839111328125,
+        "direction": 1
+      },
+      {
+        "name": "n",
+        "label": "氮",
+        "score": 0.006443023681640625,
+        "direction": 1
+      }
+    ],
+    "prediction_delta": 2.9956019531250604
+  }
+}

@@ -9,7 +9,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
-import { apply } from '../lib/index.js'
+import { apply, registerDatasourceTool } from '../lib/index.js'
 
 test('datasource 注册完整 JSON Schema，并能列出空数据源', async () => {
   const home = mkdtempSync(join(tmpdir(), 'limix-data-contract-'))
@@ -17,7 +17,7 @@ test('datasource 注册完整 JSON Schema，并能列出空数据源', async () 
   process.env.DSH_HOME = home
   try {
     const tools = []
-    apply({
+    registerDatasourceTool({
       tools: { register: (tool) => tools.push(tool) },
       effect: () => {},
     })
@@ -48,6 +48,28 @@ test('datasource 注册完整 JSON Schema，并能列出空数据源', async () 
     assert.deepEqual(tool.output.render({ command: 'list' }, result), [
       { type: 'text', text: result.text },
     ])
+  } finally {
+    if (previousHome === undefined) delete process.env.DSH_HOME
+    else process.env.DSH_HOME = previousHome
+    rmSync(home, { recursive: true, force: true })
+  }
+})
+
+test('全局 settings 只提供工厂与路由，不注册工具', () => {
+  const home = mkdtempSync(join(tmpdir(), 'limix-data-settings-'))
+  const previousHome = process.env.DSH_HOME
+  process.env.DSH_HOME = home
+  try {
+    const routes = [], services = new Map()
+    apply({
+      provide: (name, value) => services.set(name, value),
+      effect: (fn) => fn(),
+      webServer: { register: (route) => routes.push(route.path) },
+    })
+    assert.deepEqual(routes, ['/limix-datasource/config', '/limix-datasource/test'])
+    const scopedTools = []
+    services.get('limixDatasource').register({ tools: { register: (t) => scopedTools.push(t.name) } })
+    assert.deepEqual(scopedTools, ['datasource'])
   } finally {
     if (previousHome === undefined) delete process.env.DSH_HOME
     else process.env.DSH_HOME = previousHome

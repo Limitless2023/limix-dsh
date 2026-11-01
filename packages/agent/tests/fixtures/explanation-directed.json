@@ -1,0 +1,39 @@
+{
+  "task_status": "succeeded",
+  "explanation": {
+    "mode": "directed",
+    "target": "vis_3",
+    "target_label": "光强读数",
+    "unit": "传感器读数",
+    "labels": {
+      "pol_1": "偏振片 1 角度",
+      "pol_2": "偏振片 2 角度",
+      "vis_3": "光强读数"
+    },
+    "row_number": null,
+    "prior_prediction": null,
+    "input_rows": 1000,
+    "risks": [],
+    "nodes": [
+      "vis_3",
+      "pol_1",
+      "pol_2"
+    ],
+    "edges": [
+      {
+        "source": "pol_1",
+        "target": "vis_3",
+        "source_index": 1,
+        "target_index": 0,
+        "weight": 0.9595505193395056
+      },
+      {
+        "source": "pol_2",
+        "target": "vis_3",
+        "source_index": 2,
+        "target_index": 0,
+        "weight": 0.8993282055852596
+      }
+    ]
+  }
+}

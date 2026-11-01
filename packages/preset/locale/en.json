@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "LimiX Agent Preset",
+    "description": "Combines LimiX tools and prompts, defines how the agent works, and sets the default mode for new tasks while preserving saved user choices."
+  }
+}

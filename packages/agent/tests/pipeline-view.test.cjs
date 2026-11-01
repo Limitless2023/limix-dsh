@@ -41,6 +41,16 @@ const benchmarkText = `${JSON.stringify({ kind: 'benchmark', status: 'succeeded'
 ] })}\n[stderr]\nbenchmark s/LIMIX_16M: succeeded\n`
 const graphText = JSON.stringify({ task_id: 'task-g', task_status: 'succeeded', explanation: { mode: 'directed', nodes: ['a', 'b', 'y'], edges: [{ source: 'a', target: 'y', weight: 0.9 }] } })
 
+test('本地报告不计入 API 调用，分析过程收集 HTML 与 Markdown', () => {
+  assert.deepEqual(classifyLimix({ command: 'report', args: [] }), { title: '报告输出', limix: false })
+  const result = JSON.stringify({ kind: 'report', status: 'succeeded', saved_to: '/d/report.html', report_path: '/d/report.html', markdown_path: '/d/report.md', chart_count: 3 })
+  const nodes = [user(1, '生成报告'), tool(2, 'limix', { command: 'report', args: [] }, result)]
+  const html = render(nodes)
+  assert.match(html, /报告输出/)
+  const files = stepFiles(flowSteps(parseRounds(nodes, [])[0])[0]).map(f => f.path)
+  assert.deepEqual(files, ['/d/report.html', '/d/report.md'])
+})
+
 const render = (nodes) => renderToStaticMarkup(React.createElement(LimixPipelineView, {
   useTrajectory: (select) => select({ eventNodes: nodes, runningCalls: [] }),
 }))
@@ -226,4 +236,12 @@ test('报告摘要分别描述保存与修订，不把失败的后续写入算�
     tool(3, 'write', {file_path:'/d/report.html'}, 'written'),
     tool(4, 'write', {file_path:'/d/report.pdf'}, 'failed', {isError:true})], [])
   assert.equal(stepSummary(flowSteps(round)[0]), '分析报告已修订；HTML 报告已保存；仍有操作未完成')
+})
+
+ test('报告事实核验不冒充生成报告，环境准备不计入 API', () => {
+  assert.equal(classifyLimix({command:'report',args:['--inspect']}).title, '结果分析')
+  assert.equal(classifyLimix({command:'runtime',args:['status']}).limix, false)
+  const [round]=parseRounds([user(1,'核验'),tool(2,'limix',{command:'report',args:['--inspect']},'{"kind":"report_facts","ok":true}')],[])
+  assert.equal(round.stages[0].outcome,'已核验图表指标与样本范围')
+  assert.equal(stepFiles(flowSteps(round)[0]).length,0)
 })

@@ -12,7 +12,7 @@ const WORKFLOW = `当用户要求预测、分类、回归、时序外推，或�
 3. 通过一次 limix classify/regress/forecast 调用完成上传、提交、轮询和保存。直接传本地绝对路径给 --train 和 --predict，不先 upload 换成版本 ID，以保留本地评估来源。必须传 --target、--output，workdir 传会话工作目录；输出文件采用 limix-<目标列>-<时间戳>.csv。用户指定模型时必须显式传 --model（如 LIMIX_7M），不能遗漏后使用服务默认模型；未指定才使用默认。提交后核对回执中的实际模型，未知时不把期望模型写成已使用的模型；模型不符时如实说明并纠正，不混入指定模型的报告结论。
 4. forecast 还需 --date、--context、--horizon。根据频率、可用历史和主要周期选择 context；历史不足一个完整周期时说明限制，不凭空补齐。未来协变量须覆盖预测日期，并区分预先已知信息、当时可用的预测信息和事后观测；事后真值不能作为模型输入。有未来协变量时传 --predict，没有时省略 --predict，按 --horizon 外推。--context 已限制历史长度，无需剪裁文件。P10/P50/P90 用 --quantile --levels 0.1,0.5,0.9，不自行估算区间。
 5. 有独立真值时传 --truth 本地 CSV；时序真值须含日期列与目标列，日期逐行对齐预测。--truth 不上传、不参与预测。没有真值也能预测，但无法评估。metrics 是本地真实值对照，不称为服务端评估。--truth 是预测流程参数，不是现成 CSV 的独立评分入口；后补真值时不能承诺传 --truth 就无需重跑预测。
-6. 成功须 status=finished、result_version_id 和 saved_to；is_ready=true 仅表示停止轮询。报告交代业务目标、实际数据和预测范围，引用关键 metrics 并解释其含义：回归 MAE/RMSE 越低越好，R² 越高越好，负值表示在本测试集上不如用测试真值均值作常数预测（区别于训练均值基线）；分类准确率须结合类别分布解读。只使用已核对的单位，不凭 R² 或 MAE/RMSE 断言没有偏差或异常点。没有业务容差时不声称已达到生产要求；合成样例只说明流程可用。上传或字段校验失败时指出具体问题。`
+6. 成功须 status=finished、result_version_id 和 saved_to；is_ready=true 仅表示停止轮询。报告交代业务目标、实际数据和预测范围，引用关键 metrics 并解释其含义：回归 MAE/RMSE 越低越好，R² 越高越好，负值表示在本测试集上不如用测试真值均值作常数预测（区别于训练均值基线）；分类准确率须结合类别分布解读。只使用已核对的单位，不凭 R² 或 MAE/RMSE 断言没有偏差或异常点。没有业务容差时不声称已达到生产要求；合成样例只说明流程可用。预测成功状态与效果评价分开；R²<0 时直接说明效果较弱，不能因任务完成就推荐使用。日频时序可引用工具返回的 baseline_evaluation：只使用预测起点前历史，超过7天递归使用基线预测，不用未来真值。基线不可用时说明原因，不强行套周周期。误差原因只列有证据的观察或待验证假设。上传或字段校验失败时指出具体问题。`
 
 export function registerPredictCommand(ctx) {
   ctx.systemPrompt.section({ name: 'limix:predict-workflow', order: 500, text: WORKFLOW, interpolate: false })

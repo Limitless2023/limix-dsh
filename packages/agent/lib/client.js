@@ -37,7 +37,7 @@ function cellSize(k) {
 	return k <= 3 ? 62 : k <= 5 ? 52 : k <= 8 ? 42 : 34;
 }
 /** 标签过长会撑破行首，统一截断并留 title 兜底 */
-function short(s, max) {
+function short$1(s, max) {
 	return s.length <= max ? s : s.slice(0, max - 1) + "…";
 }
 function ConfusionMatrix({ data }) {
@@ -101,7 +101,7 @@ function ConfusionMatrix({ data }) {
 						fontSize: "10",
 						fill: "currentColor",
 						opacity: "0.7",
-						children: short(c, 6)
+						children: short$1(c, 6)
 					}, `h${c}`)),
 					classes.map((rc, i) => /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("g", { children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("text", {
 						x: LEFT - 6,
@@ -110,7 +110,7 @@ function ConfusionMatrix({ data }) {
 						fontSize: "10",
 						fill: "currentColor",
 						opacity: "0.7",
-						children: short(rc, 10)
+						children: short$1(rc, 10)
 					}), classes.map((cc, j) => {
 						const v = matrix[i][j];
 						const f = v / rowMax[i];
@@ -196,7 +196,7 @@ function ConfusionMatrix({ data }) {
 								/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
 									style: { wordBreak: "break-all" },
 									title: c.label,
-									children: short(c.label, 14)
+									children: short$1(c.label, 14)
 								}),
 								/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { children: c.support }),
 								/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { children: pct(c.precision) }),
@@ -1300,6 +1300,7 @@ const escape = (value) => String(value).replace(/[&<>"']/g, (c) => ({
 const text = (x, y, value, size = 13, attrs = "") => `<text x="${x}" y="${y}" font-size="${size}" ${attrs}>${escape(value)}</text>`;
 const start = (width, height, theme, title) => `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img"><title>${escape(title)}</title><rect width="100%" height="100%" fill="${theme.background}"/><g fill="${theme.foreground}" font-family="system-ui, -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif">`;
 const end = "</g></svg>";
+const short = (s) => Array.from(s).length > 24 ? Array.from(s).slice(0, 12).join("") + "…" + Array.from(s).slice(-10).join("") : s;
 const signed = (v) => v === null ? "方向未定" : `${v > 0 ? "+" : ""}${number(v)}`;
 function contributionExportSvg(data, filtered, description = "", theme = defaultExportTheme) {
 	const coverage = data.samples?.length ? (filtered?.samples?.length ?? 0) / data.samples.length * 100 : 0;
@@ -1308,16 +1309,17 @@ function contributionExportSvg(data, filtered, description = "", theme = default
 		title: `当前筛选 · ${filtered.samples?.length ?? 0} 个样本 · 覆盖率 ${number(coverage)}%`
 	}, {
 		data,
-		title: `全样本 · ${data.samples?.length ?? 0} 个样本`
+		title: `${data.input_rows && (data.samples?.length ?? 0) < data.input_rows ? "本次已解释" : "全样本"} · ${data.samples?.length ?? 0} 个样本${data.input_rows ? ` / 输入 ${data.input_rows} 行` : ""}`
 	}] : [{
 		data,
-		title: `全样本 · ${data.samples?.length ?? 0} 个样本`
+		title: `${data.input_rows && (data.samples?.length ?? 0) < data.input_rows ? "本次已解释" : "全样本"} · ${data.samples?.length ?? 0} 个样本${data.input_rows ? ` / 输入 ${data.input_rows} 行` : ""}`
 	}];
-	const plotWidth = Math.max(700, (data.feature_names?.length ?? 1) * 48);
-	const labelWidth = Math.max(100, ...(data.feature_names ?? []).map((n) => (data.labels?.[n] ?? n).length * 10));
+	const plotWidth = Math.max(700, (data.feature_names?.length ?? 1) * 32);
+	const labelWidth = Math.min(250, Math.max(100, ...(data.feature_names ?? []).map((n) => (data.labels?.[n] ?? n).length * 10)));
 	const width = 80 + plotWidth + 64 + labelWidth + 20 + 290 + 110;
-	const plotHeight = Math.max(330, Math.min(900, (data.samples?.length ?? 1) * 4), (data.feature_names?.length ?? 1) * 25);
-	const sectionHeight = plotHeight + Math.max(95, ...(data.feature_names ?? []).map((n) => (data.labels?.[n] ?? n).length * 10)) + 100, height = 110 + groups.length * sectionHeight + 50;
+	const plotHeight = Math.max(330, Math.min(600, (data.samples?.length ?? 1) * 4));
+	const rankHeight = Math.max(plotHeight, (data.feature_names?.length ?? 1) * 28);
+	const sectionHeight = Math.max(plotHeight + 180, rankHeight + 40) + 100, height = 110 + groups.length * sectionHeight + 50;
 	const scales = contributionScales(data, ...filtered ? [filtered] : []), title = `预测解释 · ${data.target_label ?? data.target}`;
 	let svg = start(width, height, theme, title) + text(36, 38, title, 23, "font-weight=\"600\"") + text(36, 67, description || "全部已解释样本", 13);
 	const timed = data.samples?.filter((s) => s.timestamp);
@@ -1347,17 +1349,17 @@ function contributionExportSvg(data, filtered, description = "", theme = default
 		svg += text(36, y - 8, data.task_type === "timeseries" ? "预测步" : "原始行", 11);
 		names.forEach((name, i) => {
 			const label = data.labels?.[name] ?? name;
-			svg += `<g transform="translate(${x + (i + .5) * columnWidth} ${y + plotHeight + 16}) rotate(55)">` + text(0, 0, label, 12) + (label === name ? "" : text(0, 17, name, 10, "opacity=\".65\"")) + "</g>";
+			svg += `<g transform="translate(${x + (i + .5) * columnWidth} ${y + plotHeight + 16}) rotate(55)"><title>${escape(label + " · " + name)}</title>` + text(0, 0, short(label), 12) + "</g>";
 		});
-		svg += `<line x1="${barZero}" x2="${barZero}" y1="${y}" y2="${y + plotHeight}" stroke="${theme.border}"/>`;
+		svg += `<line x1="${barZero}" x2="${barZero}" y1="${y}" y2="${y + rankHeight}" stroke="${theme.border}"/>`;
 		matrix.ranking.forEach((feature, i) => {
-			const cy = y + (i + .5) * plotHeight / Math.max(names.length, 1), v = feature.mean;
+			const cy = y + (i + .5) * rankHeight / Math.max(names.length, 1), v = feature.mean;
 			const barWidth = v === null || !scales.meanMaximum ? 0 : Math.abs(v) / scales.meanMaximum * barHalf;
-			svg += text(barLabel + labelWidth, cy - 1, feature.label, 12, "text-anchor=\"end\"") + (feature.label !== feature.name ? text(barLabel + labelWidth, cy + 13, feature.name, 10, "text-anchor=\"end\" opacity=\".6\"") : "");
+			svg += `<g><title>${escape(feature.label + " · " + feature.name)}</title>` + text(barLabel + labelWidth, cy - 1, short(feature.label), 12, "text-anchor=\"end\"") + (feature.label !== feature.name ? text(barLabel + labelWidth, cy + 13, short(feature.name), 10, "text-anchor=\"end\" opacity=\".6\"") : "");
 			if (v !== null) svg += `<rect x="${v < 0 ? barZero - barWidth : barZero}" y="${cy - 5}" width="${barWidth}" height="10" fill="${v < 0 ? contributionColors.negative : contributionColors.positive}"/>`;
-			svg += text(width - 30, cy + 4, signed(v), 12, "text-anchor=\"end\"");
+			svg += text(width - 30, cy + 4, signed(v), 12, "text-anchor=\"end\"") + "</g>";
 		});
-		svg += text(barZero - barHalf, y + plotHeight + 20, `−${number(scales.meanMaximum)}`, 11, "text-anchor=\"middle\"") + text(barZero, y + plotHeight + 20, "0", 11, "text-anchor=\"middle\"") + text(barZero + barHalf, y + plotHeight + 20, `+${number(scales.meanMaximum)}`, 11, "text-anchor=\"middle\"");
+		svg += text(barZero - barHalf, y + rankHeight + 20, `−${number(scales.meanMaximum)}`, 11, "text-anchor=\"middle\"") + text(barZero, y + rankHeight + 20, "0", 11, "text-anchor=\"middle\"") + text(barZero + barHalf, y + rankHeight + 20, `+${number(scales.meanMaximum)}`, 11, "text-anchor=\"middle\"");
 	});
 	svg += text(36, height - 36, "蓝色负向 · 绿色正向 · 灰蓝中性 · 灰色方向未定；中性按 0 计入均值，正负会抵消。", 12);
 	return svg + end;
@@ -1724,13 +1726,13 @@ function shortLabel(label, limit) {
 	return start$1 + "…" + end$1;
 }
 function ContributionHeatmap({ data, scope = "全部", scales }) {
-	const root = (0, react.useRef)(null), [hint, setHint] = (0, react.useState)(""), [expanded, setExpanded] = (0, react.useState)(false);
+	const root = (0, react.useRef)(null), [hint, setHint] = (0, react.useState)(""), [expanded, setExpanded] = (0, react.useState)(false), [readable, setReadable] = (0, react.useState)(false);
 	const matrix = (0, react.useMemo)(() => contributionMatrix(data), [data]);
 	const samples = data.samples ?? [], names = data.feature_names ?? [];
 	const { helpRef, helpId, helpOpen } = useExplanationHelp(!!samples.length && !!names.length);
-	const plotHeight = expanded ? Math.max(312, names.length * 22) : 312, plotWidth = 548, rowHeight = plotHeight / (samples.length || 1), columnWidth = plotWidth / (names.length || 1);
+	const plotHeight = expanded ? Math.max(312, names.length * 22) : 312, plotWidth = readable ? Math.max(548, names.length * 32) : 548, rowHeight = plotHeight / (samples.length || 1), columnWidth = plotWidth / (names.length || 1);
 	const angledLabels = names.some((name) => textWidth(data.labels?.[name] ?? name) * 11 > columnWidth - 6);
-	const axisFont = angledLabels ? Math.min(11, Math.max(7, columnWidth * .7)) : 11;
+	const axisFont = readable ? 11 : angledLabels ? Math.min(11, Math.max(7, columnWidth * .7)) : 11;
 	const axisWidth = angledLabels ? 94 : Math.min(120, columnWidth - 6);
 	const featureHint = (index) => {
 		const name = names[index], label = data.labels?.[name];
@@ -1755,6 +1757,8 @@ function ContributionHeatmap({ data, scope = "全部", scales }) {
 		const element = root.current;
 		const click = (event) => {
 			if (event.target.closest("[data-lx-matrix-expand]")) setExpanded((v) => !v);
+			const mode = event.target.closest("[data-lx-matrix-size]")?.getAttribute("data-lx-matrix-size");
+			if (mode) setReadable(mode === "readable");
 		};
 		element?.addEventListener("click", click);
 		return () => element?.removeEventListener("click", click);
@@ -1843,11 +1847,30 @@ function ContributionHeatmap({ data, scope = "全部", scales }) {
 					neutral
 				})]
 			}),
+			/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+				className: "lx-plot-tabs",
+				"aria-label": "热力图显示尺寸",
+				children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+					type: "button",
+					"data-lx-matrix-size": "overview",
+					"aria-pressed": !readable,
+					children: "全部概览"
+				}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+					type: "button",
+					"data-lx-matrix-size": "readable",
+					"aria-pressed": readable,
+					children: "清晰细看"
+				})]
+			}),
 			/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
 				className: "lx-matrix-scroll",
 				children: /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("svg", {
 					className: "lx-matrix-svg",
-					viewBox: `0 0 900 ${plotHeight + (angledLabels ? 138 : 72)}`,
+					style: readable ? {
+						minWidth: plotWidth + 352,
+						maxHeight: "none"
+					} : void 0,
+					viewBox: `0 0 ${plotWidth + 352} ${plotHeight + (angledLabels ? 138 : 72)}`,
 					role: "group",
 					"aria-label": `${scope} ${samples.length} 个样本、${names.length} 个特征的贡献热力图，共 ${matrix.cellCount} 个色块`,
 					children: [
@@ -1859,6 +1882,7 @@ function ContributionHeatmap({ data, scope = "全部", scales }) {
 							children: data.task_type === "timeseries" ? "预测步" : "原始行"
 						}),
 						/* @__PURE__ */ (0, react_jsx_runtime.jsx)("g", {
+							transform: `translate(${plotWidth - 548} 0)`,
 							role: "group",
 							"aria-label": "各影响因子影响分数对比",
 							children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)("text", {
@@ -1921,6 +1945,7 @@ function ContributionHeatmap({ data, scope = "全部", scales }) {
 							}, name);
 						}),
 						/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("g", {
+							transform: `translate(${plotWidth - 548} 0)`,
 							role: "group",
 							"aria-label": "带正负的平均贡献，按绝对大小排序",
 							children: [
@@ -2012,6 +2037,7 @@ function ContributionHeatmap({ data, scope = "全部", scales }) {
 						}),
 						/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("g", {
 							ref: helpRef,
+							transform: `translate(${plotWidth - 548} 0)`,
 							children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("g", {
 								className: "lx-matrix-help-trigger",
 								"data-lx-help-trigger": true,
@@ -2396,6 +2422,18 @@ function ExplanationBatch({ data }) {
 						children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", { children: data.mapping === "forecast_steps" ? "按接口返回的预测步与时间对应；特征包含服务生成的时间和季节性特征。" : data.mapping === "input_order" ? "样本按输入顺序对应；接口未返回样本索引，返回数量与请求一致。" : "样本按接口返回的样本索引对应。" }), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", { children: "贡献用于解释预测，不代表实际调节收益。" })]
 					})]
 				})]
+			}),
+			data.input_rows && allSamples.length < data.input_rows && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("p", {
+				className: "lx-explain-foot",
+				children: [
+					"当前解释 ",
+					allSamples.length,
+					" / ",
+					data.input_rows,
+					" 行",
+					data.selection_method === "predicted_class_stratified" ? ` · 按预测类别抽样（种子 ${data.selection_seed}）` : "",
+					"；图中排名仅代表这些样本。"
+				]
 			}),
 			!!data.missing_rows?.length && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("p", {
 				className: "lx-explain-warning",
@@ -2936,7 +2974,7 @@ const colors = [
 ];
 const finite = (value) => typeof value === "number" && Number.isFinite(value);
 const CSS$2 = `.lx-bench-controls{display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin:16px 0}.lx-bench-controls label{display:flex;gap:7px;align-items:center}.lx-bench-controls select{font:inherit;color:inherit;background:var(--dsw-alias-bg-base,#fff);border:1px solid var(--dsw-alias-border-l3,#ddd);border-radius:5px;padding:4px 8px}.lx-bench-chart{width:100%;height:auto;max-height:320px}.lx-bench-table{width:100%;border-collapse:collapse;font-size:12px}.lx-bench-table th,.lx-bench-table td{text-align:left;padding:8px;border-bottom:1px solid var(--dsw-alias-border-l3,#e3e6eb);font-variant-numeric:tabular-nums}.lx-bench-scroll{overflow:auto}.lx-bench-error{color:var(--dsw-alias-label-secondary);font-size:12px;overflow-wrap:anywhere}`;
-function BenchmarkView({ data }) {
+function BenchmarkView({ data, staticView = false }) {
 	const [datasetId, setDatasetId] = (0, react.useState)(data.datasets?.[0]?.id ?? "");
 	const [metric, setMetric] = (0, react.useState)("");
 	const root = (0, react.useRef)(null);
@@ -2983,32 +3021,28 @@ function BenchmarkView({ data }) {
 			/* @__PURE__ */ (0, react_jsx_runtime.jsx)("style", { children: CSS$2 }),
 			/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 				className: "lx-bench-controls",
-				children: [
-					/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("label", { children: ["数据集 ", /* @__PURE__ */ (0, react_jsx_runtime.jsx)("select", {
-						"data-bench": "dataset",
-						value: dataset.id,
-						onChange: () => {},
-						"aria-label": "比较数据集",
-						children: datasets.map((item) => /* @__PURE__ */ (0, react_jsx_runtime.jsx)("option", {
-							value: item.id,
-							children: item.name
-						}, item.id))
-					})] }),
-					/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("label", { children: ["指标 ", /* @__PURE__ */ (0, react_jsx_runtime.jsx)("select", {
-						"data-bench": "metric",
-						value: key,
-						onChange: () => {},
-						"aria-label": "比较指标",
-						children: keys.map((item) => /* @__PURE__ */ (0, react_jsx_runtime.jsx)("option", {
-							value: item,
-							children: labels[item]
-						}, item))
-					})] }),
-					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
-						className: "lx-result-meta",
-						children: key === "rmse" || key === "mae" ? "越低越好" : "越高越好"
-					})
-				]
+				children: [staticView ? /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("strong", { children: dataset.name }), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { children: labels[key] })] }) : /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("label", { children: ["数据集 ", /* @__PURE__ */ (0, react_jsx_runtime.jsx)("select", {
+					"data-bench": "dataset",
+					value: dataset.id,
+					onChange: () => {},
+					"aria-label": "比较数据集",
+					children: datasets.map((item) => /* @__PURE__ */ (0, react_jsx_runtime.jsx)("option", {
+						value: item.id,
+						children: item.name
+					}, item.id))
+				})] }), /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("label", { children: ["指标 ", /* @__PURE__ */ (0, react_jsx_runtime.jsx)("select", {
+					"data-bench": "metric",
+					value: key,
+					onChange: () => {},
+					"aria-label": "比较指标",
+					children: keys.map((item) => /* @__PURE__ */ (0, react_jsx_runtime.jsx)("option", {
+						value: item,
+						children: labels[item]
+					}, item))
+				})] })] }), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+					className: "lx-result-meta",
+					children: key === "rmse" || key === "mae" ? "越低越好" : "越高越好"
+				})]
 			}),
 			/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("p", {
 				className: "lx-result-meta",
@@ -3230,7 +3264,9 @@ const COMMAND_LABELS = {
 	data: "数据查询",
 	cancel: "取消任务",
 	explain: "因果解释",
-	benchmark: "多模型效果比较"
+	benchmark: "多模型效果比较",
+	report: "业务分析报告",
+	runtime: "分析环境"
 };
 const CSS$1 = `
 .lx-result{border:1px solid var(--dsw-alias-border-l3,#e3e6eb);border-radius:12px;padding:16px 18px;margin:4px 0;font:inherit;font-size:13px;line-height:1.6;min-width:0;overflow-wrap:anywhere;color:var(--dsw-alias-label-primary)}
@@ -3438,6 +3474,7 @@ function LimixToolCard({ callId, block, inspect, cwd, openFile }) {
 	}, [chartInfo]);
 	const command = typeof args.command === "string" ? args.command : "";
 	const benchmark = command === "benchmark" && parsed?.kind === "benchmark" && Array.isArray(parsed.datasets) && Array.isArray(parsed.runs) ? parsed : null;
+	const report = command === "report" && !cliFailed && parsed?.kind === "report" ? parsed : null;
 	const explanation = command === "explain" && !cliFailed ? parsed?.explanation : null;
 	const target = explanation?.target_label ?? flagValue("--target");
 	const rows$1 = parsed?.result_content?.rows ?? parsed?.rows;
@@ -3448,13 +3485,29 @@ function LimixToolCard({ callId, block, inspect, cwd, openFile }) {
 		"classify",
 		"forecast"
 	].includes(command);
-	const title = help ? "参数说明" : COMMAND_LABELS[command] ?? "工具结果";
-	const file = typeof parsed?.saved_to === "string" ? parsed.saved_to : null;
+	const title = help ? "参数说明" : parsed?.kind === "report_facts" ? "报告数据核验" : COMMAND_LABELS[command] ?? "工具结果";
+	const originalFile = report && typeof report.report_path === "string" ? report.report_path : typeof parsed?.saved_to === "string" ? parsed.saved_to : null;
+	const [reportAvailability, setReportAvailability] = (0, react.useState)(null);
+	(0, react.useEffect)(() => {
+		setReportAvailability(null);
+		if (!report || !originalFile) return;
+		const abort = new AbortController();
+		fetch("/limix-ui/report-status?path=" + encodeURIComponent(originalFile) + "&fallback=" + encodeURIComponent(report.saved_to ?? ""), { signal: abort.signal }).then((r) => {
+			if (!r.ok) throw new Error("status");
+			return r.json();
+		}).then((data) => setReportAvailability({
+			...data,
+			source: originalFile
+		})).catch(() => {});
+		return () => abort.abort();
+	}, [originalFile, report?.saved_to]);
+	const availability = reportAvailability?.source === originalFile ? reportAvailability : null;
+	const file = availability?.status === "missing" ? null : availability?.path ?? originalFile;
 	const errorMessage = typeof result.error?.error === "string" ? result.error.error : typeof result.error?.error_message === "string" ? result.error.error_message : "请展开调用详情，查看失败原因。";
 	const hint = typeof result.error?.hint === "string" ? result.error.hint : "";
 	const detailsId = `lx-result-details-${String(callId).replace(/[^a-zA-Z0-9_-]/g, "-")}`;
 	const metricsId = `${detailsId}-metrics`;
-	const compact = help || command === "health";
+	const compact = help || command === "health" || command === "runtime" || parsed?.kind === "report_facts";
 	const rawToggle = text$1 && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
 		type: "button",
 		"data-lx": "raw",
@@ -3539,6 +3592,65 @@ function LimixToolCard({ callId, block, inspect, cwd, openFile }) {
 						children: [typeof rows$1 === "number" && Number.isFinite(rows$1) ? `${rows$1} 行预测结果` : "", typeof sampleCount === "number" && Number.isFinite(sampleCount) ? `${typeof rows$1 === "number" ? " · " : ""}${sampleCount} 个样本参与评估` : ""]
 					}),
 					benchmark && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(BenchmarkView, { data: benchmark }),
+					report && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [
+						/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("p", {
+							className: "lx-result-meta",
+							children: [
+								"Markdown + HTML · ",
+								report.chart_count,
+								" 张结果图",
+								report.report_path ? " · 历史版本已保留" : ""
+							]
+						}),
+						availability?.status === "missing" && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
+							role: "alert",
+							className: "lx-result-note",
+							children: "此版报告文件已被移动或删除，请让 Agent 重新生成；原分析结果不受影响。"
+						}),
+						availability?.status === "fallback" && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
+							className: "lx-result-note",
+							children: "历史副本不可用，已切换到本版工作区报告。"
+						}),
+						Array.isArray(report.preview_paths) && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("details", {
+							className: "lx-report-previews",
+							children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("summary", { children: "查看报告图表预览" }), report.preview_paths.map((path, i) => /* @__PURE__ */ (0, react_jsx_runtime.jsx)("a", {
+								href: "/limix-ui/report-preview?path=" + encodeURIComponent(path),
+								target: "_blank",
+								rel: "noreferrer",
+								children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)("img", {
+									loading: "lazy",
+									style: {
+										width: "100%",
+										maxHeight: 280,
+										objectFit: "contain",
+										margin: "12px 0"
+									},
+									src: "/limix-ui/report-preview?path=" + encodeURIComponent(path),
+									alt: `报告图表 ${i + 1}；如未显示，请打开下方 HTML 报告`
+								})
+							}, path))]
+						})
+					] }),
+					prediction && status.kind === "done" && typeof parsed?.metrics?.r2 === "number" && parsed.metrics.r2 < 0 && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
+						className: "lx-result-note",
+						role: "status",
+						children: "任务已完成；本次评估 R² 小于 0，效果弱于测试真值均值对照，需进一步验证后再用于业务。"
+					}),
+					parsed?.baseline_evaluation && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("details", {
+						className: "lx-result-note",
+						children: [
+							/* @__PURE__ */ (0, react_jsx_runtime.jsx)("summary", { children: "查看预测时可用的时序基线对照" }),
+							/* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", { children: parsed.baseline_evaluation.description }),
+							parsed.baseline_evaluation.metrics && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("p", { children: [
+								"MAE ",
+								parsed.baseline_evaluation.metrics?.mae,
+								" · RMSE ",
+								parsed.baseline_evaluation.metrics?.rmse,
+								" · R² ",
+								parsed.baseline_evaluation.metrics?.r2 ?? "无定义"
+							] })
+						]
+					}),
 					cliFailed ? /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("p", {
 						className: "lx-result-note",
 						role: "alert",
@@ -3573,6 +3685,16 @@ function LimixToolCard({ callId, block, inspect, cwd, openFile }) {
 					!compact && (text$1 || file || inspect) && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 						className: "lx-result-actions",
 						children: [
+							report && file && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("a", {
+								href: "/limix-ui/report?path=" + encodeURIComponent(file),
+								download: true,
+								children: "下载 HTML 报告 ↓"
+							}),
+							report && typeof report.markdown_path === "string" && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("a", {
+								href: "/limix-ui/report?path=" + encodeURIComponent(report.markdown_path),
+								download: true,
+								children: "下载 Markdown ↓"
+							}),
 							benchmark && typeof parsed?.csv_path === "string" && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("a", {
 								href: "/limix-ui/artifact?path=" + encodeURIComponent(parsed.csv_path),
 								download: true,
@@ -3758,6 +3880,14 @@ function classifyLimix(args) {
 		title: "因果解释",
 		limix: true
 	};
+	if (cmd === "report") return {
+		title: list.includes("--inspect") ? "结果分析" : "报告输出",
+		limix: false
+	};
+	if (cmd === "runtime") return {
+		title: "准备工作",
+		limix: false
+	};
 	if (cmd === "benchmark") {
 		const models = flag(list, "--models");
 		return !models || /LIMIX/i.test(models) ? {
@@ -3861,6 +3991,8 @@ function limixOutcome(cmd, data) {
 	if (!data) return "";
 	if (cmd === "explain") return explainOutcome(data);
 	if (cmd === "benchmark") return benchmarkOutcome(data);
+	if (cmd === "report" && data.kind === "report_facts") return "已核验图表指标与样本范围";
+	if (cmd === "report" && data.kind === "report") return `Markdown + HTML · ${data.chart_count} 张结果图`;
 	if (cmd === "upload" && typeof data.row_count === "number") return `${data.row_count} 行 × ${data.column_count} 列`;
 	if (cmd === "check" && typeof data.allowed === "boolean") return data.allowed ? "有权限" : "无权限";
 	const metrics = metricEntries(data).slice(0, 2).map((m) => `${m.label} ${m.value}`);
@@ -4247,6 +4379,7 @@ function stageFiles(stage) {
 			add(stage.data?.saved_to, "output", "结果文件");
 			add(stage.data?.csv_path, "output", "结果数据");
 			add(stage.data?.report_path, "output", "分析报告");
+			add(stage.data?.markdown_path, "output", "Markdown 报告");
 		}
 	} else {
 		const path = stage.args.file_path ?? stage.args.path;

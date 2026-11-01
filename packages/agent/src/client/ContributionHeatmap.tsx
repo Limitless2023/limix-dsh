@@ -41,13 +41,13 @@ function shortLabel(label: string, limit: number) {
 }
 
 export function ContributionHeatmap({ data, scope = '全部', scales }: { data: ExplanationData; scope?: string; scales?: { maximum: number; meanMaximum: number } }) {
-  const root = useRef<HTMLDivElement>(null), [hint, setHint] = useState(''), [expanded, setExpanded] = useState(false)
+  const root = useRef<HTMLDivElement>(null), [hint, setHint] = useState(''), [expanded, setExpanded] = useState(false), [readable, setReadable] = useState(false)
   const matrix = useMemo(() => contributionMatrix(data), [data])
   const samples = data.samples ?? [], names = data.feature_names ?? []
   const { helpRef, helpId, helpOpen } = useExplanationHelp<SVGGElement>(!!samples.length && !!names.length)
-  const plotHeight = expanded ? Math.max(312, names.length * 22) : 312, plotWidth = 548, rowHeight = plotHeight / (samples.length || 1), columnWidth = plotWidth / (names.length || 1)
+  const plotHeight = expanded ? Math.max(312, names.length * 22) : 312, plotWidth = readable ? Math.max(548, names.length * 32) : 548, rowHeight = plotHeight / (samples.length || 1), columnWidth = plotWidth / (names.length || 1)
   const angledLabels = names.some(name => textWidth(data.labels?.[name] ?? name) * 11 > columnWidth - 6)
-  const axisFont = angledLabels ? Math.min(11, Math.max(7, columnWidth * .7)) : 11
+  const axisFont = readable ? 11 : angledLabels ? Math.min(11, Math.max(7, columnWidth * .7)) : 11
   const axisWidth = angledLabels ? 94 : Math.min(120, columnWidth - 6)
   const featureHint = (index: number) => {
     const name = names[index], label = data.labels?.[name]
@@ -62,7 +62,7 @@ export function ContributionHeatmap({ data, scope = '全部', scales }: { data: 
   useEffect(() => { setHint('') }, [data])
   useEffect(() => {
     const element = root.current
-    const click = (event: Event) => { if ((event.target as Element).closest('[data-lx-matrix-expand]')) setExpanded(v => !v) }
+    const click = (event: Event) => { if ((event.target as Element).closest('[data-lx-matrix-expand]')) setExpanded(v => !v); const mode = (event.target as Element).closest('[data-lx-matrix-size]')?.getAttribute('data-lx-matrix-size'); if (mode) setReadable(mode === 'readable') }
     element?.addEventListener('click', click); return () => element?.removeEventListener('click', click)
   }, [!!samples.length, !!names.length])
   useEffect(() => {
@@ -98,9 +98,10 @@ export function ContributionHeatmap({ data, scope = '全部', scales }: { data: 
   return <div ref={root} className={expanded ? 'lx-matrix-expanded' : undefined}>
     <style>{CSS}</style>
     <div className="lx-matrix-heading"><span>{scope} {samples.length} 个样本 · {names.length} 个特征 · 不分页</span><ContributionLegend maximum={maximum} unknown={unknown} neutral={neutral} /></div>
-    <div className="lx-matrix-scroll"><svg className="lx-matrix-svg" viewBox={`0 0 900 ${plotHeight + (angledLabels ? 138 : 72)}`} role="group" aria-label={`${scope} ${samples.length} 个样本、${names.length} 个特征的贡献热力图，共 ${matrix.cellCount} 个色块`}>
+    <div className="lx-plot-tabs" aria-label="热力图显示尺寸"><button type="button" data-lx-matrix-size="overview" aria-pressed={!readable}>全部概览</button><button type="button" data-lx-matrix-size="readable" aria-pressed={readable}>清晰细看</button></div>
+    <div className="lx-matrix-scroll"><svg className="lx-matrix-svg" style={readable ? { minWidth: plotWidth + 352, maxHeight: 'none' } : undefined} viewBox={`0 0 ${plotWidth + 352} ${plotHeight + (angledLabels ? 138 : 72)}`} role="group" aria-label={`${scope} ${samples.length} 个样本、${names.length} 个特征的贡献热力图，共 ${matrix.cellCount} 个色块`}>
       <text x="0" y="12" fontSize="10" opacity=".6">{data.task_type === 'timeseries' ? '预测步' : '原始行'}</text>
-      <g role="group" aria-label="各影响因子影响分数对比">
+      <g transform={`translate(${plotWidth - 548} 0)`} role="group" aria-label="各影响因子影响分数对比">
         <text x="626" y="12" fontSize="11">各影响因子影响分数对比</text>
       </g>
       {rowTicks.map(i => <text key={i} x="25" y={30 + (i + .5) * rowHeight + 3} textAnchor="end" fontSize="10" opacity=".6">{samples[i].row_number}</text>)}
@@ -118,7 +119,7 @@ export function ContributionHeatmap({ data, scope = '全部', scales }: { data: 
           <text textAnchor={angledLabels ? 'start' : 'middle'} fontSize={axisFont}>{shortLabel(label, axisWidth / axisFont)}</text>
         </g>
       })}
-      <g role="group" aria-label="带正负的平均贡献，按绝对大小排序">
+      <g transform={`translate(${plotWidth - 548} 0)`} role="group" aria-label="带正负的平均贡献，按绝对大小排序">
         <line x1={barZero} x2={barZero} y1="29" y2={plotHeight + 32} stroke="currentColor" opacity=".18" />
         {ranking.map((feature, i) => {
           const value = feature.mean
@@ -139,7 +140,7 @@ export function ContributionHeatmap({ data, scope = '全部', scales }: { data: 
         <text x={barZero} y={plotHeight + 46} textAnchor="middle" fontSize="10" opacity=".5">0</text>
         <text x={barStart} y={plotHeight + 46} fontSize="10" opacity=".6">{scales ? `−${number(scales.meanMaximum)}` : '负向'}</text><text x={barEnd} y={plotHeight + 46} textAnchor="end" fontSize="10" opacity=".6">{scales ? `+${number(scales.meanMaximum)}` : '正向'}</text>
       </g>
-      <g ref={helpRef}>
+      <g ref={helpRef} transform={`translate(${plotWidth - 548} 0)`}>
         <g className="lx-matrix-help-trigger" data-lx-help-trigger role="button" tabIndex={0} aria-label="平均贡献说明" aria-expanded={helpOpen} aria-controls={helpId} aria-describedby={helpOpen ? helpId : undefined}>
           <rect x="751" y="0" width="22" height="22" rx="3" fill="transparent" />
           <text x="762" y="12" textAnchor="middle" fontSize="11">ⓘ</text>

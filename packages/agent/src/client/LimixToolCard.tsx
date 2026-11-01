@@ -2,7 +2,7 @@
  * [INPUT]: 依赖 react（宿主 external）；props 由 tool.call.toolview 插槽 owner 提供
  *          （结构对齐官方 ToolCallOwnerProps：callId/toolName/block/cwd/openFile/inspect——
  *           为守构建纯度门禁不 value-import 官方包，此处以最小结构类型自持）
- * [OUTPUT]: 对外提供 LimixToolCard 组件——limix 工具调用在对话流里的富卡片：
+ * [OUTPUT]: 报告支持 HTML/Markdown 附件下载； 对外提供 LimixToolCard 组件——limix 工具调用在对话流里的富卡片：
  *           任务名称（因果解释沿用官方口径）+ 指标 + 文件下载与打开；指标说明和调用详情默认折叠
  *           + 三类预测图、可全屏的解释/模型比较卡及 JSON/CSV 下载；参数帮助不显示预测完成。
  *           服务连接与参数帮助使用紧凑行，详情按需展开，失败原因保持可见。
@@ -60,7 +60,7 @@ const COMMAND_LABELS: Record<string, string> = {
   regress: '回归预测', classify: '分类预测', forecast: '时序预测',
   health: '服务连接', check: '访问权限', upload: '上传数据', download: '保存结果',
   task: '任务进度', tasks: '任务列表', result: '预测结果', data: '数据查询', cancel: '取消任务',
-  explain: '因果解释', benchmark: '多模型效果比较',
+  explain: '因果解释', benchmark: '多模型效果比较', report: '业务分析报告', runtime: '分析环境',
 }
 const CSS = `
 .lx-result{border:1px solid var(--dsw-alias-border-l3,#e3e6eb);border-radius:12px;padding:16px 18px;margin:4px 0;font:inherit;font-size:13px;line-height:1.6;min-width:0;overflow-wrap:anywhere;color:var(--dsw-alias-label-primary)}
@@ -259,19 +259,33 @@ export function LimixToolCard({ callId, block, inspect, cwd, openFile }: Props):
 
   const command = typeof args.command === 'string' ? args.command : ''
   const benchmark = command === 'benchmark' && parsed?.kind === 'benchmark' && Array.isArray(parsed.datasets) && Array.isArray(parsed.runs) ? parsed : null
+  const report = command === 'report' && !cliFailed && parsed?.kind === 'report' ? parsed : null
   const explanation = command === 'explain' && !cliFailed ? parsed?.explanation : null
   const target = explanation?.target_label ?? flagValue('--target')
   const rows = parsed?.result_content?.rows ?? parsed?.rows
   const sampleCount = parsed?.metrics?.n
   const help = argList.some(arg => arg === '--help' || arg === '-h')
   const prediction = !help && ['regress', 'classify', 'forecast'].includes(command)
-  const title = help ? '参数说明' : COMMAND_LABELS[command] ?? '工具结果'
-  const file = typeof parsed?.saved_to === 'string' ? parsed.saved_to : null
+  const title = help ? '参数说明' : parsed?.kind === 'report_facts' ? '报告数据核验' : COMMAND_LABELS[command] ?? '工具结果'
+  const originalFile = report && typeof report.report_path === 'string' ? report.report_path : typeof parsed?.saved_to === 'string' ? parsed.saved_to : null
+  const [reportAvailability, setReportAvailability] = useState<{status: string; path?: string; source: string} | null>(null)
+  useEffect(() => {
+    setReportAvailability(null)
+    if (!report || !originalFile) return
+    const abort = new AbortController()
+    fetch('/limix-ui/report-status?path=' + encodeURIComponent(originalFile) + '&fallback=' + encodeURIComponent(report.saved_to ?? ''), {signal: abort.signal})
+      .then(r => { if (!r.ok) throw new Error('status'); return r.json() })
+      .then(data => setReportAvailability({...data, source: originalFile}))
+      .catch(() => { /* 下载和宿主文件入口仍可使用 */ })
+    return () => abort.abort()
+  }, [originalFile, report?.saved_to])
+  const availability = reportAvailability?.source === originalFile ? reportAvailability : null
+  const file = availability?.status === 'missing' ? null : availability?.path ?? originalFile
   const errorMessage = typeof result.error?.error === 'string' ? result.error.error : typeof result.error?.error_message === 'string' ? result.error.error_message : '请展开调用详情，查看失败原因。'
   const hint = typeof result.error?.hint === 'string' ? result.error.hint : ''
   const detailsId = `lx-result-details-${String(callId).replace(/[^a-zA-Z0-9_-]/g, '-')}`
   const metricsId = `${detailsId}-metrics`
-  const compact = help || command === 'health'
+  const compact = help || command === 'health' || command === 'runtime' || parsed?.kind === 'report_facts'
   const rawToggle = text && <button type="button" data-lx="raw" className={compact ? 'lx-result-details-toggle' : undefined} aria-label={compact ? `${showRaw ? '收起' : '展开'}${title}详情` : undefined} aria-expanded={showRaw} aria-controls={detailsId}>
     {compact ? <>{showRaw ? '收起' : '详情'}<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d={showRaw ? 'M4 10l4-4 4 4' : 'M4 6l4 4 4-4'} /></svg></> : showRaw ? '收起详情 ↑' : '调用详情 ↓'}
   </button>
@@ -297,6 +311,12 @@ export function LimixToolCard({ callId, block, inspect, cwd, openFile }: Props):
         {typeof sampleCount === 'number' && Number.isFinite(sampleCount) ? `${typeof rows === 'number' ? ' · ' : ''}${sampleCount} 个样本参与评估` : ''}
       </p>}
       {benchmark && <BenchmarkView data={benchmark as any} />}
+      {report && <><p className="lx-result-meta">Markdown + HTML · {report.chart_count} 张结果图{report.report_path ? ' · 历史版本已保留' : ''}</p>
+        {availability?.status === 'missing' && <p role="alert" className="lx-result-note">此版报告文件已被移动或删除，请让 Agent 重新生成；原分析结果不受影响。</p>}
+        {availability?.status === 'fallback' && <p className="lx-result-note">历史副本不可用，已切换到本版工作区报告。</p>}
+        {Array.isArray(report.preview_paths) && <details className="lx-report-previews"><summary>查看报告图表预览</summary>{report.preview_paths.map((path: string, i: number) => <a key={path} href={'/limix-ui/report-preview?path=' + encodeURIComponent(path)} target="_blank" rel="noreferrer"><img loading="lazy" style={{ width: '100%', maxHeight: 280, objectFit: 'contain', margin: '12px 0' }} src={'/limix-ui/report-preview?path=' + encodeURIComponent(path)} alt={`报告图表 ${i + 1}；如未显示，请打开下方 HTML 报告`} /></a>)}</details>}</>}
+      {prediction && status.kind === 'done' && typeof parsed?.metrics?.r2 === 'number' && parsed.metrics.r2 < 0 && <p className="lx-result-note" role="status">任务已完成；本次评估 R² 小于 0，效果弱于测试真值均值对照，需进一步验证后再用于业务。</p>}
+      {parsed?.baseline_evaluation && <details className="lx-result-note"><summary>查看预测时可用的时序基线对照</summary><p>{parsed.baseline_evaluation.description}</p>{parsed.baseline_evaluation.metrics && <p>MAE {parsed.baseline_evaluation.metrics?.mae} · RMSE {parsed.baseline_evaluation.metrics?.rmse} · R² {parsed.baseline_evaluation.metrics?.r2 ?? '无定义'}</p>}</details>}
       {cliFailed ? <p className="lx-result-note" role="alert">{errorMessage}{hint && <><br />{hint}</>}</p> : <>
         {status.kind === 'warning' && !benchmark && <p className="lx-result-note" role="alert">本次解释存在限制，请结合返回说明使用结果。</p>}
         {explanation && <ExplanationView data={explanation} />}
@@ -311,6 +331,8 @@ export function LimixToolCard({ callId, block, inspect, cwd, openFile }: Props):
         {evalView?.kind === 'reg' && <ScatterChart data={evalView.data} />}
       </>}
       {!compact && (text || file || inspect) && <div className="lx-result-actions">
+        {report && file && <a href={'/limix-ui/report?path=' + encodeURIComponent(file)} download>下载 HTML 报告 ↓</a>}
+        {report && typeof report.markdown_path === 'string' && <a href={'/limix-ui/report?path=' + encodeURIComponent(report.markdown_path)} download>下载 Markdown ↓</a>}
         {benchmark && typeof parsed?.csv_path === 'string' && <a href={'/limix-ui/artifact?path=' + encodeURIComponent(parsed.csv_path)} download>下载比较 CSV ↓</a>}
         {benchmark && file && <a href={'/limix-ui/artifact?path=' + encodeURIComponent(file)} download>下载比较 JSON ↓</a>}
         {benchmark && typeof parsed?.report_path === 'string' && openFile && <button type="button" data-lx="file" data-path={parsed.report_path}>打开完整报告 ↗</button>}

@@ -1,6 +1,6 @@
 {
   "name": "dsh-limix-preset",
-  "version": "0.3.6",
+  "version": "0.3.7",
   "private": true,
   "type": "module",
   "description": "组合 LimiX 工具与提示词，定义 Agent 工作方式，并设置新任务默认模式；保留用户已保存的默认选择。",

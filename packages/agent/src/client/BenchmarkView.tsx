@@ -1,6 +1,6 @@
 /**
  * [INPUT]: limix benchmark 的固定拆分、逐模型状态与本地指标。
- * [OUTPUT]: BenchmarkView，按数据集比较同一指标与运行状态。
+ * [OUTPUT]: BenchmarkView，按数据集比较指标；staticView 用于离线报告。
  * [POS]: 工具卡的模型比较视图；失败不补零，不跨数据集混合误差。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
@@ -15,7 +15,7 @@ const colors = ['#4168a9', '#248575', '#bb8b47', '#929baa']
 const finite = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value)
 const CSS = `.lx-bench-controls{display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin:16px 0}.lx-bench-controls label{display:flex;gap:7px;align-items:center}.lx-bench-controls select{font:inherit;color:inherit;background:var(--dsw-alias-bg-base,#fff);border:1px solid var(--dsw-alias-border-l3,#ddd);border-radius:5px;padding:4px 8px}.lx-bench-chart{width:100%;height:auto;max-height:320px}.lx-bench-table{width:100%;border-collapse:collapse;font-size:12px}.lx-bench-table th,.lx-bench-table td{text-align:left;padding:8px;border-bottom:1px solid var(--dsw-alias-border-l3,#e3e6eb);font-variant-numeric:tabular-nums}.lx-bench-scroll{overflow:auto}.lx-bench-error{color:var(--dsw-alias-label-secondary);font-size:12px;overflow-wrap:anywhere}`
 
-export function BenchmarkView({ data }: { data: BenchmarkResult }) {
+export function BenchmarkView({ data, staticView = false }: { data: BenchmarkResult; staticView?: boolean }) {
   const [datasetId, setDatasetId] = useState(data.datasets?.[0]?.id ?? '')
   const [metric, setMetric] = useState('')
   const root = useRef<HTMLDivElement>(null)
@@ -44,8 +44,10 @@ export function BenchmarkView({ data }: { data: BenchmarkResult }) {
   return <div ref={root} aria-label="多模型效果比较">
     <style>{CSS}</style>
     <div className="lx-bench-controls">
-      <label>数据集 <select data-bench="dataset" value={dataset.id} onChange={() => {}} aria-label="比较数据集">{datasets.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
-      <label>指标 <select data-bench="metric" value={key} onChange={() => {}} aria-label="比较指标">{keys.map(item => <option key={item} value={item}>{labels[item]}</option>)}</select></label>
+      {staticView ? <><strong>{dataset.name}</strong><span>{labels[key]}</span></> : <>
+        <label>数据集 <select data-bench="dataset" value={dataset.id} onChange={() => {}} aria-label="比较数据集">{datasets.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+        <label>指标 <select data-bench="metric" value={key} onChange={() => {}} aria-label="比较指标">{keys.map(item => <option key={item} value={item}>{labels[item]}</option>)}</select></label>
+      </>}
       <span className="lx-result-meta">{key === 'rmse' || key === 'mae' ? '越低越好' : '越高越好'}</span>
     </div>
     <p className="lx-result-meta">训练 {dataset.train_rows} 行 · 测试 {dataset.test_rows} 行 · {dataset.feature_count} 个特征 · 相同拆分</p>

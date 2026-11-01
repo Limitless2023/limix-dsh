@@ -1,10 +1,17 @@
 # LimiX × DeepSeek Harness 插件：交接文档
 
+> **v0.3.7 本轮交付。** 报告、独立 Python 环境、解释预检/抽样、热力图与时序基线已合入；交叉审查与最终检查见 `reviews/scenarios-release-review.md`。本机截图和报告见 `../limix-optimization-validation-20261101/index.html`。首轮报告推断仍需复核；纯浏览器 DSH 全流程、第二台电脑、Windows 实机和连续录像未验收；20 变量无向解释仍为上游失败。
+
+
 > 读者：接手开发的人/Agent（此前没有接触过 DeepSeek Harness 的插件体系）。
 > 目标：让你能独立完成「改代码 → 构建 → 安装 → 在 GUI 里验证」这个闭环。
-> 最后更新：2026-11-01（DSH 0.2.1-rc.5，插件套件 0.3.6）
+> 最后更新：2026-11-01（DSH 0.2.1-rc.5，插件套件 0.3.7）
 
-> **换机接手入口：先读 [USER-ACCEPTANCE.md](USER-ACCEPTANCE.md)。** 新电脑使用 v0.3.1 发布 tarball，不复制下文维护者的 profile、开发软链接或独立 MCP。本文后续保留历史开发笔记；安装以 INSTALL.md 为准，验收以 USER-ACCEPTANCE.md 为准。测试数据另随便携交接包提供，未放入源码仓库。
+> **历史记录：带图 HTML 报告早期开发（现已纳入 v0.3.7）。** `limix report` 在宿主本地生成单文件 HTML，保留 Markdown，复用预测、贡献、关系和比较图。当前 GitHub v0.3.6 与已有演示包不含此功能。宿主重建后须重启 DSH，新会话才使用新版提示词。验证证据见 `../_recon/html-report-validation-20261101/`；未重新请求预测 API，也未冒充远端电脑已验收。
+
+> **此前一轮 Scenarios 五个主场景实机记录（以下问题状态以顶部最新验收为准）。** 原生 DSH 界面已跑预测、解释、钢材模型比较、最终 HTML 查看及下载。形成焓 10×66 解释已补齐；五份最终报告共 10 张内嵌图、五份完整会话已导出。四份预测 CSV 独立重算指标，8 份 CSV 和 5 份 HTML 下载与源文件一致。钢材过强结论/R² 方向、单车星期/归因经 UI 追问纠正；不代表首轮报告全部正确。中文上传修复 53 项 Python 测试通过，未发布。旧报告删除造成旧卡失效、聊天 SVG 预览、多特征报告阅读仍待改进。见 `../scenarios-ui-validation-20261101/README.md`；入口 `index.html`。仅有关键帧、部分连续截图和完整日志，没有全程录像；浏览器完整流程及可选边界未重测。没有发版。
+
+> **最新演示交接：先读 [DEMO-RECORDING.md](DEMO-RECORDING.md)。** 当前基线为 v0.3.6，另一台电脑已安装 DSH；按短业务问题从浏览器操作并全程记录。此前 [USER-ACCEPTANCE.md](USER-ACCEPTANCE.md) 保留 v0.3.1 验收计划，不再作为安装版本依据。安装以 INSTALL.md 为准，不复制维护者的 profile、开发软链接或独立 MCP。数据与录制计划另随便携包提供，未上传源码仓库。
 
 > 0.3.1 本轮交付：默认业务分析报告与 Markdown 文件、中文专属提示词、紧凑辅助卡及长特征标签。标准模式隔离保留。审查与验证见 reviews/report-release-review.md。
 

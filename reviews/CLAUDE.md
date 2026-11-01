@@ -2,6 +2,7 @@
 
 > L2 | 父级: ../CLAUDE.md
 
+scenarios-release-review.md - v0.3.7 报告、环境、输入与分发交叉审查；记录修复、最终检查和未验收项。
 causal-backend-review.md - 解释后端与宿主交叉审查；记录离线复现、修复状态和验证边界。
 causal-frontend-review.md - 结果卡交叉审查；记录解释语义、全屏竞态及大结果裁剪的修复证据。
 benchmark-release-review.md - 多模型比较与五插件封装审查；记录离线复现、平台边界和打包清单核验。

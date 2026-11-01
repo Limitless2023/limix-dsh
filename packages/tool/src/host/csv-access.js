@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 本地文件系统、显式 CSV 根目录、成功调用的文件路径。
- * [OUTPUT]: createCsvAccess，校验真实路径、扩展名与显式大小限额；解释产物要求登记。
+ * [OUTPUT]: createCsvAccess，校验真实路径、扩展名与显式大小限额；报告登记持久保留，普通产物最多 1000 条。
  * [POS]: 图表读取边界；凭据不进入记录，重启后仍可读取已完成的预测。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
@@ -11,6 +11,7 @@ import { randomUUID } from 'node:crypto'
 
 let writes = Promise.resolve()
 const DEFAULT_MAX_BYTES = 5_000_000
+const isReportFile = path => /\.(?:html|md|svg)$/i.test(path)
 
 export function createCsvAccess(roots, receiptPath = join(homedir(), '.limix', 'dsh-csv-files.json'), options = {}) {
   const extensions = options.extensions ?? ['.csv']
@@ -34,7 +35,10 @@ export function createCsvAccess(roots, receiptPath = join(homedir(), '.limix', '
         }
         await mkdir(dirname(receiptPath), { recursive: true })
         const temp = `${receiptPath}.${randomUUID()}.tmp`
-        await writeFile(temp, JSON.stringify([...files].slice(-1000)), { mode: 0o600 })
+        // 沿用旧登记文件，避免升级后历史报告失去授权；普通预测产物仍限制数量。
+        const retained = [...files].filter(isReportFile)
+        const recent = [...files].filter(path => !isReportFile(path)).slice(-1000)
+        await writeFile(temp, JSON.stringify([...retained, ...recent]), { mode: 0o600 })
         await rename(temp, receiptPath)
       }
       writes = writes.then(save, save)

@@ -1,6 +1,6 @@
 """
 [INPUT]: explain 模块；模拟真实异步返回与临时 CSV。
-[OUTPUT]: 单样本/原值对应、时序参数拒绝、回执恢复、进度日志和输出完整性验证。
+[OUTPUT]: 单样本/原值对应、回执恢复、进度日志和报告视图完整性验证。
 [POS]: 解释业务契约测试，不调用生产 API。
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 """
@@ -53,6 +53,10 @@ class ExplainTests(unittest.TestCase):
         self.assertEqual(summary['explanation']['samples'][0]['feature_values'],['4','8'])
         self.assertNotIn('feature_values_by_row',summary['explanation'])
         self.assertTrue((self.root/'out.csv').exists())
+        detail=Path(summary['explanation']['detail_path'])
+        view=json.loads(detail.read_text())
+        self.assertEqual(view['task_status'],'succeeded')
+        self.assertEqual(view['samples'],summary['explanation']['samples'])
 
     def test_progress_log_records_submit_status_changes_and_save(self):
         cli=Mock();cli.upload_file.return_value={'data_version_id':'version-1'}
@@ -117,6 +121,7 @@ class ExplainTests(unittest.TestCase):
         self.assertEqual(cli.api_call.call_args.args[1],'GET')
         self.assertEqual(cli.emit.call_args.args[0]['task_status'],'degraded_succeeded')
         self.assertEqual(cli.emit.call_args.args[0]['explanation']['risks'],['仅局部归因'])
+        self.assertEqual(json.loads((self.root/'out.view.json').read_text())['task_status'],'degraded_succeeded')
 
     def test_unknown_submission_receipt_blocks_duplicate_post(self):
         (self.root/'out.receipt.json').write_text(json.dumps({'task_id':None,'context':{}}))

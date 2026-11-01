@@ -1,6 +1,6 @@
 /**
  * [INPUT]: node:test；构建后的工具入口、preset 补丁、命令与 CSV 边界。
- * [OUTPUT]: preset 默认配置与挂载隔离、工作流注册、附件传递、取消与文件边界验证。
+ * [OUTPUT]: preset 默认配置与挂载隔离、工作流注册、附件传递、取消、文件边界与历史报告保留验证。
  * [POS]: tool 宿主契约测试，不调用生产 API。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
@@ -138,6 +138,34 @@ test('并发登记合并记录，超大文件与非 CSV 不公开', async () => 
     assert.equal(await access.resolve(files[1]), await realpath(files[1]))
     assert.equal(await access.resolve(files[2]), null)
     assert.equal(await access.resolve(files[3]), null)
+  } finally { await rm(temp, { recursive: true, force: true }) }
+})
+
+test('旧登记的 HTML/MD/SVG 在超过1000个普通产物后仍可读，普通产物保留上限不变', async () => {
+  const temp = await mkdtemp(join(tmpdir(), 'limix-report-retention-'))
+  try {
+    const receipt = join(temp, 'files.json')
+    const history = ['old.html', 'old.md', 'old.SVG'].map(file => join(temp, file))
+    const secret = join(temp, 'unregistered.html')
+    await Promise.all([...history, secret].map(file => writeFile(file, 'history')))
+    // 直接写入升级前的共享登记格式，不能要求用户重新生成旧报告。
+    await writeFile(receipt, JSON.stringify(await Promise.all(history.map(file => realpath(file)))))
+    const artifacts = Array.from({ length: 1002 }, (_, i) => join(temp, `result-${i}.${i % 2 ? 'csv' : 'json'}`))
+    await Promise.all(artifacts.map(file => writeFile(file, '1')))
+    const access = createCsvAccess([temp], receipt, { extensions: ['.csv', '.json'], registeredOnly: true })
+    await access.remember(artifacts, temp)
+    const reports = createCsvAccess([temp], receipt, { extensions: ['.html', '.md', '.svg'], registeredOnly: true })
+    for (const file of history) assert.equal(await reports.resolve(file), await realpath(file))
+    assert.equal(await reports.resolve(secret), null)
+    assert.equal(await access.resolve(artifacts[0]), null)
+    assert.equal(await access.resolve(artifacts[1]), null)
+    assert.equal(await access.resolve(artifacts[2]), await realpath(artifacts[2]))
+    assert.equal(await access.resolve(artifacts.at(-1)), await realpath(artifacts.at(-1)))
+    assert.equal(JSON.parse(await readFile(receipt, 'utf8')).length, 1003)
+    await unlink(history[0])
+    assert.equal(await reports.resolve(history[0]), null, '登记不绕过文件存在性检查')
+    await unlink(history[1]); await symlink(secret, history[1])
+    assert.equal(await reports.resolve(history[1]), null, '旧路径替换为未登记文件的链接仍拒绝')
   } finally { await rm(temp, { recursive: true, force: true }) }
 })
 

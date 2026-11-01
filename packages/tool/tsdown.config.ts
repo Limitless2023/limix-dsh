@@ -1,6 +1,8 @@
 /**
- * [POS]: dsh-limix-tool 的构建入口——只有宿主半（limix 工具 + csv 只读路由）。
- *        界面半在 dsh-limix-agent 包里，由 profile 加载。
+ * [INPUT]: 宿主入口与共用的 React/SVG 图表。
+ * [OUTPUT]: 包含离线报告渲染器的宿主 ESM。
+ * [POS]: React 服务端渲染随包构建，不依赖用户另装图表环境。
+ * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
 import { defineConfig } from 'tsdown'
 
@@ -13,5 +15,7 @@ export default defineConfig([
     dts: false,
     clean: false,
     fixedExtension: false,
+    noExternal: [/^react(?:-dom)?(?:\/|$)/],
+    define: { 'process.env.NODE_ENV': '"production"' },
   },
 ])

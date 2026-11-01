@@ -1,7 +1,7 @@
 """固定拆分的多模型实测。
 
 [INPUT]: 训练/预测/独立真值 manifest；cli 的 HTTP 层；可取消的独立计算环境。
-[OUTPUT]: add_parser；stdout 紧凑摘要、完整 JSON/CSV/HTML、输入保护与可恢复回执。
+[OUTPUT]: add_parser；结果与回执；delegated_process 支持取消及可选超时。
 [POS]: tool assets 的可选 benchmark 编排层；重依赖仅在调用时加载。
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 """
@@ -597,8 +597,8 @@ def stop_process_tree(process):
     process.communicate(timeout=5)
 
 
-def delegated_process(command,env):
-    """宿主取消会传到独立环境；处理启动期间信号，避免留下孤儿进程。"""
+def delegated_process(command,env,timeout=None):
+    """取消或超时统一终止委派进程树；默认不限时，由宿主控制期限。"""
     cancelled = [None]
     def cancel(signum,_frame):
         cancelled[0] = signum
@@ -607,12 +607,17 @@ def delegated_process(command,env):
     try:
         options = {'start_new_session':True} if os.name!='nt' else {'creationflags':subprocess.CREATE_NEW_PROCESS_GROUP}
         process = subprocess.Popen(command,env=env,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,**options)
+        deadline = None if timeout is None else time.monotonic()+timeout
         while True:
             if cancelled[0] is not None:
                 stop_process_tree(process)
                 raise SystemExit(128+cancelled[0])
+            remaining = None if deadline is None else deadline-time.monotonic()
+            if remaining is not None and remaining <= 0:
+                stop_process_tree(process)
+                raise subprocess.TimeoutExpired(command,timeout)
             try:
-                stdout,stderr = process.communicate(timeout=0.2)
+                stdout,stderr = process.communicate(timeout=0.2 if remaining is None else min(0.2,remaining))
                 if cancelled[0] is not None:
                     stop_process_tree(process)
                     raise SystemExit(128+cancelled[0])

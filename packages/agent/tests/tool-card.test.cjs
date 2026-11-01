@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 真实工具卡、首屏组件与脱敏回归结果。
- * [OUTPUT]: node:test 验证状态、帮助卡、指标、详情隐藏与模式隔离。
+ * [OUTPUT]: node:test 验证状态、报告附件、帮助卡、指标与模式隔离。
  * [POS]: 防止工具错误误报成功和 LimiX 引导泄漏到标准模式。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
@@ -61,6 +61,19 @@ test('空边列表不伪造关系，非数值分数不渲染', () => {
 const render = (text) => renderToStaticMarkup(React.createElement(LimixToolCard, {
   callId: 'test', block: { ...fixture, kind: 'tool-result', content: [{ type: 'text', text }] },
 }))
+
+test('报告卡提供两种文件下载，不重复绘制整份报告', () => {
+  const html = renderToStaticMarkup(React.createElement(LimixToolCard, { callId: 'report', openFile() {}, block: {
+    kind: 'tool-result', call: { name: 'limix', argsRaw: JSON.stringify({ command: 'report', args: [] }) },
+    content: [{ type: 'text', text: JSON.stringify({ kind: 'report', status: 'succeeded', saved_to: '/tmp/report.html', markdown_path: '/tmp/report.md', chart_count: 3 }) }],
+  } }))
+  assert.match(html, /业务分析报告/)
+  assert.match(html, /下载 HTML 报告/)
+  assert.match(html, /下载 Markdown/)
+  assert.match(html, /3.*张结果图/)
+  assert.match(html, /\/limix-ui\/report\?path=/)
+  assert.doesNotMatch(html, /lx-bench-chart|lx-contribution-heatmap/)
+})
 
 test('真实结果默认展示指标，隐藏 ID、命令和原始返回值', () => {
   const html = render(fixture.content[0].text)

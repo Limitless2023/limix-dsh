@@ -1,15 +1,16 @@
 /**
- * [INPUT]: 五个插件 package.json、源码、npm 及本地构建依赖。
+ * [INPUT]: 五个插件清单、源码、共用分发契约、npm 及本地构建依赖。
  * [OUTPUT]: dist/v<version> 的 tarball、manifest.json、SHA256SUMS。
  * [POS]: 发布封装器；构建后核验文件，不提交 Git 或上传 Release。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
 import { execFileSync } from 'node:child_process'
-import { readFile, readdir, mkdir, writeFile } from 'node:fs/promises'
+import { readFile, mkdir, writeFile } from 'node:fs/promises'
 import { createHash } from 'node:crypto'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import assert from 'node:assert/strict'
+import { assertPackageFiles } from './package-contract.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const packages = ['data', 'tool', 'agent', 'preset', 'brand']
@@ -27,17 +28,7 @@ for (const { directory, manifest } of definitions) {
   if (manifest.scripts?.build) execFileSync('npm', ['run', 'build'], { cwd, stdio: 'inherit' })
   const [packed] = JSON.parse(execFileSync('npm', ['pack', '--json', '--ignore-scripts', '--pack-destination', output], { cwd, encoding: 'utf8' }))
   const files = new Set(packed.files.map(file => file.path))
-  const required = ['package.json', 'cordis.patch.yml']
-  const visit = value => {
-    if (typeof value === 'string' && value.startsWith('./') && !value.includes('*')) required.push(value.slice(2))
-    else if (value && typeof value === 'object') Object.values(value).forEach(visit)
-  }
-  visit(manifest.exports)
-  if (directory === 'tool') {
-    for (const file of await readdir(resolve(cwd, 'assets'))) if (/^limix.*\.py$/.test(file)) required.push(`assets/${file}`)
-  }
-  for (const file of required) assert.ok(files.has(file), `${manifest.name}: 缺少 ${file}`)
-  for (const file of files) assert.ok(!/(^|\/)(\.DS_Store|\.env|node_modules|__pycache__)(\/|$)/.test(file), `禁止打包 ${file}`)
+  await assertPackageFiles(manifest, files, cwd)
   const bytes = await readFile(resolve(output, packed.filename))
   results.push({ name: manifest.name, version, filename: packed.filename, bytes: bytes.length,
     sha256: createHash('sha256').update(bytes).digest('hex'), integrity: packed.integrity, files: [...files] })

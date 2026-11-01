@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 依赖 ./tool-result.ts 的 parseToolResult/resultState/metricEntries；数据是工具名、参数与 CLI 输出文本。
- * [OUTPUT]: 对外提供 Stage、limixStage、localStage、runningStage、parseSteps、classifyLimix。
+ * [OUTPUT]: 本地 report 核验归入结果分析、生成归入报告输出； 对外提供 Stage、limixStage、localStage、runningStage、parseSteps、classifyLimix。
  * [POS]: 分析过程的单步翻译层：把一次工具调用译成业务标题、参数行、结果行与接口步骤。
  *        pipeline-model.ts 负责分轮，本文件不感知轮次与界面。指标只读工具 metrics，不从日志猜数字。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
@@ -96,6 +96,8 @@ export function classifyLimix(args: Args): { title: string; limix: boolean } {
     health: '检查服务连接', check: '检查接口权限', data: '查询数据版本', cancel: '取消任务',
   }
   if (cmd === 'explain') return { title: '因果解释', limix: true }
+  if (cmd === 'report') return { title: list.includes('--inspect') ? '结果分析' : '报告输出', limix: false }
+  if (cmd === 'runtime') return { title: '准备工作', limix: false }
   if (cmd === 'benchmark') {
     const models = flag(list, '--models')
     return !models || /LIMIX/i.test(models) ? { title: '模型比较', limix: true } : { title: '模型比较', limix: false }
@@ -172,6 +174,8 @@ function limixOutcome(cmd: string, data: Json | null): string {
   if (!data) return ''
   if (cmd === 'explain') return explainOutcome(data)
   if (cmd === 'benchmark') return benchmarkOutcome(data)
+  if (cmd === 'report' && data.kind === 'report_facts') return '已核验图表指标与样本范围'
+  if (cmd === 'report' && data.kind === 'report') return `Markdown + HTML · ${data.chart_count} 张结果图`
   if (cmd === 'upload' && typeof data.row_count === 'number') return `${data.row_count} 行 × ${data.column_count} 列`
   if (cmd === 'check' && typeof data.allowed === 'boolean') return data.allowed ? '有权限' : '无权限'
   const metrics = metricEntries(data).slice(0, 2).map(m => `${m.label} ${m.value}`)

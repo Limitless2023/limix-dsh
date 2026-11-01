@@ -1,6 +1,6 @@
 /**
  * [INPUT]: pipeline-model 的轮次与 pipeline-stage 的工具事实、参数和结构化结果。
- * [OUTPUT]: FlowStep、flowSteps、flowState、stepTitle、stepSummary、stepFiles、explanationMode。
+ * [OUTPUT]: 收集 Markdown 与 HTML 报告路径； FlowStep、flowSteps、flowState、stepTitle、stepSummary、stepFiles、explanationMode。
  * [POS]: 将相邻操作归并为业务步骤；仅按明确文件类型、命令与操作说明分类，不生成分析结论。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
@@ -40,6 +40,7 @@ export function stageFiles(stage: Stage): FlowFile[] {
       add(stage.data?.saved_to, 'output', '结果文件')
       add(stage.data?.csv_path, 'output', '结果数据')
       add(stage.data?.report_path, 'output', '分析报告')
+      add(stage.data?.markdown_path, 'output', 'Markdown 报告')
     }
   } else {
     const path = stage.args.file_path ?? stage.args.path

@@ -8,12 +8,13 @@
           task / tasks / cancel / result / download / data / api / docs / doctor / explain / benchmark
 [POS]: dsh-limix-tool 的 CLI；指标计算由同目录 limix_metrics 提供；解释由 limix_explain 编排。
        本地真值校验失败使用统一错误出口。
+       上传头使用安全 ASCII 文件名，保留原文件路径、扩展名与内容。
        预测与解释零第三方依赖；benchmark 的本地模型依赖独立 Python 环境；docs 子命令读取 Mintlify Markdown，无需凭证。
        文档 https://limix.mintlify.site/api/overview，2026-09-14 核对（54 主线 + 3 按需端点）。
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 """
 
-from limix_metrics import compute_metrics, inference_metrics_context
+from limix_metrics import compute_metrics, inference_metrics_context, seasonal_baseline
 from limix_explain import add_parser as add_explain_parser
 from limix_benchmark import add_parser as add_benchmark_parser
 
@@ -215,6 +216,11 @@ def encode_multipart(file_path, fields):
         parts.append(
             f"--{boundary}\r\nContent-Disposition: form-data; name=\"{k}\"\r\n\r\n{v}\r\n".encode("utf-8"))
     filename = os.path.basename(file_path)
+    # 服务端拒绝非 ASCII 上传名；仅替换传输头，不改用户文件或数据。
+    if not re.fullmatch(r"[A-Za-z0-9_. -]+", filename):
+        suffix = Path(filename).suffix
+        suffix = suffix if re.fullmatch(r"\.[A-Za-z0-9]+", suffix) else ""
+        filename = f"upload-{uuid.uuid4().hex}{suffix}"
     with open(file_path, "rb") as f:
         content = f.read()
     parts.append(
@@ -334,6 +340,10 @@ def run_inference(cfg, kind, payload, sync, no_wait, out_path, wait_seconds, met
             metrics = None
     if metrics:
         result["metrics"] = metrics
+        result["evaluation"] = {"status": "needs_review" if metrics.get("r2", 0) < 0 else "evaluated",
+                                "business_acceptance": "unknown_without_tolerance"}
+    if kind == "timeseries" and out_path and ctxm.get("train") and ctxm.get("predict_path"):
+        result["baseline_evaluation"] = seasonal_baseline(ctxm["train"], ctxm["predict_path"], result["saved_to"], ctxm.get("target"), ctxm.get("date"))
     emit(result)
 
 

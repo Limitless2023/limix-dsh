@@ -6,7 +6,8 @@
  */
 import { randomUUID } from 'node:crypto'
 
-const WORKFLOW = `当用户要求比较 LimiX 与其他模型、比较不同 LimiX 模型，或使用 /limix-compare，执行固定拆分模型比较：
+const WORKFLOW = `比较依赖由插件激活时预装到独立 Python 环境；先用 runtime status 查看状态，失败用 runtime prepare 重试。不得临时向系统 Python 安装依赖；需要自定义环境时才用 --python。
+当用户要求比较 LimiX 与其他模型、比较不同 LimiX 模型，或使用 /limix-compare，执行固定拆分模型比较：
 1. 当前 benchmark 仅支持 regression/classification。时序比较尚未接入；收到时序比较请求时先说明边界，不能将任务伪装成回归比较或承诺自动完成。先明确数据、目标和独立测试集；同一数据集的所有模型使用完全相同的训练/测试拆分和特征，真值只用于本地评估。分类分层，同一实体或重复样本放在同组；不按成绩挑样本或删除差结果。
 2. 用 limix 工具 command=benchmark；manifest JSON 的 datasets 数组包含 id/name/task_type/target/train/predict/truth，文件相对 manifest 所在目录解析。遵守用户指定模型范围，未指定时默认 LIMIX_7M、LIMIX_16M、XGBoost 与均值/多数类 BASELINE；固定 --seed，保存唯一 --output 路径。核对特征在业务预测时点可获得，不能使用目标泄漏或事后信息。
 3. 比较入口需要独立 Python 环境中的 numpy/pandas/scikit-learn；选择 XGBoost 时另需 xgboost，并在固定训练集上训练。先检查已有环境，缺依赖时指出具体缺项，通过 --python 指定解释器，不修改宿主运行时。LimiX 预测和解释自身不需要这些第三方库。

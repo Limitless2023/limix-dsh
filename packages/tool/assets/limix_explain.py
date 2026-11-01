@@ -1,6 +1,6 @@
 """
 [INPUT]: CLI HTTP/上传函数；本地 CSV 或时序预测结果版本、字段字典与原预测文件。
-[OUTPUT]: explain 子命令；表格/时序局部解释、关系图 JSON/CSV 与受控视图文件。
+[OUTPUT]: explain 子命令；所有模式保存 JSON/CSV/.view.json，供结果卡和报告复用。
 [POS]: 扩展任务编排；与预测状态分离，提交回执支持超时续查。stderr 进度行由 agent 的 pipeline-stage 解析，改格式须同步。
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 """
@@ -13,6 +13,7 @@ import time
 from pathlib import Path
 from limix_explain_batch import select_rows, normalize_local, contribution_rows
 from limix_explain_timeseries import normalize_timeseries
+from limix_explain_input import prepare_features, stratified_rows, numeric
 
 TERMINAL = {'succeeded', 'degraded_succeeded', 'partially_succeeded', 'failed', 'timeout', 'cancelled'}
 SUCCESS = {'succeeded', 'degraded_succeeded', 'partially_succeeded'}
@@ -29,7 +30,9 @@ def add_parser(sub, cli):
     selection = p.add_mutually_exclusive_group()
     selection.add_argument('--row', type=int, help='local 解释输入第几行（1 起，不含表头）；默认第 1 行')
     selection.add_argument('--rows', help='local 批量行号：1-10、1,3,5-8 或 all；与 --row 互斥')
-    p.add_argument('--features', help='显式特征，逗号分隔；默认排除目标列')
+    selection.add_argument('--sample-count', type=int, help='按预测类别确定性抽样；仅分类 local，须 --prediction；不替代显式行号')
+    p.add_argument('--sample-seed', type=int, default=42, help='分组抽样随机种子，默认42')
+    p.add_argument('--features', help='显式特征，逗号分隔；默认排除目标与已识别标识列，可显式覆盖')
     p.add_argument('--labels', help='可选 JSON：fields 字段中文名映射、target_label、unit')
     p.add_argument('--prediction', help='可选原预测 CSV，用同一行的 pred_label 对比解释时预测')
     p.add_argument('--model', choices=['LIMIX_2M','LIMIX_7M','LIMIX_16M','LIMIX_64M'], help='表格默认 LIMIX_16M；时序沿用原模型，不传')
@@ -72,7 +75,7 @@ def validate(args):
         version = getattr(args,'result_version_id',None)
         if args.mode != 'local' or not isinstance(version,str) or not version.strip():
             raise ValueError('时序解释必须使用 --mode local --task-type timeseries --result-version-id 已完成预测版本')
-        for key in ['data','train','target','features','row','rows','prediction','model']:
+        for key in ['data','train','target','features','row','rows','prediction','model','sample_count']:
             if getattr(args,key,None) is not None:
                 raise ValueError(f'时序解释沿用原预测参数，不接受 --{key.replace("_","-")}')
         signature={'mode':'local','task_type':'timeseries','result_version_id':version,
@@ -84,9 +87,8 @@ def validate(args):
     if not args.data or not args.target:
         raise ValueError('表格解释必须提供 --data 与 --target')
     columns, rows = read_csv(args.data)
-    features = [x.strip() for x in args.features.split(',')] if args.features else [x for x in columns if x != args.target]
-    if not features or len(features) != len(set(features)) or any(not x or x not in columns or x == args.target for x in features):
-        raise ValueError('特征列为空、重复、不存在或包含目标列')
+    train_rows = read_csv(args.train)[1] if args.mode == 'local' and args.train else None
+    features, excluded = prepare_features(columns, rows, args.target, args.features, train_rows)
     if args.mode == 'local':
         if not args.train or not args.task_type:
             raise ValueError('local 必须提供 --train 与 --task-type')
@@ -94,9 +96,20 @@ def validate(args):
         if any(x not in train_columns for x in features + [args.target]):
             raise ValueError('参考数据缺少特征或目标列')
         selected = select_rows(args.row, getattr(args, 'rows', None), len(rows))
+        if getattr(args, 'sample_count', None) is not None:
+            if args.task_type != 'classification' or not args.prediction:
+                raise ValueError('--sample-count 仅用于分类，须提供同一输入的 --prediction')
+            if args.row is not None or getattr(args, 'rows', None) is not None: raise ValueError('抽样与显式行号不能同时使用')
+            _, sampled_predictions = read_csv(args.prediction)
+            if len(sampled_predictions) != len(rows): raise ValueError('原预测与待解释数据行数不一致')
+            selected = stratified_rows(sampled_predictions, args.sample_count, getattr(args, 'sample_seed', 42))
+        for i,row in enumerate(train_rows or []):
+            value = row.get(args.target)
+            if value is None or not value.strip() or (args.task_type == 'regression' and not numeric(value)):
+                raise ValueError(f'参考数据第 {i+1} 行目标值无效')
     else:
         selected = []
-        if getattr(args, 'rows', None) is not None or args.row is not None:
+        if getattr(args, 'rows', None) is not None or args.row is not None or getattr(args, 'sample_count', None) is not None:
             raise ValueError('--row/--rows 仅用于 local')
         if args.target not in columns:
             raise ValueError('关系图输入必须包含目标列')
@@ -114,6 +127,9 @@ def validate(args):
         if len(predictions) != len(rows): raise ValueError('原预测与待解释数据行数不一致')
         # 有原特征时逐行核对，拒绝把不同文件的同一行号误绑定。
         for source, predicted in zip(rows, predictions):
+            for name in excluded:
+                if name in predicted and source[name] != predicted[name]:
+                    raise ValueError('原预测文件的样本 ID 与输入顺序不一致')
             for name in features:
                 if name in predicted and source[name] != predicted[name]:
                     try:
@@ -131,6 +147,9 @@ def validate(args):
     return rows, features, {'target': args.target, 'target_label': str(labels.get('target_label', args.target)),
         'unit': str(labels.get('unit', '')), 'labels': label_map, 'row_numbers': selected,
         'row_number': selected[0] if len(selected)==1 else None, 'feature_names':features,
+        'excluded_identifiers': excluded, 'sample_ids': {str(n): {c: rows[n-1][c] for c in excluded} for n in selected},
+        'selection_method': 'predicted_class_stratified' if getattr(args, 'sample_count', None) else ('all' if len(selected)==len(rows) else 'explicit_rows'),
+        'selection_seed': getattr(args, 'sample_seed', 42) if getattr(args, 'sample_count', None) else None,
         'prior_predictions': prior, 'input_rows': len(rows),'signature':signature,'task_type':args.task_type if args.mode=='local' else None,
         'feature_values_by_row':{str(n):{name:rows[n-1][name] if rows[n-1][name] != '' else None for name in features} for n in selected}}
 
@@ -267,12 +286,13 @@ def run(cfg, args, cli):
         if status not in SUCCESS:
             cli.die(data.get('error_message') or f'解释未完成：{status}',exit_code=3,payload={'task_id':task_id,'task_status':status,'saved_to':str(output)})
         view=normalize(data,context)
+        view['task_status']=status
         csv_path=output.with_suffix('.csv');export_csv(csv_path,view)
         cli.log(f'已保存解释 → {output}')
+        detail_path=output.with_suffix('.view.json');save_json(detail_path,view)
         if view.get('requested_count',1)>1:
-            detail_path=output.with_suffix('.view.json');save_json(detail_path,view)
             view={k:v for k,v in view.items() if k not in ['samples','prior_predictions','row_numbers']}
-            view['detail_path']=str(detail_path)
+        view['detail_path']=str(detail_path)
         cli.emit({'task_id':task_id,'task_status':status,'result_id':data.get('result_id'),'model_type':(data.get('result') or {}).get('model_type'),
             'saved_to':str(output),'csv_path':str(csv_path),'explanation':view})
     except (ValueError, OSError, KeyError, TypeError) as e:

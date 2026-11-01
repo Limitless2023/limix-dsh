@@ -1,5 +1,5 @@
 /**
- * [INPUT]: 实际宿主 runCli/registerLimixTool、benchmark.run 和离线假解释器。
+ * [INPUT]: 实际宿主 runCli/registerLimixTool、benchmark.run；显式指定离线假解释器，禁用自动环境预备。
  * [OUTPUT]: POSIX 取消子孙进程实测；Windows taskkill 调用与超时分支断言。
  * [POS]: benchmark 取消链集成测试；不读取业务配置、不发网络请求。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
@@ -39,9 +39,9 @@ test('取消宿主后，独立解释器与忽略 TERM 的孙进程都停止', { 
       + 'b.run({"base_url":"https://example.invalid"},a,None)\n')
     let definition
     registerLimixTool({ tools: { register: value => { definition = value } } },
-      { cliPath: outer, pythonBin: 'python3', timeoutMs: 10000 })
+      { cliPath: outer, pythonBin: 'python3', timeoutMs: 10000, preparePython: false })
     const controller = new AbortController()
-    const task = definition.execute({ command: 'benchmark', args: [], workdir: folder },
+    const task = definition.execute({ command: 'benchmark', args: ['--python', child], workdir: folder },
       { signal: controller.signal })
     const rejected = assert.rejects(task, { name: 'AbortError' })
     for (let i = 0; i < 60 && !existsSync(grandStarted); i++) await delay(50)

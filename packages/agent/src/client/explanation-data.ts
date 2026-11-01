@@ -26,6 +26,9 @@ export interface ExplanationData {
   row_number?: number
   row_numbers?: number[]
   input_rows?: number
+  selection_method?: string
+  selection_seed?: number | null
+  excluded_identifiers?: string[]
   prediction?: number | string
   prior_prediction?: number | string
   prediction_delta?: number

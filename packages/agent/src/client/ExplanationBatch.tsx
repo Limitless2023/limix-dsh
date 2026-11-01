@@ -56,6 +56,7 @@ export function ExplanationBatch({ data }: { data: ExplanationData }) {
     <div className="lx-batch-summary"><strong>{data.explained_count ?? allSamples.length} / {data.requested_count ?? allSamples.length} 个样本</strong><div className="lx-batch-meta"><span>{names.length} 个特征{data.input_rows ? ` · 输入共 ${data.input_rows} 行` : ''}</span>
       <ExplanationHelp label="数据说明"><p>{data.mapping === 'forecast_steps' ? '按接口返回的预测步与时间对应；特征包含服务生成的时间和季节性特征。' : data.mapping === 'input_order' ? '样本按输入顺序对应；接口未返回样本索引，返回数量与请求一致。' : '样本按接口返回的样本索引对应。'}</p><p>贡献用于解释预测，不代表实际调节收益。</p></ExplanationHelp>
     </div></div>
+    {data.input_rows && allSamples.length < data.input_rows && <p className="lx-explain-foot">当前解释 {allSamples.length} / {data.input_rows} 行{data.selection_method === 'predicted_class_stratified' ? ` · 按预测类别抽样（种子 ${data.selection_seed}）` : ''}；图中排名仅代表这些样本。</p>}
     {!!data.missing_rows?.length && <p className="lx-explain-warning">仅解释了部分样本；未返回原始行：{data.missing_rows.join('、')}。整体排序只统计已返回样本。</p>}
     <div className="lx-explain-tabs" aria-label="解释数据视图"><button type="button" data-lx-batch="visual" aria-pressed={view === 'visual'}>可视化</button><button type="button" data-lx-batch="raw" aria-pressed={view === 'raw'}>原始数据</button></div>
     <div className="lx-analysis-toolbar"><ExplanationFilter data={data} value={filter} onApply={applyFilter}/><ExplanationExport filename={`${data.target}-解释${active ? '-筛选对比' : ''}`} build={theme => contributionExportSvg(data, active ? visible : undefined, description, theme)}/></div>

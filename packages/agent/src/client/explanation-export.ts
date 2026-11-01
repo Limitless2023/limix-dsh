@@ -14,17 +14,19 @@ const escape = (value: unknown) => String(value).replace(/[&<>"']/g, c => ({ '&'
 const text = (x: number, y: number, value: unknown, size = 13, attrs = '') => `<text x="${x}" y="${y}" font-size="${size}" ${attrs}>${escape(value)}</text>`
 const start = (width: number, height: number, theme: ExportTheme, title: string) => `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img"><title>${escape(title)}</title><rect width="100%" height="100%" fill="${theme.background}"/><g fill="${theme.foreground}" font-family="system-ui, -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif">`
 const end = '</g></svg>'
+const short = (s: string) => Array.from(s).length > 24 ? Array.from(s).slice(0, 12).join('') + '…' + Array.from(s).slice(-10).join('') : s
 const signed = (v: number | null) => v === null ? '方向未定' : `${v > 0 ? '+' : ''}${number(v)}`
 
 export function contributionExportSvg(data: ExplanationData, filtered?: ExplanationData, description = '', theme = defaultExportTheme) {
   const coverage = data.samples?.length ? (filtered?.samples?.length ?? 0) / data.samples.length * 100 : 0
-  const groups = filtered ? [{ data: filtered, title: `当前筛选 · ${filtered.samples?.length ?? 0} 个样本 · 覆盖率 ${number(coverage)}%` }, { data, title: `全样本 · ${data.samples?.length ?? 0} 个样本` }] : [{ data, title: `全样本 · ${data.samples?.length ?? 0} 个样本` }]
-  const plotWidth = Math.max(700, (data.feature_names?.length ?? 1) * 48)
-  const labelWidth = Math.max(100, ...(data.feature_names ?? []).map(n => (data.labels?.[n] ?? n).length * 10))
+  const groups = filtered ? [{ data: filtered, title: `当前筛选 · ${filtered.samples?.length ?? 0} 个样本 · 覆盖率 ${number(coverage)}%` }, { data, title: `${data.input_rows && (data.samples?.length ?? 0) < data.input_rows ? '本次已解释' : '全样本'} · ${data.samples?.length ?? 0} 个样本${data.input_rows ? ` / 输入 ${data.input_rows} 行` : ''}` }] : [{ data, title: `${data.input_rows && (data.samples?.length ?? 0) < data.input_rows ? '本次已解释' : '全样本'} · ${data.samples?.length ?? 0} 个样本${data.input_rows ? ` / 输入 ${data.input_rows} 行` : ''}` }]
+  const plotWidth = Math.max(700, (data.feature_names?.length ?? 1) * 32)
+  const labelWidth = Math.min(250, Math.max(100, ...(data.feature_names ?? []).map(n => (data.labels?.[n] ?? n).length * 10)))
   const width = 80 + plotWidth + 64 + labelWidth + 20 + 290 + 110
-  const plotHeight = Math.max(330, Math.min(900, (data.samples?.length ?? 1) * 4), (data.feature_names?.length ?? 1) * 25)
-  const labelHeight = Math.max(95, ...(data.feature_names ?? []).map(n => (data.labels?.[n] ?? n).length * 10))
-  const sectionHeight = plotHeight + labelHeight + 100, height = 110 + groups.length * sectionHeight + 50
+  const plotHeight = Math.max(330, Math.min(600, (data.samples?.length ?? 1) * 4))
+  const rankHeight = Math.max(plotHeight, (data.feature_names?.length ?? 1) * 28)
+  const labelHeight = 180
+  const sectionHeight = Math.max(plotHeight + labelHeight, rankHeight + 40) + 100, height = 110 + groups.length * sectionHeight + 50
   const scales = contributionScales(data, ...(filtered ? [filtered] : [])), title = `预测解释 · ${data.target_label ?? data.target}`
   let svg = start(width, height, theme, title) + text(36, 38, title, 23, 'font-weight="600"') + text(36, 67, description || '全部已解释样本', 13)
   const timed = data.samples?.filter(s => s.timestamp)
@@ -45,16 +47,16 @@ export function contributionExportSvg(data: ExplanationData, filtered?: Explanat
     const ticks = [...new Set([0, .25, .5, .75, 1].map(t => Math.round(t * (samples.length - 1))))].filter(i => i >= 0 && i < samples.length)
     ticks.forEach(i => { svg += text(x - 12, y + (i + .5) * rowHeight + 4, samples[i].step ?? samples[i].row_number, 11, 'text-anchor="end"') })
     svg += text(36, y - 8, data.task_type === 'timeseries' ? '预测步' : '原始行', 11)
-    names.forEach((name, i) => { const label = data.labels?.[name] ?? name; svg += `<g transform="translate(${x + (i + .5) * columnWidth} ${y + plotHeight + 16}) rotate(55)">` + text(0, 0, label, 12) + (label === name ? '' : text(0, 17, name, 10, 'opacity=".65"')) + '</g>' })
-    svg += `<line x1="${barZero}" x2="${barZero}" y1="${y}" y2="${y + plotHeight}" stroke="${theme.border}"/>`
+    names.forEach((name, i) => { const label = data.labels?.[name] ?? name; svg += `<g transform="translate(${x + (i + .5) * columnWidth} ${y + plotHeight + 16}) rotate(55)">` + `<title>${escape(label + ' · ' + name)}</title>` + text(0, 0, short(label), 12) + '</g>' })
+    svg += `<line x1="${barZero}" x2="${barZero}" y1="${y}" y2="${y + rankHeight}" stroke="${theme.border}"/>`
     matrix.ranking.forEach((feature, i) => {
-      const cy = y + (i + .5) * plotHeight / Math.max(names.length, 1), v = feature.mean
+      const cy = y + (i + .5) * rankHeight / Math.max(names.length, 1), v = feature.mean
       const barWidth = v === null || !scales.meanMaximum ? 0 : Math.abs(v) / scales.meanMaximum * barHalf
-      svg += text(barLabel + labelWidth, cy - 1, feature.label, 12, 'text-anchor="end"') + (feature.label !== feature.name ? text(barLabel + labelWidth, cy + 13, feature.name, 10, 'text-anchor="end" opacity=".6"') : '')
+      svg += `<g><title>${escape(feature.label + ' · ' + feature.name)}</title>` + text(barLabel + labelWidth, cy - 1, short(feature.label), 12, 'text-anchor="end"') + (feature.label !== feature.name ? text(barLabel + labelWidth, cy + 13, short(feature.name), 10, 'text-anchor="end" opacity=".6"') : '')
       if (v !== null) svg += `<rect x="${v < 0 ? barZero - barWidth : barZero}" y="${cy - 5}" width="${barWidth}" height="10" fill="${v < 0 ? contributionColors.negative : contributionColors.positive}"/>`
-      svg += text(width - 30, cy + 4, signed(v), 12, 'text-anchor="end"')
+      svg += text(width - 30, cy + 4, signed(v), 12, 'text-anchor="end"') + '</g>'
     })
-    svg += text(barZero - barHalf, y + plotHeight + 20, `−${number(scales.meanMaximum)}`, 11, 'text-anchor="middle"') + text(barZero, y + plotHeight + 20, '0', 11, 'text-anchor="middle"') + text(barZero + barHalf, y + plotHeight + 20, `+${number(scales.meanMaximum)}`, 11, 'text-anchor="middle"')
+    svg += text(barZero - barHalf, y + rankHeight + 20, `−${number(scales.meanMaximum)}`, 11, 'text-anchor="middle"') + text(barZero, y + rankHeight + 20, '0', 11, 'text-anchor="middle"') + text(barZero + barHalf, y + rankHeight + 20, `+${number(scales.meanMaximum)}`, 11, 'text-anchor="middle"')
   })
   svg += text(36, height - 36, '蓝色负向 · 绿色正向 · 灰蓝中性 · 灰色方向未定；中性按 0 计入均值，正负会抵消。', 12)
   return svg + end

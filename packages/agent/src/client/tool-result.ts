@@ -13,11 +13,18 @@ function objectJson(text: string): Json | null {
   } catch { return null }
 }
 
+/** CLI 先写进度日志，失败时最后写错误 JSON：整段解析失败后取末尾 JSON 块 */
+function errorJson(stderr: string): Json | null {
+  const text = stderr.trim()
+  const start = text.lastIndexOf('\n{')
+  return objectJson(text) ?? (start >= 0 ? objectJson(text.slice(start + 1)) : null)
+}
+
 export function parseToolResult(text: string) {
   const [stdout, stderr = ''] = text.split('\n[stderr]\n')
   const envelope = objectJson(stdout.trim())
   const data = typeof envelope?.stdout === 'string' ? objectJson(envelope.stdout) : envelope
-  const errorData = objectJson(stderr.trim())
+  const errorData = errorJson(stderr)
   const failed = (typeof envelope?.exitCode === 'number' && envelope.exitCode !== 0)
     || data?.ok === false || data?.success === false || ['failed', 'timeout'].includes(data?.task_status ?? data?.status)
     || (!stdout.trim() && !!stderr.trim())

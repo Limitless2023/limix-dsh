@@ -31,7 +31,7 @@ let react_dom = require("react-dom");
 react_dom = __toESM(react_dom);
 
 //#region src/client/ConfusionMatrix.tsx
-const ACCENT$2 = "#2563eb";
+const ACCENT$1 = "#2563eb";
 /** 单元格边长按类别数收缩，保证整图宽度稳定在卡片内 */
 function cellSize(k) {
 	return k <= 3 ? 62 : k <= 5 ? 52 : k <= 8 ? 42 : 34;
@@ -122,7 +122,7 @@ function ConfusionMatrix({ data }) {
 								width: cs - 2,
 								height: cs - 2,
 								rx: 3,
-								fill: ACCENT$2,
+								fill: ACCENT$1,
 								opacity: v === 0 ? .04 : .1 + .72 * f
 							}),
 							diag && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("rect", {
@@ -132,7 +132,7 @@ function ConfusionMatrix({ data }) {
 								height: cs - 2,
 								rx: 3,
 								fill: "none",
-								stroke: ACCENT$2,
+								stroke: ACCENT$1,
 								strokeWidth: "1.5",
 								opacity: "0.85"
 							}),
@@ -362,7 +362,7 @@ function ForecastChart({ hist, pred, p10, p90, truth, startLabel, endLabel, targ
 
 //#endregion
 //#region src/client/ScatterChart.tsx
-const ACCENT$1 = "#2563eb";
+const ACCENT = "#2563eb";
 const W = 400;
 const H = 300;
 const PAD = {
@@ -438,7 +438,7 @@ function ScatterChart({ data }) {
 					cx: sx(p.t),
 					cy: sy(p.p),
 					r,
-					fill: ACCENT$1,
+					fill: ACCENT,
 					opacity: op
 				}, i)),
 				/* @__PURE__ */ (0, react_jsx_runtime.jsx)("text", {
@@ -753,11 +753,17 @@ function objectJson(text$1) {
 		return null;
 	}
 }
+/** CLI 先写进度日志，失败时最后写错误 JSON：整段解析失败后取末尾 JSON 块 */
+function errorJson(stderr) {
+	const text$1 = stderr.trim();
+	const start$1 = text$1.lastIndexOf("\n{");
+	return objectJson(text$1) ?? (start$1 >= 0 ? objectJson(text$1.slice(start$1 + 1)) : null);
+}
 function parseToolResult(text$1) {
 	const [stdout, stderr = ""] = text$1.split("\n[stderr]\n");
 	const envelope = objectJson(stdout.trim());
 	const data = typeof envelope?.stdout === "string" ? objectJson(envelope.stdout) : envelope;
-	const errorData = objectJson(stderr.trim());
+	const errorData = errorJson(stderr);
 	return {
 		data,
 		failed: typeof envelope?.exitCode === "number" && envelope.exitCode !== 0 || data?.ok === false || data?.success === false || ["failed", "timeout"].includes(data?.task_status ?? data?.status) || !stdout.trim() && !!stderr.trim(),
@@ -2599,7 +2605,7 @@ function ExplanationGraph({ data }) {
 				className: "lx-explain-subtitle",
 				children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 					className: "lx-graph-mode",
-					children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { children: data.mode === "directed" ? "有向关系探索" : "无向关联探索" }), /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(ExplanationHelp, {
+					children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { children: data.mode === "directed" ? "全局因果 · 有向" : "全局因果 · 无向" }), /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(ExplanationHelp, {
 						label: "关系图说明",
 						children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", { children: "连线表示模型发现的关系，数值为关系分数。" }), data.mode === "directed" && cycles.length > 0 && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", { children: "图中含双向或循环关系，不代表确定的因果顺序。" })]
 					})]
@@ -3223,7 +3229,7 @@ const COMMAND_LABELS = {
 	result: "预测结果",
 	data: "数据查询",
 	cancel: "取消任务",
-	explain: "预测解释",
+	explain: "因果解释",
 	benchmark: "多模型效果比较"
 };
 const CSS$1 = `
@@ -3300,7 +3306,7 @@ function LimixToolCard({ callId, block, inspect, cwd, openFile }) {
 	const cliFailed = settled && (block?.isError === true || result.failed);
 	const status = resultState(settled, cliFailed, parsed);
 	const metrics = metricEntries(parsed);
-	const argList = (0, react.useMemo)(() => {
+	const argList$1 = (0, react.useMemo)(() => {
 		const raw = Array.isArray(args.args) ? args.args.filter((a) => typeof a === "string") : [];
 		return raw[0] === args.command ? raw.slice(1) : raw;
 	}, [args]);
@@ -3308,13 +3314,13 @@ function LimixToolCard({ callId, block, inspect, cwd, openFile }) {
 	const cmdLine = [
 		"limix",
 		typeof args.command === "string" ? args.command : "",
-		...argList.map(shorten)
+		...argList$1.map(shorten)
 	].filter(Boolean).join(" ");
 	/** 取命令行某个 flag 的值；时序与分类/回归两条支路共用 */
-	const flagValue = (0, react.useMemo)(() => (flag) => {
-		const i = argList.indexOf(flag);
-		return i >= 0 && i + 1 < argList.length ? argList[i + 1] : void 0;
-	}, [argList]);
+	const flagValue = (0, react.useMemo)(() => (flag$1) => {
+		const i = argList$1.indexOf(flag$1);
+		return i >= 0 && i + 1 < argList$1.length ? argList$1[i + 1] : void 0;
+	}, [argList$1]);
 	/** 结果文件路径：三类任务的 -o 产物统一经 saved_to 回报 */
 	const savedCsv = (0, react.useMemo)(() => {
 		const s = parsed && typeof parsed["saved_to"] === "string" ? parsed["saved_to"] : null;
@@ -3436,13 +3442,13 @@ function LimixToolCard({ callId, block, inspect, cwd, openFile }) {
 	const target = explanation?.target_label ?? flagValue("--target");
 	const rows$1 = parsed?.result_content?.rows ?? parsed?.rows;
 	const sampleCount = parsed?.metrics?.n;
-	const help = argList.some((arg) => arg === "--help" || arg === "-h");
+	const help = argList$1.some((arg) => arg === "--help" || arg === "-h");
 	const prediction = !help && [
 		"regress",
 		"classify",
 		"forecast"
 	].includes(command);
-	const title = help ? "参数说明" : explanation && explanation.mode !== "local" ? "因果关系探索" : COMMAND_LABELS[command] ?? "工具结果";
+	const title = help ? "参数说明" : COMMAND_LABELS[command] ?? "工具结果";
 	const file = typeof parsed?.saved_to === "string" ? parsed.saved_to : null;
 	const errorMessage = typeof result.error?.error === "string" ? result.error.error : typeof result.error?.error_message === "string" ? result.error.error_message : "请展开调用详情，查看失败原因。";
 	const hint = typeof result.error?.hint === "string" ? result.error.hint : "";
@@ -3665,94 +3671,14 @@ function LimixToolCard({ callId, block, inspect, cwd, openFile }) {
 }
 
 //#endregion
-//#region src/client/LimixPipelineView.tsx
-const ACCENT = "rgb(65, 118, 230)";
-function textOf$1(blocks) {
-	return (blocks ?? []).filter((b) => (b.type === "text" || b.kind === "text") && b.text).map((b) => b.text).join("\n");
+//#region src/client/pipeline-stage.ts
+const baseName = (p) => p.split("/").pop() ?? p;
+const argList = (args) => Array.isArray(args.args) ? args.args.map(String) : [];
+const clip = (text$1, size) => text$1.length > size ? `${text$1.slice(0, size)}…（已截断）` : text$1;
+function flag(list, ...names) {
+	const i = list.findIndex((tok) => names.includes(tok));
+	return i >= 0 && i + 1 < list.length ? list[i + 1] : "";
 }
-function parseArgs(raw) {
-	try {
-		const v = JSON.parse(raw ?? "{}");
-		return typeof v === "object" && v !== null && !Array.isArray(v) ? v : {};
-	} catch {
-		return {};
-	}
-}
-/** stdout 段解析成对象（剥 [stderr] 段；整体 → 首末花括号截取） */
-function parseOutObj(text$1) {
-	const stdout = text$1.split("\n[stderr]\n")[0].trim();
-	if (!stdout) return null;
-	const asObj = (v) => typeof v === "object" && v !== null && !Array.isArray(v) ? v : null;
-	try {
-		const v = asObj(JSON.parse(stdout));
-		if (v) return v;
-	} catch {}
-	const a = stdout.indexOf("{");
-	const b = stdout.lastIndexOf("}");
-	if (a >= 0 && b > a) try {
-		return asObj(JSON.parse(stdout.slice(a, b + 1)));
-	} catch {}
-	return null;
-}
-/** 深扫对象里的目标键（≤3 层），同键取首见 */
-function deepFind(obj, keys, depth = 0, out = {}) {
-	if (!obj || typeof obj !== "object" || depth > 3) return out;
-	for (const [k, v] of Object.entries(obj)) {
-		const lk = k.toLowerCase();
-		if (keys.includes(lk) && (typeof v === "number" || typeof v === "string")) {
-			if (!(lk in out)) out[lk] = v;
-		} else if (typeof v === "object") deepFind(v, keys, depth + 1, out);
-	}
-	return out;
-}
-const METRIC_KEYS = [
-	"mape",
-	"rmse",
-	"mae",
-	"r2",
-	"accuracy",
-	"auc",
-	"f1",
-	"skillmape",
-	"skillmae"
-];
-const METRIC_ZH = {
-	mape: "MAPE",
-	rmse: "RMSE",
-	mae: "MAE",
-	r2: "R²",
-	accuracy: "准确率",
-	auc: "AUC",
-	f1: "F1",
-	skillmape: "超基线(MAPE)",
-	skillmae: "超基线(MAE)"
-};
-const ID_KEYS = [
-	"task_id",
-	"result_version_id",
-	"data_version_id"
-];
-const ID_ZH = {
-	task_id: "任务",
-	result_version_id: "结果版本",
-	data_version_id: "数据版本"
-};
-function fmtMetric(v) {
-	const n = Number(v);
-	if (!Number.isFinite(n)) return String(v);
-	return Math.abs(n) >= 100 ? n.toFixed(1) : String(Number(n.toPrecision(4)));
-}
-/** 兜底区的工具中文名 */
-const TOOL_ZH = {
-	bash: "Shell",
-	str_replace_editor: "编辑文件",
-	web_search: "网页搜索",
-	skill: "加载技能",
-	todo_write: "待办",
-	ask_user_question: "询问用户",
-	goal: "目标",
-	subagent: "子代理"
-};
 /** limix CLI 旗标 → 中文键 */
 const FLAG_ZH = {
 	"--train": "训练文件",
@@ -3763,302 +3689,473 @@ const FLAG_ZH = {
 	"--horizon": "预测步数",
 	"--covariates": "协变量",
 	"--model": "模型",
+	"--models": "模型",
 	"-o": "输出文件",
 	"--output": "输出文件",
 	"--levels": "分位档",
 	"--quantile": "带分位区间",
 	"--sync": "同步模式",
 	"--timeout": "超时(s)",
-	"--data": "请求体",
-	"--date-format": "时间格式"
+	"--data": "数据文件",
+	"--date-format": "时间格式",
+	"--truth": "真值文件",
+	"--mode": "解释方式",
+	"--task-type": "任务类型",
+	"--rows": "解释范围",
+	"--row": "解释行",
+	"--labels": "字段说明文件",
+	"--prediction": "原预测文件",
+	"--features": "特征列",
+	"--threshold": "关系阈值",
+	"--task-id": "续查任务",
+	"--result-version-id": "结果版本",
+	"--manifest": "比较清单文件",
+	"--datasets": "数据集",
+	"--seed": "随机种子",
+	"--python": "比较环境"
 };
-const baseName = (p) => p.includes("/") ? p.split("/").pop() ?? p : p;
 /** limix 参数 → 中文键值行 */
 function limixKv(args) {
 	const rows$1 = [["子命令", String(args.command ?? "")]];
-	const list = Array.isArray(args.args) ? args.args.map(String) : [];
+	const list = argList(args);
 	for (let i = 0; i < list.length; i++) {
 		const tok = list[i];
 		if (tok.startsWith("-")) {
 			const zh = FLAG_ZH[tok] ?? tok;
 			const next = list[i + 1];
 			if (next !== void 0 && !next.startsWith("--")) {
-				rows$1.push([zh, /文件/.test(zh) ? baseName(next) : next]);
+				rows$1.push([zh, /文件|环境/.test(zh) ? baseName(next) : next]);
 				i++;
 			} else rows$1.push([zh, "开"]);
 		} else rows$1.push(["参数", baseName(tok)]);
 	}
 	return rows$1.filter(([, v]) => v !== "");
 }
-/**
-* 解析一条龙命令内部的接口序列（CLI stderr 日志：上传/复用/提交/轮询/下载/结果版本/重试）
-*/
-function parseSubsteps(text$1) {
-	const idx = text$1.indexOf("\n[stderr]\n");
-	if (idx < 0) return [];
-	const out = [];
-	let poll = 0;
-	for (const line of text$1.slice(idx + 10).split("\n")) {
-		const l = line.trim();
-		let m;
-		if (m = l.match(/^上传成功:\s*(\S+)\s*→/)) out.push(`⇧ 上传 ${m[1]}`);
-		else if (m = l.match(/^([^:：]{1,12}):\s*使用已有数据版本/)) out.push(`⇧ ${m[1]}复用已有版本`);
-		else if (m = l.match(/^已提交异步任务\s*(\S+)/)) out.push(`▶ 提交任务 ${m[1].slice(0, 8)}…`);
-		else if (m = l.match(/^任务\s*\S+:\s*(\S+)/)) {
-			poll += 1;
-			const label = `↻ 轮询 ×${poll}（${m[1]}）`;
-			if (out.length && out[out.length - 1].startsWith("↻ 轮询")) out[out.length - 1] = label;
-			else out.push(label);
-		} else if (m = l.match(/^已下载\s*→\s*(\S+)/)) out.push(`⇩ 下载 ${m[1].split("/").pop() ?? m[1]}`);
-		else if (m = l.match(/^结果版本\s*(\S+)/)) out.push(`✓ 结果版本 ${m[1].slice(0, 8)}…`);
-		else if (/重试/.test(l)) out.push("↻ 网络重试");
-	}
-	return out;
-}
-/** 失败时抽 stderr 首个有内容行 */
-function firstErrLine(text$1) {
-	const idx = text$1.indexOf("\n[stderr]\n");
-	const err = idx >= 0 ? text$1.slice(idx + 10) : text$1;
-	for (const line of err.split("\n")) {
-		const l = line.trim();
-		if (l) return l.slice(0, 180);
-	}
-	return "";
-}
-/** limix 工具调用 → 阶段分类 */
+/** 能力名称与 API 文档一致：因果解释；模式在流程摘要中区分全局因果与局部归因。 */
 function classifyLimix(args) {
 	const cmd = String(args.command ?? "");
-	const list = Array.isArray(args.args) ? args.args.map(String) : [];
+	const list = argList(args);
 	const joined = list.join(" ");
-	if (cmd === "upload") return {
-		cat: "upload",
-		title: "上传数据"
+	if (list.includes("--help") || list.includes("-h")) return {
+		title: "查看命令说明",
+		limix: false
 	};
-	if (cmd === "classify" || cmd === "regress" || cmd === "forecast") {
-		if (list.includes("--help") || list.includes("-h")) return {
-			cat: "api",
-			title: "查用法"
-		};
-		return {
-			cat: "predict",
-			title: `LimiX 预测（${cmd === "classify" ? "分类" : cmd === "regress" ? "回归" : "时序"}）`
+	const titles = {
+		upload: "上传数据",
+		classify: "分类预测",
+		regress: "回归预测",
+		forecast: "时序预测",
+		task: "查询任务",
+		tasks: "查看任务历史",
+		result: "查询结果版本",
+		download: "下载结果",
+		health: "检查服务连接",
+		check: "检查接口权限",
+		data: "查询数据版本",
+		cancel: "取消任务"
+	};
+	if (cmd === "explain") return {
+		title: "因果解释",
+		limix: true
+	};
+	if (cmd === "benchmark") {
+		const models = flag(list, "--models");
+		return !models || /LIMIX/i.test(models) ? {
+			title: "模型比较",
+			limix: true
+		} : {
+			title: "模型比较",
+			limix: false
 		};
 	}
 	if (cmd === "api") {
 		if (/explanation/i.test(joined)) return {
-			cat: "explain",
-			title: "因果解释"
+			title: "因果解释",
+			limix: true
+		};
+		if (/visualization/i.test(joined)) return {
+			title: "官方图表接口",
+			limix: true
 		};
 		if (/evaluat/i.test(joined)) return {
-			cat: "evaluate",
-			title: "评估"
+			title: "评估",
+			limix: true
 		};
 		if (/imput/i.test(joined)) return {
-			cat: "data",
-			title: "缺失补全"
+			title: "缺失补全",
+			limix: true
 		};
 		return {
-			cat: "api",
-			title: "API 直调"
+			title: "API 直调",
+			limix: true
 		};
 	}
-	if (cmd === "task" || cmd === "tasks" || cmd === "result") return {
-		cat: "poll",
-		title: "任务查询"
-	};
-	if (cmd === "download") return {
-		cat: "download",
-		title: "下载结果"
-	};
-	if (cmd === "health" || cmd === "check") return {
-		cat: "health",
-		title: "连通性检查"
-	};
-	if (cmd === "data") return {
-		cat: "poll",
-		title: "数据查询"
-	};
 	return {
-		cat: "api",
-		title: `limix ${cmd}`
+		title: titles[cmd] ?? `limix ${cmd}`,
+		limix: true
 	};
 }
-/** 由输出对象派生指标与 ID 标签 */
-function deriveOut(text$1) {
-	const obj = parseOutObj(text$1);
-	const output = obj ? JSON.stringify(obj, null, 2).slice(0, 2e3) : (text$1.split("\n[stderr]\n")[0].trim() || text$1.trim()).slice(0, 1200) || "（无输出）";
-	const metricsRaw = obj ? deepFind(obj, METRIC_KEYS) : {};
-	const idsRaw = obj ? deepFind(obj, ID_KEYS) : {};
+function scopeText(list) {
+	const rows$1 = flag(list, "--rows");
+	if (rows$1) return rows$1 === "all" ? "全部样本" : `第 ${rows$1} 行`;
+	const row = flag(list, "--row");
+	return row ? `第 ${row} 行` : "";
+}
+function limixMeta(cmd, list, data) {
+	const model = data?.model_type ?? flag(list, "--model");
+	if ([
+		"classify",
+		"regress",
+		"forecast"
+	].includes(cmd)) {
+		const train = flag(list, "--train");
+		const predict = flag(list, "--predict");
+		return [
+			model,
+			flag(list, "--target") && `目标 ${flag(list, "--target")}`,
+			train && `参考 ${baseName(train)}`,
+			predict && `预测 ${baseName(predict)}`,
+			flag(list, "--horizon") && `未来 ${flag(list, "--horizon")} 步`
+		].filter(Boolean).join(" · ");
+	}
+	if (cmd === "explain") {
+		const file = flag(list, "--data");
+		return [
+			model,
+			scopeText(list),
+			flag(list, "--target") && `目标 ${flag(list, "--target")}`,
+			file && baseName(file)
+		].filter(Boolean).join(" · ");
+	}
+	if (cmd === "benchmark") {
+		const models = flag(list, "--models").split(",").filter(Boolean).join("、");
+		const names = (Array.isArray(data?.datasets) ? data.datasets : []).map((d) => d.name).filter(Boolean);
+		return [models, names.length === 1 ? names[0] : names.length > 1 ? `${names.length} 个数据集` : ""].filter(Boolean).join(" · ");
+	}
+	if (cmd === "upload") return list.filter((tok) => !tok.startsWith("-")).slice(0, 1).map(baseName).join("");
+	return "";
+}
+function shortNumber(value) {
+	return String(Number(value.toPrecision(Math.abs(value) >= 100 ? 5 : 4)));
+}
+function benchmarkOutcome(data) {
+	const runs = Array.isArray(data.runs) ? data.runs : [];
+	if (!runs.length) return "";
+	const counts = `${runs.filter((r) => r.status === "succeeded").length}/${runs.length} 组完成`;
+	if (!Array.isArray(data.datasets) || data.datasets.length !== 1) return counts;
+	const key = data.datasets[0].task_type === "classification" ? "accuracy" : "rmse";
+	const unit = key === "rmse" ? String(data.datasets[0].unit ?? "") : "";
+	const rows$1 = runs.flatMap((r) => r.status === "succeeded" && typeof r.metrics?.[key] === "number" && Number.isFinite(r.metrics[key]) ? [`${r.model} ${shortNumber(r.metrics[key])}`] : []);
+	return rows$1.length ? `${key === "rmse" ? "RMSE" : "准确率"}：${rows$1.join("，")}${unit && ` ${unit}`}` : counts;
+}
+function explainOutcome(data) {
+	const view = data.explanation;
+	if (!view) return "";
+	if (Array.isArray(view.nodes) && Array.isArray(view.edges)) return `${view.nodes.length} 个变量 · ${view.edges.length} 条关系`;
+	const parts = [];
+	if (typeof view.explained_count === "number" && typeof view.requested_count === "number") parts.push(`已解释 ${view.explained_count}/${view.requested_count} 行`);
+	if (Array.isArray(view.feature_names)) parts.push(`${view.feature_names.length} 个特征`);
+	return parts.join(" · ");
+}
+function limixOutcome(cmd, data) {
+	if (!data) return "";
+	if (cmd === "explain") return explainOutcome(data);
+	if (cmd === "benchmark") return benchmarkOutcome(data);
+	if (cmd === "upload" && typeof data.row_count === "number") return `${data.row_count} 行 × ${data.column_count} 列`;
+	if (cmd === "check" && typeof data.allowed === "boolean") return data.allowed ? "有权限" : "无权限";
+	const metrics = metricEntries(data).slice(0, 2).map((m) => `${m.label} ${m.value}`);
+	return [...typeof data.metrics?.n === "number" ? [`${data.metrics.n} 行`] : [], ...metrics].join(" · ");
+}
+const DONE_STATUS = new Set([
+	"finished",
+	"succeeded",
+	"degraded_succeeded",
+	"partially_succeeded"
+]);
+const STOP_STATUS = {
+	failed: "任务失败",
+	timeout: "任务超时",
+	cancelled: "任务取消"
+};
+function statusStep(status) {
+	return DONE_STATUS.has(status) ? "任务完成" : STOP_STATUS[status] ?? "等待完成";
+}
+/** 解析 stderr 进度日志；旧会话缺的步骤保持缺失，不补写。 */
+function parseSteps(text$1) {
+	const idx = text$1.indexOf("\n[stderr]\n");
+	if (idx < 0) return [];
+	const out = [];
+	const put = (step) => {
+		if (out[out.length - 1] === "等待完成" && /^(等待完成|任务(完成|失败|超时|取消))$/.test(step)) out[out.length - 1] = step;
+		else out.push(step);
+	};
+	for (const line of text$1.slice(idx + 10).split("\n")) {
+		const l = line.trim();
+		let m;
+		if (m = l.match(/^上传成功:\s*(.+?)\s*→/)) put(`上传 ${m[1]}`);
+		else if (m = l.match(/^([^:：]{1,12}):\s*使用已有数据版本/)) put(`复用${m[1]}`);
+		else if (/^已提交异步任务\s/.test(l)) put("提交任务");
+		else if (/^解释任务\s*\S+?；/.test(l)) put("提交解释");
+		else if (/^续查解释任务\s/.test(l)) put("续查任务");
+		else if (m = l.match(/^任务\s*\S+:\s*(\S+)/)) put(statusStep(m[1]));
+		else if (m = l.match(/^已下载\s*→\s*(.+?)(?:\s+\(\d+ bytes\))?$/)) put(`下载 ${baseName(m[1])}`);
+		else if (m = l.match(/^已保存解释\s*→\s*(.+)$/)) put(`保存 ${baseName(m[1])}`);
+		else if (/^结果版本\s/.test(l)) put("生成结果版本");
+		else if (m = l.match(/^benchmark\s+\S+?\/(\S+):\s*(\S+)/)) put(`${m[1]} ${m[2] === "succeeded" ? "完成" : m[2] === "failed" ? "失败" : "未完成"}`);
+		else if (/重试/.test(l)) put("网络重试");
+	}
+	return out;
+}
+const ID_LABELS = {
+	task_id: "任务",
+	result_id: "解释结果",
+	result_version_id: "结果版本",
+	data_version_id: "数据版本"
+};
+function outputText(data, text$1) {
+	return data ? clip(JSON.stringify(data, null, 2), 2e3) : clip(text$1.split("\n[stderr]\n")[0].trim() || text$1.trim(), 1200) || "（无输出）";
+}
+function errorLine(error, text$1) {
+	if (typeof error?.error === "string") return error.error.slice(0, 180);
+	if (typeof error?.error_message === "string") return error.error_message.slice(0, 180);
+	const idx = text$1.indexOf("\n[stderr]\n");
+	return ((idx >= 0 ? text$1.slice(idx + 10) : text$1).split("\n").map((l) => l.trim()).find(Boolean) ?? "").slice(0, 180);
+}
+function settledBase(text$1, isError, clock) {
+	const { data, failed, error } = parseToolResult(text$1);
+	const stopped = !!isError || failed;
+	const state = resultState(true, stopped, data);
 	return {
-		output,
-		metrics: Object.entries(metricsRaw).map(([k, v]) => [METRIC_ZH[k] ?? k, fmtMetric(v)]),
-		ids: Object.entries(idsRaw).map(([k, v]) => [ID_ZH[k] ?? k, String(v)])
+		data,
+		...clock,
+		ok: !stopped,
+		stateKind: state.kind,
+		stateLabel: state.label,
+		errLine: stopped ? errorLine(error, text$1) : "",
+		output: outputText(data, text$1)
 	};
 }
-/** 会话节点 → 分轮管线（升序解析，调用方倒序展示） */
-function parseRounds(nodes, running) {
-	const rounds = [];
-	let cur = null;
-	let turn = 0;
-	for (const n of nodes) {
-		if (n.kind === "user") {
-			turn += 1;
-			cur = {
-				turn,
-				time: n.time,
-				ask: textOf$1(n.content).slice(0, 120) || "（空消息）",
-				result: "",
-				stages: [],
-				others: []
+function limixStage(args, text$1, isError, clock) {
+	const cmd = String(args.command ?? "");
+	const list = argList(args);
+	const { data,...base } = settledBase(text$1, isError, clock);
+	const { title, limix } = classifyLimix(args);
+	const ids = Object.keys(ID_LABELS).flatMap((key) => typeof data?.[key] === "string" ? [[ID_LABELS[key], data[key]]] : []);
+	return {
+		...base,
+		toolName: "limix",
+		args,
+		data,
+		title,
+		limix,
+		meta: limixMeta(cmd, list, data),
+		outcome: limixOutcome(cmd, data),
+		summary: [
+			"limix",
+			cmd,
+			...list
+		].filter(Boolean).join(" ").slice(0, 200),
+		inputKv: limixKv(args),
+		inputRaw: clip(JSON.stringify(args, null, 2), 2e3),
+		metrics: metricEntries(data).map((m) => [m.label, m.value]),
+		ids,
+		substeps: limix ? parseSteps(text$1) : []
+	};
+}
+const isReportFile = (path) => /\.(md|html)$/i.test(path);
+/** 本地工具 → 业务标题与参数行；bash 优先用模型自述的 description */
+function describeLocal(name, args) {
+	const path = String(args.file_path ?? args.path ?? "");
+	const file = path ? baseName(path) : "";
+	const fileKv = file ? [["文件", file]] : [];
+	const brief = (title) => ({
+		title,
+		kv: fileKv,
+		summary: path || title
+	});
+	switch (name) {
+		case "bash": {
+			const command = String(args.command ?? "");
+			const description = String(args.description ?? "").trim();
+			return {
+				title: description.slice(0, 60) || "运行命令",
+				kv: [...description ? [["说明", description]] : [], ["命令", command.slice(0, 300) || "（命令为空）"]],
+				summary: command.slice(0, 200)
 			};
-			rounds.push(cur);
-			continue;
 		}
-		if (!cur) continue;
-		if (n.kind === "assistant") {
-			const first = textOf$1(n.blocks ?? n.content).split("\n").map((s) => s.replace(/^[#>\-*\s]+/, "").trim()).find((s) => s.length > 4);
-			if (first) cur.result = first.slice(0, 110);
-			continue;
+		case "read": return brief(`读取文件 ${file}`);
+		case "write": return brief(`${isReportFile(path) ? "生成报告" : "写入文件"} ${file}`);
+		case "edit": return brief(`${isReportFile(path) ? "修改报告" : "修改文件"} ${file}`);
+		case "present": {
+			const files = Array.isArray(args.files) ? args.files : [];
+			const first = baseName(String(files[0]?.path ?? ""));
+			return {
+				title: `展示文件 ${first}${files.length > 1 ? ` 等 ${files.length} 个` : ""}`,
+				kv: files.map((f) => ["文件", baseName(String(f.path ?? ""))]),
+				summary: first
+			};
 		}
-		if (n.kind !== "tool-result") continue;
-		const name = n.call?.name;
-		const args = parseArgs(n.call?.argsRaw);
-		const fullText = textOf$1(n.content);
-		const ok = !n.isError && !(/^\s*$/.test(fullText.split("\n[stderr]\n")[0]) && fullText.includes("[stderr]"));
-		const base = {
-			ok,
-			time: n.time,
-			start: n.callTime ?? n.time,
-			end: n.time,
-			errLine: ok ? "" : firstErrLine(fullText)
-		};
-		if (name === "limix") {
-			const { cat, title } = classifyLimix(args);
-			const list = Array.isArray(args.args) ? args.args.map(String) : [];
-			cur.stages.push({
-				key: `s${n.seq}`,
-				cat,
-				title,
-				summary: [
-					"limix",
-					String(args.command ?? ""),
-					...list
-				].filter(Boolean).join(" ").slice(0, 200),
-				inputKv: limixKv(args),
-				inputRaw: JSON.stringify(args, null, 2).slice(0, 2e3),
-				...deriveOut(fullText),
-				substeps: parseSubsteps(fullText),
-				...base,
-				limix: true
-			});
-		} else if (name === "datasource") {
-			const cmd = String(args.command ?? "");
-			const kv = [["子命令", cmd]];
-			if (args.source) kv.push(["数据源", String(args.source).slice(0, 12) + "…"]);
+		case "datasource": {
+			const command = String(args.command ?? "");
+			const title = command === "query" ? args.mode === "materialize" ? "取数落盘" : "取数预览" : command === "inspect" ? "查看库表结构" : "查看数据源清单";
+			const kv = [["子命令", command]];
 			if (args.table) kv.push(["表", String(args.table)]);
-			if (args.mode) kv.push(["模式", String(args.mode)]);
 			if (args.fileName) kv.push(["落盘文件", String(args.fileName)]);
 			if (args.sql) kv.push(["SQL", String(args.sql).slice(0, 300)]);
-			cur.stages.push({
-				key: `s${n.seq}`,
-				cat: "data",
-				title: cmd === "query" ? args.mode === "materialize" ? "取数落盘（宽表）" : "取数预览" : cmd === "inspect" ? "看库表结构" : "数据源清单",
-				summary: [
-					"datasource",
-					cmd,
-					String(args.sql ?? args.table ?? "")
-				].filter(Boolean).join(" ").slice(0, 200),
-				inputKv: kv,
-				inputRaw: JSON.stringify(args, null, 2).slice(0, 2e3),
-				...deriveOut(fullText),
-				substeps: [],
-				...base
-			});
-		} else if (name === "bash") {
-			const cmdText = String(args.command ?? "");
-			if (/\.html|\.md\b|报告/i.test(cmdText) && /python|cat|tee|>|write/i.test(cmdText)) cur.stages.push({
-				key: `s${n.seq}`,
-				cat: "report",
-				title: "生成报告",
-				summary: cmdText.slice(0, 200),
-				inputKv: [["命令", cmdText.slice(0, 300)]],
-				inputRaw: cmdText.slice(0, 2e3),
-				output: fullText.slice(0, 1200) || "（无输出）",
-				metrics: [],
-				ids: [],
-				substeps: [],
-				...base
-			});
-			else if (/pandas|\.csv|python/i.test(cmdText)) cur.stages.push({
-				key: `s${n.seq}`,
-				cat: "prep",
-				title: "数据处理",
-				summary: cmdText.slice(0, 200) || "bash 数据处理",
-				inputKv: [["命令", cmdText.slice(0, 300) || "（见原始参数）"]],
-				inputRaw: cmdText.slice(0, 2e3),
-				output: fullText.slice(0, 1200) || "（无输出）",
-				metrics: [],
-				ids: [],
-				substeps: [],
-				...base
-			});
-			else cur.others.push(["Shell", cmdText.slice(0, 90) || "（命令为空）"]);
-		} else if (name === "str_replace_editor" && /\.(html|md)"/.test(n.call?.argsRaw ?? "") && /create/.test(String(args.command ?? ""))) {
-			const path = String(args.path ?? "");
-			cur.stages.push({
-				key: `s${n.seq}`,
-				cat: "report",
-				title: "生成报告",
-				summary: `写入 ${baseName(path)}`,
-				inputKv: [["文件", baseName(path) || "（未知）"]],
-				inputRaw: JSON.stringify(args, null, 2).slice(0, 2e3),
-				output: fullText.slice(0, 800) || "（已写入）",
-				metrics: [],
-				ids: [],
-				substeps: [],
-				...base
-			});
-		} else if (name) {
-			const brief = String(args.command ?? args.path ?? args.query ?? args.name ?? "").slice(0, 90) || (n.call?.argsRaw ?? "").slice(0, 90);
-			cur.others.push([TOOL_ZH[name] ?? name, brief]);
+			return {
+				title,
+				kv,
+				summary: String(args.sql ?? args.table ?? command).slice(0, 200)
+			};
 		}
-	}
-	const last = rounds[rounds.length - 1];
-	if (last) for (const rc of running) {
-		if (rc.name !== "limix" && rc.name !== "datasource") continue;
-		const args = parseArgs(rc.argsRaw);
-		const meta = rc.name === "limix" ? classifyLimix(args) : {
-			cat: "data",
-			title: "数据源调用"
+		case "grep":
+		case "glob": return {
+			title: "搜索文件",
+			kv: [["条件", String(args.pattern ?? "")]],
+			summary: String(args.pattern ?? "")
 		};
-		last.stages.push({
-			key: `r${rc.callId ?? String(last.stages.length)}`,
-			cat: meta.cat,
-			title: meta.title,
-			summary: "运行中…",
-			inputKv: rc.name === "limix" ? limixKv(args) : [["参数", "（运行中）"]],
-			inputRaw: JSON.stringify(args, null, 2).slice(0, 2e3),
-			output: "（进行中）",
-			metrics: [],
-			ids: [],
-			errLine: "",
-			ok: true,
-			running: true,
-			time: last.time,
-			start: last.time,
-			end: Number.MAX_SAFE_INTEGER,
-			substeps: [],
-			limix: rc.name === "limix"
-		});
+		case "web_fetch": return {
+			title: "读取网页",
+			kv: [["网址", String(args.url ?? "")]],
+			summary: String(args.url ?? "")
+		};
+		case "web_search": return {
+			title: "搜索网页",
+			kv: [["关键词", JSON.stringify(args.queries ?? "")]],
+			summary: "搜索网页"
+		};
+		case "todo_write": return brief("更新待办");
+		case "ask_user_question": return brief("询问用户");
+		case "load_workspace_dependencies": return brief("加载工作区依赖");
+		case "subagent": return brief("调用子代理");
+		case "skill": return brief("加载技能");
+		default: return {
+			title: name,
+			kv: [],
+			summary: name
+		};
 	}
-	return rounds.filter((r) => r.stages.length > 0 || r.others.length > 0).reverse();
+}
+function localStage(name, args, text$1, isError, clock) {
+	const { data: _data,...base } = settledBase(text$1, isError, clock);
+	const { title, kv, summary } = describeLocal(name, args);
+	return {
+		...base,
+		toolName: name,
+		args,
+		data: _data,
+		title,
+		limix: false,
+		meta: "",
+		outcome: "",
+		summary,
+		inputKv: kv,
+		inputRaw: clip(JSON.stringify(args, null, 2), 2e3),
+		metrics: [],
+		ids: [],
+		substeps: [],
+		output: clip(text$1.trim(), 1200) || "（无输出）"
+	};
+}
+/** 运行中节点尚无输出：只翻译标题与参数，end 取最大值以便并行判定 */
+function runningStage(name, args, key, time) {
+	const local = name === "limix" ? null : describeLocal(name, args);
+	const { title, limix } = local ? {
+		title: local.title,
+		limix: false
+	} : classifyLimix(args);
+	const list = argList(args);
+	return {
+		key,
+		toolName: name,
+		args,
+		data: null,
+		title,
+		limix,
+		running: true,
+		ok: true,
+		time,
+		start: time,
+		end: Number.MAX_SAFE_INTEGER,
+		meta: local ? "" : limixMeta(String(args.command ?? ""), list, null),
+		outcome: "",
+		stateKind: "running",
+		stateLabel: "运行中",
+		summary: local?.summary ?? list.join(" ").slice(0, 200),
+		inputKv: local?.kv ?? limixKv(args),
+		inputRaw: clip(JSON.stringify(args, null, 2), 2e3),
+		output: "（进行中）",
+		metrics: [],
+		ids: [],
+		errLine: "",
+		substeps: []
+	};
+}
+
+//#endregion
+//#region src/client/pipeline-model.ts
+const blockKind = (b) => b.kind ?? b.type;
+function textOf$1(blocks) {
+	return (blocks ?? []).filter((b) => blockKind(b) === "text" && b.text).map((b) => b.text).join("\n");
+}
+function parseArgs(raw) {
+	try {
+		const v = JSON.parse(raw ?? "{}");
+		return typeof v === "object" && v !== null && !Array.isArray(v) ? v : {};
+	} catch {
+		return {};
+	}
+}
+/** 结论行只留可读文字：去掉 Markdown 粗体与行内代码，链接保留标题，避免露出路径语法 */
+function firstLine(text$1) {
+	return text$1.replace(/\[([^\]]*)\]\([^\n]*?\)(?=\s|$|[，。；：、])/g, "$1").replace(/\*\*|`/g, "").split("\n").map((s) => s.replace(/^[#>\-*\s]+/, "").trim()).find((s) => s.length > 4) ?? "";
+}
+function pushAssistant(round, node) {
+	(node.blocks ?? node.content ?? []).forEach((block, index) => {
+		const text$1 = (block.text ?? "").trim();
+		if (!text$1) return;
+		const kind = blockKind(block);
+		if (kind === "reasoning") round.timeline.push({
+			type: "thinking",
+			key: `n${node.seq}-${index}`,
+			text: text$1
+		});
+		else if (kind === "text") {
+			round.timeline.push({
+				type: "reply",
+				key: `n${node.seq}-${index}`,
+				text: text$1
+			});
+			round.result = firstLine(text$1).slice(0, 110) || round.result;
+		}
+	});
+}
+function pushStage(round, stage) {
+	round.stages.push(stage);
+	round.timeline.push({
+		type: "stage",
+		key: stage.key,
+		stage
+	});
+}
+function stageOf(node) {
+	const name = node.call?.name;
+	if (!name) return null;
+	const args = parseArgs(node.call?.argsRaw);
+	const text$1 = textOf$1(node.content);
+	const clock = {
+		key: `s${node.seq}`,
+		time: node.time,
+		start: node.callTime ?? node.time,
+		end: node.time
+	};
+	return name === "limix" ? limixStage(args, text$1, node.isError, clock) : localStage(name, args, text$1, node.isError, clock);
 }
 /**
-* 相邻阶段的"并行"分组，两个判据取或：
-* ① 时间区间重叠 = 真·并发执行；
-* ② 无缝续接（间隔 ≤150ms）= 模型一步批量发出、宿主执行器排队串行跑
-*   （实测同批 limix 调用间隔 0~1ms；真·串行步之间隔着秒级 LLM 思考，不会误判）。
-* 两种在业务叙事里都是"agent 同时安排了这几件事"，且运行中/落定后显示一致
+* 相邻阶段的并行分组，两个判据取或：
+* ① 时间区间重叠 = 真并发；
+* ② 无缝续接（间隔 ≤150ms）= 模型一步批量发出、宿主排队串行执行。
+*   实测同批 limix 调用间隔 0~1ms；串行步之间隔着秒级 LLM 思考，不会误判。
 */
 function groupParallel(stages) {
 	const groups = [];
@@ -4076,571 +4173,642 @@ function groupParallel(stages) {
 	}
 	return groups;
 }
-const CAT_STYLE = {
-	prep: {
-		bg: "rgba(15,17,21,.055)",
-		label: "⚙"
-	},
-	data: {
-		bg: "rgba(88,120,180,.14)",
-		label: "🗄"
-	},
-	upload: {
-		bg: "rgba(65,118,230,.12)",
-		label: "⇧"
-	},
-	predict: {
-		bg: "rgba(65,118,230,.2)",
-		label: "◆"
-	},
-	evaluate: {
-		bg: "rgba(22,163,74,.14)",
-		label: "☑"
-	},
-	explain: {
-		bg: "rgba(150,90,200,.16)",
-		label: "☀"
-	},
-	poll: {
-		bg: "rgba(127,127,127,.12)",
-		label: "↻"
-	},
-	download: {
-		bg: "rgba(127,127,127,.12)",
-		label: "⇩"
-	},
-	health: {
-		bg: "rgba(127,127,127,.12)",
-		label: "♥"
-	},
-	api: {
-		bg: "rgba(127,127,127,.12)",
-		label: "≡"
-	},
-	running: {
-		bg: "rgba(180,83,9,.14)",
-		label: "…"
-	},
-	report: {
-		bg: "rgba(20,140,120,.13)",
-		label: "📄"
+/** 会话节点 → 分轮模型（升序解析，返回最新一轮在前） */
+function parseRounds(nodes, running) {
+	const rounds = [];
+	let cur = null;
+	for (const node of nodes) if (node.kind === "user") {
+		cur = {
+			turn: rounds.length + 1,
+			time: node.time,
+			ask: textOf$1(node.content) || "（空消息）",
+			result: "",
+			stages: [],
+			timeline: []
+		};
+		rounds.push(cur);
+	} else if (!cur) continue;
+	else if (node.kind === "assistant") pushAssistant(cur, node);
+	else if (node.kind === "tool-result") {
+		const stage = stageOf(node);
+		if (stage) pushStage(cur, stage);
 	}
-};
-function fmtDur(ms) {
-	if (!Number.isFinite(ms) || ms < 0) return "";
-	const s = Math.round(ms / 1e3);
-	if (s < 1) return "<1s";
-	if (s < 60) return `${s}s`;
-	return `${Math.floor(s / 60)}分${s % 60}秒`;
+	const last = rounds[rounds.length - 1];
+	if (last) running.forEach((call, index) => {
+		if (call.name) pushStage(last, runningStage(call.name, parseArgs(call.argsRaw), `r${call.callId ?? index}`, last.time));
+	});
+	for (const round of rounds) for (const group of groupParallel(round.stages)) if (group.length > 1) group.forEach((stage) => {
+		stage.parallel = true;
+	});
+	return rounds.filter((r) => r.timeline.length > 0).reverse();
 }
 function fmtTime(t) {
 	const d = new Date(t);
 	const p = (x) => String(x).padStart(2, "0");
 	return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
 }
-/** 轮次总耗时：首个发起到末个完成（排除运行中的 Infinity） */
-function roundDur(r) {
-	const ends = r.stages.map((s) => s.end).filter((e) => e !== Number.MAX_SAFE_INTEGER);
-	if (!ends.length) return "运行中";
-	return fmtDur(Math.max(...ends) - Math.min(...r.stages.map((s) => s.start)));
+
+//#endregion
+//#region src/client/pipeline-flow.ts
+const REPORT = /\.(md|html?|pdf|docx|pptx)$/i;
+const DATA = /\.(csv|tsv|xlsx?|parquet|json)$/i;
+const fileName = (p) => p.split(/[/\\]/).pop() || p;
+function argument(stage, name) {
+	const args = Array.isArray(stage.args.args) ? stage.args.args : [];
+	const index = args.indexOf(name);
+	return index >= 0 && typeof args[index + 1] === "string" ? args[index + 1] : "";
 }
-const ui = {
-	wrap: {
-		padding: "14px 22px",
-		overflowY: "auto",
-		height: "100%",
-		fontSize: 13
-	},
-	empty: {
-		opacity: .55,
-		padding: 24,
-		textAlign: "center",
-		lineHeight: 2
-	},
-	round: {
-		border: "1px solid rgba(0,0,0,.09)",
-		borderRadius: 12,
-		padding: "12px 16px",
-		marginBottom: 14,
-		overflow: "hidden",
-		minWidth: 0
-	},
-	roundHead: {
-		display: "flex",
-		alignItems: "baseline",
-		gap: 10,
-		flexWrap: "wrap",
-		cursor: "pointer",
-		userSelect: "none"
-	},
-	caret: {
-		fontSize: 11,
-		opacity: .45,
-		width: 12
-	},
-	turnTag: {
-		fontSize: 11,
-		fontWeight: 700,
-		color: ACCENT,
-		background: "rgba(65,118,230,.1)",
-		padding: "1px 8px",
-		borderRadius: 999,
-		whiteSpace: "nowrap"
-	},
-	limixTag: {
-		fontSize: 11,
-		fontWeight: 700,
-		color: "#fff",
-		background: ACCENT,
-		padding: "1px 8px",
-		borderRadius: 999,
-		whiteSpace: "nowrap",
-		cursor: "help"
-	},
-	ask: {
-		fontWeight: 600,
-		overflowWrap: "anywhere"
-	},
-	time: {
-		fontSize: 11,
-		opacity: .45,
-		marginLeft: "auto",
-		whiteSpace: "nowrap"
-	},
-	result: {
-		margin: "6px 0 0 22px",
-		fontSize: 12.5,
-		opacity: .75,
-		overflowWrap: "anywhere",
-		borderLeft: `2px solid rgba(65,118,230,.35)`,
-		paddingLeft: 8
-	},
-	flow: {
-		display: "flex",
-		alignItems: "center",
-		flexWrap: "wrap",
-		gap: 6,
-		marginTop: 10
-	},
-	chip: (cat, ok, active, running) => ({
-		display: "inline-flex",
-		alignItems: "center",
-		gap: 5,
-		padding: "4px 11px",
-		borderRadius: 8,
-		fontSize: 12.5,
-		cursor: "pointer",
-		background: CAT_STYLE[cat].bg,
-		border: active ? `1.5px solid ${ACCENT}` : ok ? "1px solid rgba(0,0,0,.08)" : "1px solid rgba(220,38,38,.55)",
-		color: ok ? "inherit" : "#dc2626",
-		opacity: running ? .8 : 1
-	}),
-	chipMeta: {
-		fontSize: 10.5,
-		opacity: .55
-	},
-	arrow: {
-		opacity: .3,
-		fontSize: 12
-	},
-	parallel: {
-		display: "inline-flex",
-		flexDirection: "column",
-		gap: 4,
-		padding: 5,
-		borderRadius: 10,
-		border: `1px dashed rgba(65,118,230,.4)`
-	},
-	parallelTag: {
-		fontSize: 10,
-		color: ACCENT,
-		opacity: .75,
-		lineHeight: 1,
-		paddingLeft: 2
-	},
-	errBox: {
-		marginTop: 10,
-		padding: "6px 10px",
-		borderRadius: 8,
-		fontSize: 12,
-		color: "#dc2626",
-		background: "rgba(220,38,38,.07)",
-		border: "1px solid rgba(220,38,38,.25)",
-		overflowWrap: "anywhere"
-	},
-	metricPill: {
-		display: "inline-flex",
-		gap: 4,
-		alignItems: "baseline",
-		padding: "2px 10px",
-		borderRadius: 999,
-		fontSize: 12,
-		background: "rgba(22,163,74,.09)",
-		border: "1px solid rgba(22,163,74,.3)"
-	},
-	idPill: {
-		display: "inline-flex",
-		gap: 4,
-		alignItems: "baseline",
-		padding: "2px 10px",
-		borderRadius: 999,
-		fontSize: 11.5,
-		background: "rgba(127,127,127,.08)",
-		border: "1px solid rgba(0,0,0,.1)"
-	},
-	idVal: {
-		fontFamily: "ui-monospace, monospace",
-		userSelect: "all",
-		cursor: "text"
-	},
-	substeps: {
-		marginTop: 10,
-		display: "flex",
-		alignItems: "center",
-		flexWrap: "wrap",
-		gap: 5,
-		borderTop: "1px dashed rgba(0,0,0,.12)",
-		paddingTop: 10
-	},
-	substep: {
-		fontSize: 11.5,
-		padding: "2px 9px",
-		borderRadius: 999,
-		background: "rgba(65,118,230,.07)",
-		border: "1px solid rgba(65,118,230,.2)",
-		whiteSpace: "nowrap"
-	},
-	detail: {
-		marginTop: 10,
-		borderTop: "1px dashed rgba(0,0,0,.12)",
-		paddingTop: 10,
-		display: "grid",
-		gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)",
-		gap: 12
-	},
-	ioLabel: {
-		fontSize: 11,
-		opacity: .5,
-		marginBottom: 4
-	},
-	kvGrid: {
-		display: "grid",
-		gridTemplateColumns: "auto minmax(0,1fr)",
-		gap: "3px 12px",
-		fontSize: 12.5,
-		background: "rgba(127,127,127,.07)",
-		borderRadius: 8,
-		padding: 10
-	},
-	kvKey: {
-		opacity: .55,
-		whiteSpace: "nowrap"
-	},
-	kvVal: {
-		overflowWrap: "anywhere",
-		minWidth: 0
-	},
-	io: {
-		whiteSpace: "pre-wrap",
-		overflowWrap: "anywhere",
-		fontFamily: "ui-monospace, monospace",
-		fontSize: 11.5,
-		lineHeight: 1.55,
-		background: "rgba(127,127,127,.07)",
-		borderRadius: 8,
-		padding: 10,
-		maxHeight: 260,
-		overflowY: "auto"
-	},
-	rawToggle: {
-		fontSize: 11,
-		opacity: .5,
-		cursor: "pointer",
-		marginTop: 6
+function explanationMode(stage) {
+	const mode = stage.data?.explanation?.mode ?? argument(stage, "--mode");
+	if (mode === "directed") return "全局因果 · 有向";
+	if (mode === "undirected") return "全局因果 · 无向";
+	if (mode === "local" || stage.args.command === "explain") return argument(stage, "--task-type") === "timeseries" ? "局部归因 · 时序" : "局部归因";
+	return "解释模式见调用详情";
+}
+/** 文件只取结构化参数与回执；失败写入不产生可打开的输出。 */
+function stageFiles(stage) {
+	const files = [];
+	const add = (path, role, label) => {
+		if (typeof path === "string" && path && !/[\u0000-\u001f]/.test(path)) files.push({
+			path,
+			role,
+			label
+		});
+	};
+	if (stage.toolName === "limix") {
+		for (const [flag$1, label] of [
+			["--train", "参考数据"],
+			["--predict", "待预测数据"],
+			["--data", "解释数据"],
+			["--truth", "真值数据"],
+			["--manifest", "比较清单"]
+		]) add(argument(stage, flag$1), "input", label);
+		if (stage.ok && !stage.running) {
+			add(stage.data?.saved_to, "output", "结果文件");
+			add(stage.data?.csv_path, "output", "结果数据");
+			add(stage.data?.report_path, "output", "分析报告");
+		}
+	} else {
+		const path = stage.args.file_path ?? stage.args.path;
+		if (stage.toolName === "read") add(path, "input", "读取文件");
+		if (["write", "edit"].includes(stage.toolName) && stage.ok && !stage.running) add(path, "output", stage.toolName === "edit" ? "修订文件" : "生成文件");
+		if (stage.toolName === "present" && stage.ok && !stage.running && Array.isArray(stage.args.files)) for (const file of stage.args.files) add(file?.path, "output", "展示文件");
+		if (stage.ok && !stage.running) add(stage.data?.saved_to, "output", "生成文件");
 	}
-};
-function LimixPipelineView({ useSession, useTrajectory }) {
-	const traj = useTrajectory((t) => t);
-	const nodes = (0, react.useMemo)(() => traj?.eventNodes ?? [], [traj]);
-	const runningCalls = traj?.runningCalls ?? [];
-	const rounds = (0, react.useMemo)(() => parseRounds(nodes, runningCalls), [nodes, runningCalls]);
-	window.__lxPipelineNodes = nodes;
-	const [openKey, setOpenKey] = (0, react.useState)(null);
-	const [override, setOverride] = (0, react.useState)({});
-	const [showRaw, setShowRaw] = (0, react.useState)(false);
-	if (!rounds.length) return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-		style: ui.empty,
+	return files;
+}
+function stepFiles(step) {
+	const unique = /* @__PURE__ */ new Map();
+	for (const stage of step.stages) for (const file of stageFiles(stage)) {
+		const path = (!/^(?:[/\\]|[A-Za-z]:)/.test(file.path) && step.cwd ? `${step.cwd}/${file.path}` : file.path).replace(/\\/g, "/").replace(/\/\.\//g, "/");
+		const key = `${file.role}:${path}`;
+		const previous = unique.get(key);
+		unique.set(key, {
+			...file,
+			path,
+			label: previous?.label === "修订文件" ? previous.label : file.label
+		});
+	}
+	return [...unique.values()];
+}
+function category(stage, afterPrediction) {
+	if (stage.title === "查看命令说明") return "准备工作";
+	if (stage.toolName === "limix") return stage.title === "上传数据" || stage.title === "查询数据版本" ? "数据处理" : stage.title;
+	const path = String(stage.args.file_path ?? stage.args.path ?? "");
+	if (["write", "edit"].includes(stage.toolName) && REPORT.test(path)) return "报告输出";
+	if (stage.toolName === "present") return stageFiles(stage).some((file) => REPORT.test(file.path)) ? "报告输出" : "结果分析";
+	if (stage.toolName === "read" && REPORT.test(path)) return "结果分析";
+	if (stage.toolName === "datasource" || DATA.test(path)) return afterPrediction ? "结果分析" : "数据处理";
+	if (stage.toolName === "bash") {
+		const description = String(stage.args.description ?? "");
+		if (/依赖|环境|目录|deps|dependenc|environment|output dir/i.test(description)) return "准备工作";
+		if (/报告|report/i.test(description) && /生成|写入|保存|修订|修改|输出|create|write/i.test(description)) return "报告输出";
+		if (/分析|预测结果|指标|比较|评估|统计|绘图|图表|analy[sz]|evaluat|prediction|benchmark|artifact|explain|contribution/i.test(description)) return "结果分析";
+		if (/数据|字段|缺失|清洗|转换|划分|csv|data|column/i.test(description)) return "数据处理";
+		return afterPrediction ? "结果分析" : "准备工作";
+	}
+	if ([
+		"read",
+		"glob",
+		"grep"
+	].includes(stage.toolName)) return afterPrediction ? "结果分析" : "准备工作";
+	if ([
+		"load_workspace_dependencies",
+		"skill",
+		"todo_write"
+	].includes(stage.toolName)) return "准备工作";
+	return stage.title;
+}
+/** 只合并相邻本地同类操作；相同参数的失败重试可归入同一步。 */
+function flowSteps(round, cwd) {
+	const steps = [];
+	let afterPrediction = false;
+	let reportPhase = false;
+	for (const [index, stage] of round.stages.entries()) {
+		let title = category(stage, afterPrediction);
+		const core = [
+			"分类预测",
+			"回归预测",
+			"时序预测",
+			"因果解释",
+			"模型比较"
+		].includes(title);
+		if (core) reportPhase = false;
+		if (!stage.limix && !core) {
+			if (title === "报告输出") reportPhase = true;
+			else if (reportPhase) title = "报告输出";
+			else if (afterPrediction) title = "结果分析";
+			else if (title === "结果分析" && round.stages.some((s) => [
+				"分类预测",
+				"回归预测",
+				"时序预测",
+				"因果解释",
+				"模型比较"
+			].includes(s.title))) title = "数据处理";
+			else if (![
+				"数据处理",
+				"准备工作",
+				"结果分析"
+			].includes(title)) title = "准备工作";
+		}
+		const path = String(stage.args.file_path ?? stage.args.path ?? "");
+		const next = round.stages[index + 1];
+		const previous = steps[steps.length - 1];
+		if (stage.toolName === "read" && REPORT.test(path) && (previous?.title === "报告输出" && stepFiles(previous).some((f) => f.path === path) || next && ["write", "edit"].includes(next.toolName) && (next.args.file_path ?? next.args.path) === path)) title = "报告输出";
+		if (title === "准备工作" && previous && !previous.limix) {
+			previous.stages.push(stage);
+			continue;
+		}
+		if (previous?.title === "准备工作" && !stage.limix && title !== "准备工作") {
+			previous.title = title;
+			previous.stages.push(stage);
+			continue;
+		}
+		if ([
+			"分类预测",
+			"回归预测",
+			"时序预测",
+			"因果解释",
+			"模型比较"
+		].includes(title)) afterPrediction = true;
+		const prev = steps[steps.length - 1];
+		const last = prev?.stages[prev.stages.length - 1];
+		const retry = last && last.stateKind === "error" && last.toolName === stage.toolName && JSON.stringify(last.args) === JSON.stringify(stage.args);
+		if (prev && prev.title === title && (!prev.limix && !stage.limix && !["模型比较"].includes(title) || retry)) prev.stages.push(stage);
+		else steps.push({
+			key: stage.key,
+			title,
+			stages: [stage],
+			limix: stage.limix,
+			cwd
+		});
+	}
+	return steps;
+}
+function flowState(stages) {
+	if (stages.some((s) => s.running || s.stateKind === "running")) return {
+		kind: "running",
+		label: "进行中"
+	};
+	if (stages.some((s) => s.stateKind === "error")) return {
+		kind: "error",
+		label: "有未完成步骤"
+	};
+	if (stages.some((s) => s.stateKind === "warning")) return {
+		kind: "warning",
+		label: "部分完成"
+	};
+	if (stages.some((s) => s.stateKind === "idle")) return {
+		kind: "idle",
+		label: stages.find((s) => s.stateKind === "idle").stateLabel
+	};
+	return {
+		kind: "done",
+		label: "已完成"
+	};
+}
+function stepSummary(step) {
+	const last = step.stages[step.stages.length - 1];
+	if (step.title === "因果解释") return [explanationMode(last), last.outcome].filter(Boolean).join(" · ");
+	if ([
+		"分类预测",
+		"回归预测",
+		"时序预测",
+		"模型比较"
+	].includes(step.title)) {
+		const target = argument(last, "--target");
+		const horizon = argument(last, "--horizon");
+		return [
+			target && `目标 ${target}`,
+			horizon && `未来 ${horizon} 步`,
+			last.outcome || last.stateLabel
+		].filter(Boolean).join(" · ");
+	}
+	const outputs = stepFiles(step).filter((f) => f.role === "output");
+	if (step.title === "报告输出" && outputs.length) {
+		const descriptions = outputs.map((f) => {
+			return `${/\.md$/i.test(f.path) ? "分析报告" : /\.html?$/i.test(f.path) ? "HTML 报告" : fileName(f.path)}${f.label === "修订文件" ? "已修订" : "已保存"}`;
+		});
+		return [...new Set(descriptions)].join("；") + (flowState(step.stages).kind !== "done" ? "；仍有操作未完成" : "");
+	}
+	return localSummary(step);
+}
+/** 名称取自实际操作对象；缺少依据时保留通用标题。 */
+function stepTitle(step) {
+	if (step.title !== "结果分析") return step.title;
+	const text$1 = step.stages.map((s) => String(s.args.description ?? "")).join(" ");
+	if (/contribution|attribution|归因|贡献/i.test(text$1)) return "归因结果解读";
+	if (/explan|解释/i.test(text$1)) return "解释结果核对";
+	if (/prediction|预测/i.test(text$1)) return "预测结果核对";
+	if (/benchmark|comparison|模型比较|基线/i.test(text$1)) return "模型比较复核";
+	if (/artifact|产物|交付/i.test(text$1)) return "交付文件核对";
+	return step.title;
+}
+/** 只陈述已返回操作的动作；指标仍只读结构化 metrics，不从脚本日志推算。 */
+function localSummary(step) {
+	const completed = step.stages.filter((s) => s.ok && !s.running && s.stateKind === "done");
+	if (!completed.length) return flowState(step.stages).kind === "running" ? "正在执行，结果返回后更新摘要" : "未完成，展开查看原因与执行记录";
+	const descriptions = completed.map((s) => String(s.args.description ?? "")).join(" ");
+	const actions = [];
+	const add = (text$1) => {
+		if (!actions.includes(text$1)) actions.push(text$1);
+	};
+	if (step.title === "数据处理") {
+		if (/reference|参考|训练/i.test(descriptions) && /predict|待预测/i.test(descriptions) && /truth|真值/i.test(descriptions)) add("核对参考数据、待预测数据与真值");
+		if (completed.some((s) => s.toolName === "read" && /target_label/.test(s.output) && /fields/.test(s.output))) add("读取字段说明");
+	}
+	if (step.title === "结果分析") {
+		if (/summari[sz]|汇总|rank|排序/i.test(descriptions) && /contribution|归因|贡献/i.test(descriptions)) add("汇总逐样本特征贡献");
+		if (completed.some((s) => /解释时预测.*原预测|逐行预测对照|prior vs explanation/i.test(s.output + String(s.args.description ?? "")))) add("对照解释时预测与原预测");
+		if (!actions.length && /prediction|预测/i.test(descriptions) && /compar|benchmark|比较/i.test(descriptions)) add("读取预测结果与模型比较明细");
+		if (!actions.length && /explan|解释/i.test(descriptions)) add("核对解释明细与结果结构");
+		if (!actions.length && /artifact|产物/i.test(descriptions)) add("核对输出文件与结果清单");
+	}
+	if (!actions.length) for (const stage of completed) {
+		const description = String(stage.args.description ?? "");
+		if (/清洗|clean/i.test(description)) add("执行数据清洗");
+		else if (/转换|convert|transform/i.test(description)) add("转换数据格式");
+		else if (/划分|split/i.test(description)) add("划分训练与预测数据");
+		else if (/检查|核对|检验|inspect|check|verify|profile/i.test(description) && /data|csv|字段|数据/i.test(description)) add("检查数据内容与字段");
+		else if (stage.toolName === "read") add(`读取 ${fileName(String(stage.args.file_path ?? stage.args.path ?? "文件"))}`);
+		else if (/[\u4e00-\u9fff]/.test(description)) add(description);
+	}
+	const outputs = stepFiles(step).filter((f) => f.role === "output");
+	if (outputs.length && step.title !== "报告输出") add(`输出 ${fileName(outputs[0].path)}`);
+	return (actions.slice(0, 2).join("；") || "执行记录已返回，可展开查看输入与输出") + (flowState(step.stages).kind !== "done" ? "；仍有操作未完成" : "");
+}
+
+//#endregion
+//#region src/client/PipelineParts.tsx
+const PIPELINE_CSS = `
+.lx-flow{height:100%;overflow:auto;box-sizing:border-box;padding:20px clamp(18px,3vw,44px) 160px;color:var(--dsw-alias-label-primary);font-size:13px;line-height:1.5;container-type:inline-size}
+.lx-flow-inner{max-width:1000px;margin:0 auto}
+.lx-flow button{font:inherit;color:inherit;cursor:pointer;background:none;border:0;text-align:left;padding:0}
+.lx-flow button:focus-visible,.lx-flow summary:focus-visible{outline:2px solid #416fbd;outline-offset:4px;border-radius:3px}
+.lx-flow-kicker{color:var(--dsw-alias-label-secondary);font-size:11px;letter-spacing:.08em;margin-bottom:5px}
+.lx-flow-header{padding-bottom:12px;border-bottom:1px solid var(--dsw-alias-border-l3,#e3e7ec);margin-bottom:12px}
+.lx-flow-heading{display:flex;align-items:baseline;gap:16px;flex-wrap:wrap}
+.lx-flow h2{font-size:20px;font-weight:600;letter-spacing:-.02em;margin:0;overflow-wrap:anywhere}
+.lx-flow-status{font-size:12px;color:#258068;white-space:nowrap}
+.lx-flow-status[data-state=error]{color:#c64b42}.lx-flow-status[data-state=warning],.lx-flow-status[data-state=running]{color:#a47320}.lx-flow-status[data-state=idle]{color:var(--dsw-alias-label-secondary)}
+.lx-flow-caption{color:var(--dsw-alias-label-secondary);margin:6px 0 0;font-size:12px}
+.lx-flow-section{margin:0 0 18px}
+.lx-flow-section-head{display:flex;align-items:center;gap:12px;margin:0 0 8px;color:var(--dsw-alias-label-secondary);font-size:12px}
+.lx-flow-section-head span:last-child{margin-left:auto;font-size:11px}
+.lx-flow-request{margin-bottom:10px;color:var(--dsw-alias-label-secondary);font-size:12px}
+.lx-flow-request summary{cursor:pointer}.lx-flow-request p{white-space:pre-wrap;overflow-wrap:anywhere;margin:8px 0}
+.lx-flow-list{list-style:none;margin:0;padding:0}
+.lx-flow-step{position:relative;display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:16px;margin:0;padding:7px 10px 11px 34px;min-width:0;border-radius:6px}
+.lx-flow-step:hover{background:color-mix(in srgb,var(--dsw-alias-state-business-primary,#3465ce) 3%,transparent)}
+.lx-flow-step[data-step="报告输出"]{background:color-mix(in srgb,var(--dsw-alias-state-business-primary,#3465ce) 5%,transparent);margin-top:4px}
+.lx-flow-step>.lx-flow-detail,.lx-flow-step>.lx-flow-result,.lx-flow-step>.lx-flow-error{grid-column:1/-1}
+.lx-flow-step:not(:last-child):before{content:"";position:absolute;left:9px;top:29px;bottom:-3px;width:1px;background:var(--dsw-alias-border-l3,#dfe5ed)}
+.lx-flow-marker{position:absolute;left:0;top:11px;border:0;border-radius:50%;width:19px;height:19px;display:flex;align-items:center;justify-content:center;color:#258068;font-size:12px;background:var(--dsw-alias-bg-base,#fff)}
+.lx-flow-marker[data-state=running]{color:#a47320}.lx-flow-marker[data-state=error]{color:#c64b42}.lx-flow-marker[data-state=warning],.lx-flow-marker[data-state=idle]{color:#a47320}
+.lx-flow button.lx-flow-step-toggle{display:block;width:100%;padding:0;min-width:0;grid-column:1;grid-row:1}
+.lx-flow-step-toggle>*{pointer-events:none}
+.lx-flow-title-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-height:25px}
+.lx-flow-title{font-weight:600;font-size:15px}.lx-flow-brand{font-size:10px;line-height:16px;color:var(--dsw-alias-state-business-primary,#3465ce);background:color-mix(in srgb,var(--dsw-alias-state-business-primary,#3465ce) 10%,transparent);padding:0 6px;border-radius:4px;font-weight:500;white-space:nowrap}
+.lx-flow-chevron{color:var(--dsw-alias-label-secondary);font-size:11px}
+.lx-flow-summary{font-size:12px;color:var(--dsw-alias-label-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block;max-width:100%}
+.lx-flow-actions{grid-column:2;grid-row:1;display:flex;align-items:center;justify-content:flex-end;gap:12px;flex-wrap:wrap;align-self:center;max-width:220px}
+.lx-flow-actions:empty{display:none}
+.lx-flow button.lx-flow-link{color:var(--dsw-alias-state-business-primary,#3465ce);font-size:12px;overflow-wrap:anywhere}
+.lx-flow button.lx-flow-link:hover{text-decoration:underline}
+.lx-flow-detail{margin-top:13px;padding:16px 18px;background:var(--dsw-alias-interactive-bg-hover,#f5f7fa);border-radius:8px;min-width:0}
+.lx-flow-detail h4{font-size:11px;color:var(--dsw-alias-label-secondary);font-weight:500;letter-spacing:.04em;margin:0 0 8px}
+.lx-flow-detail h4:not(:first-child){margin-top:18px}
+.lx-flow-fields{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:5px 20px;margin:0;font-size:12px}
+.lx-flow-fields dt{color:var(--dsw-alias-label-secondary)}.lx-flow-fields dd{margin:0;overflow-wrap:anywhere}
+.lx-flow-files{display:flex;flex-direction:column;gap:6px}.lx-flow-files small{margin-right:10px;color:var(--dsw-alias-label-secondary)}
+.lx-flow-operations{padding-left:18px;margin:0;font-size:12px}.lx-flow-operations li{padding:3px 0;overflow-wrap:anywhere}
+.lx-flow-error{font-size:12px;color:#c64b42;margin:7px 0;overflow-wrap:anywhere}
+.lx-flow-technical{margin-top:16px;font-size:12px;color:var(--dsw-alias-label-secondary)}.lx-flow-technical summary{cursor:pointer}
+.lx-flow-technical pre{max-height:260px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;font-size:11px;background:var(--dsw-alias-bg-base,#fff);padding:12px;border-radius:6px}
+.lx-flow-result{margin-top:16px;min-width:0}.lx-flow-empty{padding:35px 0;color:var(--dsw-alias-label-secondary)}
+@container(max-width:650px){.lx-flow-step{grid-template-columns:minmax(0,1fr);padding-right:4px}.lx-flow-actions{grid-column:1;grid-row:2;justify-content:flex-start;max-width:none;margin-top:4px}.lx-flow-step>.lx-flow-detail,.lx-flow-step>.lx-flow-result,.lx-flow-step>.lx-flow-error{grid-column:1}.lx-flow-summary{white-space:normal}.lx-flow h2{font-size:19px}.lx-flow-step{padding-left:34px}.lx-flow-title{font-size:15px}.lx-flow-detail{padding:13px 12px}.lx-flow-fields{gap:5px 10px}.lx-flow-status{font-size:11px}.lx-flow-summary{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}}
+`;
+function FileLinks({ step, openFile, role }) {
+	const [error, setError] = (0, react.useState)("");
+	return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+		className: "lx-flow-files",
+		children: [stepFiles(step).filter((f) => f.role === role).map((file) => /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("small", { children: file.label }), openFile ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+			type: "button",
+			className: "lx-flow-link",
+			title: file.path,
+			onClick: () => {
+				setError("");
+				Promise.resolve().then(() => openFile(file.path)).catch(() => setError("文件打开失败，请在工作区检查文件是否仍存在。"));
+			},
+			children: fileName(file.path)
+		}) : /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+			title: file.path,
+			children: fileName(file.path)
+		})] }, file.path)), error && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
+			className: "lx-flow-error",
+			role: "alert",
+			children: error
+		})]
+	});
+}
+function TechnicalDetails({ stages }) {
+	return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("details", {
+		className: "lx-flow-technical",
+		children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("summary", { children: [
+			"查看技术详情 · ",
+			stages.length,
+			" 次操作"
+		] }), stages.map((stage) => /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", { children: [
+			/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("p", { children: [
+				stage.title,
+				" · ",
+				stage.stateLabel
+			] }),
+			/* @__PURE__ */ (0, react_jsx_runtime.jsx)("pre", { children: stage.inputRaw }),
+			/* @__PURE__ */ (0, react_jsx_runtime.jsx)("pre", { children: stage.output })
+		] }, stage.key))]
+	});
+}
+function StepDetails({ step, openFile }) {
+	const last = step.stages[step.stages.length - 1];
+	const fields = last.inputKv.filter(([key]) => ![
+		"子命令",
+		"命令",
+		"说明",
+		"参数",
+		"解释方式"
+	].includes(key) && !/文件|环境/.test(key));
+	if (typeof last.data?.model_type === "string" && !fields.some(([key]) => key === "模型")) fields.unshift(["模型", last.data.model_type]);
+	const inputs = stepFiles(step).filter((file) => file.role === "input");
+	const outputs = stepFiles(step).filter((file) => file.role === "output");
+	const prediction = [
+		"分类预测",
+		"回归预测",
+		"时序预测"
+	].includes(step.title);
+	return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+		className: "lx-flow-detail",
 		children: [
-			"本会话还没有 LimiX 分析活动。 发起一次预测（样例库选一个，或直接描述需求），这里会实时展开完整的调用管线：",
-			/* @__PURE__ */ (0, react_jsx_runtime.jsx)("br", {}),
-			"数据处理 → 上传 → 预测 → 评估 / 因果解释 → 取结果。"
+			inputs.length > 0 && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("h4", { children: "输入" }), /* @__PURE__ */ (0, react_jsx_runtime.jsx)(FileLinks, {
+				step,
+				role: "input",
+				openFile
+			})] }),
+			(fields.length > 0 || step.title === "因果解释") && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("h4", { children: "分析配置" }), /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("dl", {
+				className: "lx-flow-fields",
+				children: [step.title === "因果解释" && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("dt", { children: "解释模式" }), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("dd", { children: explanationMode(last) })] }), fields.map(([key, value], i) => /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+					style: { display: "contents" },
+					children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("dt", { children: key }), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("dd", { children: key === "任务类型" ? {
+						regression: "回归",
+						classification: "分类",
+						timeseries: "时序"
+					}[value] ?? value : key === "解释范围" && value === "all" ? "全部样本" : value })]
+				}, i))]
+			})] }),
+			/* @__PURE__ */ (0, react_jsx_runtime.jsx)("h4", { children: "执行内容" }),
+			/* @__PURE__ */ (0, react_jsx_runtime.jsx)("ol", {
+				className: "lx-flow-operations",
+				children: step.stages.map((stage) => /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("li", { children: [
+					stage.title,
+					" ",
+					/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
+						className: "lx-flow-caption",
+						children: ["· ", stage.stateLabel]
+					}),
+					stage.substeps.length > 0 && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+						className: "lx-flow-caption",
+						children: stage.substeps.join(" → ")
+					})
+				] }, stage.key))
+			}),
+			(outputs.length > 0 || last.outcome || last.metrics.length > 0 || prediction) && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [
+				/* @__PURE__ */ (0, react_jsx_runtime.jsx)("h4", { children: "结果" }),
+				last.outcome && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
+					style: {
+						margin: "0 0 8px",
+						fontSize: 12
+					},
+					children: last.outcome
+				}),
+				/* @__PURE__ */ (0, react_jsx_runtime.jsx)(FileLinks, {
+					step,
+					role: "output",
+					openFile
+				}),
+				prediction && last.metrics.length === 0 && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
+					className: "lx-flow-caption",
+					children: last.running ? "预测结果返回后显示评估指标。" : "工具未返回评估指标；仅在有真值并完成评估后展示。"
+				})
+			] }),
+			/* @__PURE__ */ (0, react_jsx_runtime.jsx)(TechnicalDetails, { stages: step.stages })
 		]
 	});
-	const newestTurn = rounds[0].turn;
-	return /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
-		style: ui.wrap,
-		children: rounds.map((r) => {
-			const open = override[r.turn] ?? r.turn === newestTurn;
-			return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-				style: ui.round,
-				children: [
-					/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-						style: ui.roundHead,
-						onClick: () => setOverride((o) => ({
-							...o,
-							[r.turn]: !open
-						})),
+}
+function FlowStepRow({ step, openFile }) {
+	const state = flowState(step.stages);
+	const [override, setOverride] = (0, react.useState)(null);
+	const [showResult, setShowResult] = (0, react.useState)(false);
+	const [fileError, setFileError] = (0, react.useState)("");
+	const open = override ?? state.kind === "running";
+	const last = step.stages[step.stages.length - 1];
+	const result = last.toolName === "limix" && last.data && [
+		"分类预测",
+		"回归预测",
+		"时序预测",
+		"因果解释",
+		"模型比较"
+	].includes(step.title);
+	const reports = stepFiles(step).filter((f) => f.role === "output" && /\.(md|html?|pdf|docx|pptx)$/i.test(f.path));
+	return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("li", {
+		className: "lx-flow-step",
+		"data-step": step.title,
+		children: [
+			/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+				className: "lx-flow-marker",
+				"data-state": state.kind,
+				"aria-hidden": "true",
+				children: state.kind === "done" ? "✓" : state.kind === "running" ? "◌" : "!"
+			}),
+			/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("button", {
+				type: "button",
+				className: "lx-flow-step-toggle",
+				"aria-label": `${open ? "收起" : "展开"}${stepTitle(step)}`,
+				"aria-expanded": open,
+				onClick: () => setOverride(!open),
+				children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
+					className: "lx-flow-title-row",
+					children: [
+						/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+							className: "lx-flow-title",
+							children: stepTitle(step)
+						}),
+						step.limix && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+							className: "lx-flow-brand",
+							children: "LimiX"
+						}),
+						state.kind !== "done" && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+							className: "lx-flow-status",
+							"data-state": state.kind,
+							children: state.label
+						}),
+						/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+							className: "lx-flow-chevron",
+							children: open ? "▴" : "▾"
+						})
+					]
+				}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+					className: "lx-flow-summary",
+					children: stepSummary(step)
+				})]
+			}),
+			step.stages.filter((s) => s.errLine).map((s) => /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
+				className: "lx-flow-error",
+				children: s.errLine
+			}, s.key)),
+			/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+				className: "lx-flow-actions",
+				children: [result && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+					type: "button",
+					className: "lx-flow-link",
+					"aria-expanded": showResult,
+					onClick: () => setShowResult(!showResult),
+					children: showResult ? "收起结果" : step.title === "因果解释" ? "解释图表" : step.title === "模型比较" ? "比较结果" : "预测结果"
+				}), openFile && reports.map((file, index) => /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+					type: "button",
+					className: "lx-flow-link",
+					title: file.path,
+					onClick: () => {
+						setFileError("");
+						Promise.resolve().then(() => openFile(file.path)).catch(() => setFileError("文件打开失败，请在工作区检查文件是否仍存在。"));
+					},
+					children: reports.length === 1 ? "打开报告" : /\.md$/i.test(file.path) ? "分析报告" : /\.html?$/i.test(file.path) ? "HTML 报告" : `报告 ${index + 1}`
+				}, file.path))]
+			}),
+			fileError && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
+				className: "lx-flow-error",
+				role: "alert",
+				children: fileError
+			}),
+			open && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(StepDetails, {
+				step,
+				openFile
+			}),
+			showResult && result && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+				className: "lx-flow-result",
+				children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(LimixToolCard, {
+					callId: last.key,
+					toolName: "limix",
+					openFile,
+					block: {
+						kind: "tool-result",
+						call: {
+							name: "limix",
+							argsRaw: JSON.stringify(last.args)
+						},
+						content: [{
+							type: "text",
+							text: JSON.stringify(last.data)
+						}],
+						isError: !last.ok
+					}
+				})
+			})
+		]
+	});
+}
+
+//#endregion
+//#region src/client/LimixPipelineView.tsx
+function LimixPipelineView({ useTrajectory, useSession, useSessions, sessionId, cwd, openFile }) {
+	const traj = useTrajectory((t) => t);
+	const title = useSessions?.((s) => s.byId?.[sessionId]?.title);
+	const session = useSession?.((s) => s);
+	const visible = (0, react.useMemo)(() => parseRounds(traj?.eventNodes ?? [], traj?.runningCalls ?? []).reverse(), [traj]).filter((round) => round.stages.length > 0);
+	const stages = visible.flatMap((round) => round.stages);
+	const state = session?.running ? {
+		kind: "running",
+		label: "进行中"
+	} : flowState(stages);
+	const current = [...stages].reverse().find((stage) => stage.running || stage.stateKind === "running");
+	return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+		className: "lx-flow",
+		children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("style", { children: PIPELINE_CSS }), /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+			className: "lx-flow-inner",
+			children: [
+				/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("header", {
+					className: "lx-flow-header",
+					children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+						className: "lx-flow-heading",
+						children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("h2", { children: typeof title === "string" && title ? title : "从数据到分析交付" }), stages.length > 0 && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+							className: "lx-flow-status",
+							"data-state": state.kind,
+							children: state.label
+						})]
+					}), (current || session?.running || !stages.length) && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
+						className: "lx-flow-caption",
+						children: current ? `正在执行：${current.title}` : session?.running ? "Agent 正在继续分析" : "数据处理、预测、因果解释与报告将在这里按顺序呈现。"
+					})]
+				}),
+				visible.length === 0 && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
+					className: "lx-flow-empty",
+					children: "本会话还没有分析活动。"
+				}),
+				visible.map((round, index) => {
+					const steps = flowSteps(round, cwd);
+					const revision = index > 0 && steps.some((s) => s.title === "报告输出" && s.stages.some((stage) => stage.toolName === "edit")) && !steps.some((s) => s.limix);
+					return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("section", {
+						className: "lx-flow-section",
+						"aria-label": `第 ${round.turn} 轮分析`,
 						children: [
-							/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
-								style: ui.caret,
-								children: open ? "▾" : "▸"
-							}),
-							/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
-								style: ui.turnTag,
-								children: [
+							visible.length > 1 && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+								className: "lx-flow-section-head",
+								children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("strong", { children: index === 0 ? "开始分析" : revision ? "报告修订" : "补充分析" }), /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", { children: [
 									"第 ",
-									r.turn,
-									" 轮"
-								]
+									round.turn,
+									" 轮 · ",
+									fmtTime(round.time)
+								] })]
 							}),
-							(() => {
-								const lx = r.stages.filter((st) => st.limix);
-								if (lx.length === 0) return null;
-								const byTitle = /* @__PURE__ */ new Map();
-								for (const st of lx) byTitle.set(st.title, (byTitle.get(st.title) ?? 0) + 1);
-								const detail = [...byTitle].map(([t, n]) => n > 1 ? `${t} ×${n}` : t).join(" · ");
-								return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
-									style: ui.limixTag,
-									title: detail,
-									children: ["LimiX ×", lx.length]
-								});
-							})(),
-							/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
-								style: ui.ask,
-								children: r.ask
+							/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("details", {
+								className: "lx-flow-request",
+								children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("summary", { children: ["本次请求 ", /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+									style: { marginLeft: 8 },
+									children: fmtTime(round.time)
+								})] }), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", { children: round.ask })]
 							}),
-							/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
-								style: ui.time,
-								children: [
-									r.stages.length,
-									" 阶段 · ",
-									roundDur(r),
-									" · ",
-									fmtTime(r.time)
-								]
+							/* @__PURE__ */ (0, react_jsx_runtime.jsx)("ol", {
+								className: "lx-flow-list",
+								children: steps.map((step) => /* @__PURE__ */ (0, react_jsx_runtime.jsx)(FlowStepRow, {
+									step,
+									openFile
+								}, step.key))
 							})
 						]
-					}),
-					r.result && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-						style: ui.result,
-						children: ["结论：", r.result]
-					}),
-					open && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [
-						/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-							style: ui.flow,
-							children: [groupParallel(r.stages).map((group, gi) => /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
-								style: { display: "contents" },
-								children: [gi > 0 && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
-									style: ui.arrow,
-									children: "→"
-								}), /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
-									style: group.length > 1 ? ui.parallel : { display: "contents" },
-									children: [group.length > 1 && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
-										style: ui.parallelTag,
-										title: "模型一步并行发出；宿主按队列依次执行",
-										children: ["并行 ×", group.length]
-									}), group.map((s) => /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
-										style: ui.chip(s.cat, s.ok, openKey === s.key, s.running),
-										title: s.summary,
-										onClick: () => {
-											setOpenKey((k) => k === s.key ? null : s.key);
-											setShowRaw(false);
-										},
-										children: [
-											/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
-												"aria-hidden": "true",
-												children: CAT_STYLE[s.cat].label
-											}),
-											s.title,
-											s.substeps.length > 1 && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
-												style: ui.chipMeta,
-												children: [
-													"·",
-													s.substeps.length,
-													"接口"
-												]
-											}),
-											!s.running && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
-												style: ui.chipMeta,
-												children: fmtDur(s.end - s.start)
-											}),
-											s.running && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
-												style: {
-													fontSize: 11,
-													opacity: .7
-												},
-												children: "运行中"
-											}),
-											!s.ok && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
-												style: { fontSize: 11 },
-												children: "失败"
-											})
-										]
-									}, s.key))]
-								})]
-							}, group[0].key)), r.others.length > 0 && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
-								style: { display: "contents" },
-								children: [r.stages.length > 0 && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
-									style: ui.arrow,
-									children: "→"
-								}), /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
-									style: ui.chip("api", true, openKey === `others-${r.turn}`),
-									title: "不进主线的其他工具活动（搜索/读改文件/普通 Shell 等）",
-									onClick: () => setOpenKey((k) => k === `others-${r.turn}` ? null : `others-${r.turn}`),
-									children: [
-										/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
-											"aria-hidden": "true",
-											children: "≡"
-										}),
-										"其他活动",
-										/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
-											style: ui.chipMeta,
-											children: ["×", r.others.length]
-										})
-									]
-								})]
-							})]
-						}),
-						openKey === `others-${r.turn}` && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
-							style: {
-								...ui.detail,
-								gridTemplateColumns: "minmax(0,1fr)"
-							},
-							children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
-								style: ui.kvGrid,
-								children: r.others.map(([name, brief], i) => /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
-									style: { display: "contents" },
-									children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
-										style: ui.kvKey,
-										children: name
-									}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
-										style: ui.kvVal,
-										children: brief || "—"
-									})]
-								}, i))
-							})
-						}),
-						r.stages.filter((s) => s.key === openKey).map((s) => /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", { children: [
-							!s.ok && s.errLine && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-								style: ui.errBox,
-								children: ["✕ ", s.errLine]
-							}),
-							(s.metrics.length > 0 || s.ids.length > 0) && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-								style: {
-									display: "flex",
-									flexWrap: "wrap",
-									gap: 6,
-									marginTop: 10
-								},
-								children: [s.metrics.map(([k, v]) => /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
-									style: ui.metricPill,
-									children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
-										style: {
-											opacity: .6,
-											fontSize: 11
-										},
-										children: k
-									}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("b", { children: v })]
-								}, k)), s.ids.map(([k, v]) => /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
-									style: ui.idPill,
-									title: "点击全选后 Cmd+C 复制",
-									children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
-										style: {
-											opacity: .55,
-											fontSize: 10.5
-										},
-										children: k
-									}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
-										style: ui.idVal,
-										children: v.length > 18 ? v.slice(0, 18) + "…" : v
-									})]
-								}, k))]
-							}),
-							s.substeps.length > 0 && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-								style: ui.substeps,
-								children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
-									style: {
-										...ui.ioLabel,
-										marginBottom: 0,
-										marginRight: 4
-									},
-									children: "内部接口序列"
-								}), s.substeps.map((step, i) => /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
-									style: { display: "contents" },
-									children: [i > 0 && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
-										style: ui.arrow,
-										children: "→"
-									}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
-										style: ui.substep,
-										children: step
-									})]
-								}, i))]
-							}),
-							/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-								style: ui.detail,
-								children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-									style: { minWidth: 0 },
-									children: [
-										/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
-											style: ui.ioLabel,
-											children: "输入"
-										}),
-										/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
-											style: ui.kvGrid,
-											children: s.inputKv.map(([k, v], i) => /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
-												style: { display: "contents" },
-												children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
-													style: ui.kvKey,
-													children: k
-												}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
-													style: ui.kvVal,
-													children: v
-												})]
-											}, i))
-										}),
-										/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
-											style: ui.rawToggle,
-											onClick: (e) => {
-												e.stopPropagation();
-												setShowRaw((x) => !x);
-											},
-											children: showRaw ? "▲ 收起原始参数" : "▼ 原始参数"
-										}),
-										showRaw && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
-											style: {
-												...ui.io,
-												marginTop: 4
-											},
-											children: s.inputRaw
-										})
-									]
-								}), /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-									style: { minWidth: 0 },
-									children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-										style: ui.ioLabel,
-										children: ["输出 · ", fmtTime(s.time)]
-									}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
-										style: ui.io,
-										children: s.output
-									})]
-								})]
-							})
-						] }, s.key))
-					] })
-				]
-			}, r.turn);
-		})
-	});
+					}, `${sessionId ?? ""}-${round.turn}`);
+				})
+			]
+		})]
+	}, sessionId);
 }
 
 //#endregion
@@ -4890,7 +5058,12 @@ function WelcomeContent({ inputActions }) {
 
 //#endregion
 //#region src/client/index.tsx
-const inject = ["slots", "locale"];
+const inject = [
+	"slots",
+	"locale",
+	"sessions",
+	"sidebarRight"
+];
 function apply(ctx) {
 	ctx.effect(() => ctx.locale.register("limix-agent", {
 		zh: { "view.pipeline": "分析过程" },
@@ -4915,7 +5088,17 @@ function apply(ctx) {
 		name: "conversation.view",
 		id: "limix-pipeline",
 		order: 15,
-		label: () => t("view.pipeline")
+		label: () => t("view.pipeline"),
+		inject: (sessionId) => ({
+			cwd: ctx.sessions.list.getSnapshot().byId[sessionId]?.cwd,
+			openFile: (path) => {
+				const cwd = ctx.sessions.list.getSnapshot().byId[sessionId]?.cwd?.replace(/\\/g, "/").replace(/\/+$/, "");
+				let normalized = path.replace(/\\/g, "/").replace(/^(?:\.\/)+/, "");
+				if (cwd && normalized.startsWith(cwd + "/")) normalized = normalized.slice(cwd.length + 1);
+				const encode = (value) => encodeURIComponent(value).replace(/%3A/gi, ":");
+				ctx.sidebarRight.openResource(`dsh-resource://file/session/${encode(sessionId)}/${normalized.split("/").map(encode).join("/")}`);
+			}
+		})
 	}, LimixPipelineView));
 }
 

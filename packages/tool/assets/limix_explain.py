@@ -1,7 +1,7 @@
 """
 [INPUT]: CLI HTTP/上传函数；本地 CSV 或时序预测结果版本、字段字典与原预测文件。
 [OUTPUT]: explain 子命令；表格/时序局部解释、关系图 JSON/CSV 与受控视图文件。
-[POS]: 扩展任务编排；与预测状态分离，提交回执支持超时续查。
+[POS]: 扩展任务编排；与预测状态分离，提交回执支持超时续查。stderr 进度行由 agent 的 pipeline-stage 解析，改格式须同步。
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 """
 import csv
@@ -245,11 +245,15 @@ def run(cfg, args, cli):
             record={'request':body,'context':context,'task_id':None};save_json(receipt,record)
             submitted=cli.api_call(cfg,'POST','/v1/extensions/explanations/tasks',body=body,timeout=120)
             task_id=submitted['task_id'];record.update({'task_id':task_id,'submission':submitted});save_json(receipt,record)
-        cli.log(f'解释任务 {task_id}；回执 {receipt}')
+        cli.log(f'续查解释任务 {task_id}' if args.task_id else f'解释任务 {task_id}；回执 {receipt}')
         deadline=time.monotonic()+args.timeout
+        reported=None
         while True:
             data=cli.api_call(cfg,'GET',f'/v1/extensions/tasks/{task_id}',retries=2)
             status=data.get('task_status')
+            # 只记状态变化：stderr 会进入模型上下文，不能每次轮询都写一行。
+            if status!=reported:
+                cli.log(f'任务 {task_id}: {status}');reported=status
             if status in TERMINAL:break
             if time.monotonic() >= deadline:
                 cli.die('解释仍在运行，保留回执，可用 --task-id 续查',exit_code=3,payload={'task_id':task_id,'task_status':status,'receipt':str(receipt)})
@@ -264,11 +268,12 @@ def run(cfg, args, cli):
             cli.die(data.get('error_message') or f'解释未完成：{status}',exit_code=3,payload={'task_id':task_id,'task_status':status,'saved_to':str(output)})
         view=normalize(data,context)
         csv_path=output.with_suffix('.csv');export_csv(csv_path,view)
+        cli.log(f'已保存解释 → {output}')
         if view.get('requested_count',1)>1:
             detail_path=output.with_suffix('.view.json');save_json(detail_path,view)
             view={k:v for k,v in view.items() if k not in ['samples','prior_predictions','row_numbers']}
             view['detail_path']=str(detail_path)
-        cli.emit({'task_id':task_id,'task_status':status,'result_id':data.get('result_id'),'saved_to':str(output),
-            'csv_path':str(csv_path),'explanation':view})
+        cli.emit({'task_id':task_id,'task_status':status,'result_id':data.get('result_id'),'model_type':(data.get('result') or {}).get('model_type'),
+            'saved_to':str(output),'csv_path':str(csv_path),'explanation':view})
     except (ValueError, OSError, KeyError, TypeError) as e:
         cli.die(str(e),exit_code=2,payload={'saved_to':str(output) if output.exists() else None})

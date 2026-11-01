@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 全部真实变量与关系边；分层布局、共用说明图标与宿主主题。
- * [OUTPUT]: 关系图、目标聚焦、高亮与边明细；解读说明按需展开。
+ * [OUTPUT]: 全局因果（有向/无向）图、目标聚焦、高亮与边明细；解读说明按需展开。
  * [POS]: ExplanationView 的图分支；图形不代表已验证干预效果。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
@@ -39,7 +39,7 @@ export function ExplanationGraph({ data }: { data: ExplanationData }) {
   }, [])
   const active = new Set(selected ? [selected, ...edges.filter(e => e.source === selected || e.target === selected).flatMap(e => [e.source, e.target])] : nodes)
   return <div ref={root}>
-    <div className="lx-explain-subtitle"><div className="lx-graph-mode"><span>{data.mode === 'directed' ? '有向关系探索' : '无向关联探索'}</span>
+    <div className="lx-explain-subtitle"><div className="lx-graph-mode"><span>{data.mode === 'directed' ? '全局因果 · 有向' : '全局因果 · 无向'}</span>
       <ExplanationHelp label="关系图说明"><p>连线表示模型发现的关系，数值为关系分数。</p>{data.mode === 'directed' && cycles.length > 0 && <p>图中含双向或循环关系，不代表确定的因果顺序。</p>}</ExplanationHelp>
     </div><span>{allNodes.length} 个变量 · {allEdges.length} 条关系</span></div>
     <div className="lx-explain-tabs" aria-label="关系数据视图"><button type="button" data-lx-graph="visual" aria-pressed={view === 'visual'}>可视化</button><button type="button" data-lx-graph="raw" aria-pressed={view === 'raw'}>原始数据</button></div>

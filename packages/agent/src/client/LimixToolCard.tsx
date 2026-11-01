@@ -3,7 +3,7 @@
  *          （结构对齐官方 ToolCallOwnerProps：callId/toolName/block/cwd/openFile/inspect——
  *           为守构建纯度门禁不 value-import 官方包，此处以最小结构类型自持）
  * [OUTPUT]: 对外提供 LimixToolCard 组件——limix 工具调用在对话流里的富卡片：
- *           任务名称 + 业务指标 + 结果文件下载与打开；指标说明和调用详情默认折叠
+ *           任务名称（因果解释沿用官方口径）+ 指标 + 文件下载与打开；指标说明和调用详情默认折叠
  *           + 三类预测图、可全屏的解释/模型比较卡及 JSON/CSV 下载；参数帮助不显示预测完成。
  *           服务连接与参数帮助使用紧凑行，详情按需展开，失败原因保持可见。
  * [POS]: limix-ui 的工具结果渲染器；对位 Next.js 版 tools-ui 的 DSH 形态。
@@ -60,7 +60,7 @@ const COMMAND_LABELS: Record<string, string> = {
   regress: '回归预测', classify: '分类预测', forecast: '时序预测',
   health: '服务连接', check: '访问权限', upload: '上传数据', download: '保存结果',
   task: '任务进度', tasks: '任务列表', result: '预测结果', data: '数据查询', cancel: '取消任务',
-  explain: '预测解释', benchmark: '多模型效果比较',
+  explain: '因果解释', benchmark: '多模型效果比较',
 }
 const CSS = `
 .lx-result{border:1px solid var(--dsw-alias-border-l3,#e3e6eb);border-radius:12px;padding:16px 18px;margin:4px 0;font:inherit;font-size:13px;line-height:1.6;min-width:0;overflow-wrap:anywhere;color:var(--dsw-alias-label-primary)}
@@ -265,7 +265,7 @@ export function LimixToolCard({ callId, block, inspect, cwd, openFile }: Props):
   const sampleCount = parsed?.metrics?.n
   const help = argList.some(arg => arg === '--help' || arg === '-h')
   const prediction = !help && ['regress', 'classify', 'forecast'].includes(command)
-  const title = help ? '参数说明' : explanation && explanation.mode !== 'local' ? '因果关系探索' : COMMAND_LABELS[command] ?? '工具结果'
+  const title = help ? '参数说明' : COMMAND_LABELS[command] ?? '工具结果'
   const file = typeof parsed?.saved_to === 'string' ? parsed.saved_to : null
   const errorMessage = typeof result.error?.error === 'string' ? result.error.error : typeof result.error?.error_message === 'string' ? result.error.error_message : '请展开调用详情，查看失败原因。'
   const hint = typeof result.error?.hint === 'string' ? result.error.hint : ''

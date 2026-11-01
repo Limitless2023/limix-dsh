@@ -129,7 +129,8 @@ limix-dsh/
 │  │  ├─ src/index.ts        宿主半：空 apply（只占位，让 dsh.client 被扫描）
 │  │  ├─ src/client/index.tsx  注册 3 个槽：toolview(key=limix)、conversation.view、chat.turnTail
 │  │  ├─ src/client/LimixToolCard.tsx     单次调用卡（任务 + 指标 + 折叠详情）
-│  │  ├─ src/client/LimixPipelineView.tsx 「分析过程」：按轮次展开调用管线
+│  │  ├─ src/client/LimixPipelineView.tsx 「分析过程」：按请求顺序呈现业务步骤，输入/执行/结果按需展开
+│  │  ├─ src/client/pipeline-{model,stage,flow}.ts 分轮、单步翻译与业务流程归并
 │  │  ├─ src/client/LimixTurnStack.tsx    本轮任务摘要（类型 + 指标 + 样本数）
 │  │  ├─ src/client/LimixWelcome.tsx      空白 LimiX 会话开场白与示例
 │  │  ├─ src/client/tool-result.ts        卡片与摘要共用的输出展示模型
@@ -325,6 +326,20 @@ zstd -dc "$S/session.v4.jsonl.zstd" | tail -3             # 看最后几条记�
 - 截图：../_recon/t5-classification-verified.png、../_recon/t5-forecast-verified.png。
 - Agent 文字回复仍会重复表格；当前以提示词约束，工具卡已默认精简。
 - 测试使用合成数据；分数不代表真实业务效果。未发布 Release。
+
+### 2026-11-01：分析过程业务流程改版（fix/analysis-process-view，未发版）
+
+- 页面采用单一业务流程，替代简略版/详细版。按实际顺序展示数据处理、分类/回归/时序预测、因果解释、模型比较与报告输出。
+- 本地操作按业务步骤归并。摘要写实际动作与产物；结果节点区分预测核对和归因解读。报告分别标明保存与修订。
+- 因果解释沿用 API 口径：局部归因、全局因果·有向、全局因果·无向。结果卡与关系图同步名称。
+- 输入、配置、执行内容和结果按需展开。原始参数和输出再折叠一层；不展示模型思考，不截取回复充当结论。
+- 紧凑行布局将结果入口置于右侧；LimiX 使用浅蓝底标签，报告行轻量强调。1512×838 下示例会话的报告输出位于首屏。
+- 文件按会话 cwd 去重，通过宿主会话授权地址预览。结果图表复用 LimixToolCard，点击后才挂载。
+- CLI 补充解释状态变化、保存路径、实际模型与比较提交日志；续查不冒充新提交。错误解析支持进度日志末尾的 JSON；旧会话缺失步骤不补写。
+- 验证：70 项 agent 测试、52 项 CLI 测试、13 项暂存快照的宿主契约/取消测试、TypeScript 检查与 agent 构建通过。
+- 真实历史会话验证默认收起、鼠标/键盘展开、局部归因热力图、Markdown/HTML 预览；760px 宽流程无横向溢出。
+- 最新页面截图：`../_recon/pipeline-flow-brand-tag.png`（本地证据，未纳入仓库）。
+- 边界：未重新发起生产预测。benchmark Python 完整套件因运行时缺少 scikit-learn 未通过；运行态、失败、分类/时序与三种解释模式由自动化测试覆盖。
 
 ### 每天开工前的固定检查
 

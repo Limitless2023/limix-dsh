@@ -54,7 +54,8 @@ LimiX 是一个预训练的结构化数据基础模型（表格 / 时序预测�
 | 当前 profile | `desktop`，目录 `~/.dsh/profiles/desktop`（`package.json` 的 `dsh.profile.bundles` 决定装了什么） |
 | 仓库 | `~/Desktop/Projects/Coffee/limix-dsh` |
 | 构建工具链 | `tsdown`（在 `~/Desktop/Projects/DeepSeek_Harness/packages/limix-ui/node_modules` 里；构建时把这个 node_modules 软链到目标包即可，见 §5） |
-| 本机 Python | `/Users/limitless/.dsh/dsh-runtimes/dsh-primary-runtime/dependencies/python/bin/python3` |
+| DSH 基础 Python | `/Users/limitless/.dsh/dsh-runtimes/dsh-primary-runtime/dependencies/python/bin/python3` |
+| 模型比较测试 Python | `/Users/limitless/Desktop/Projects/Coffee/materials-datasets/.venv/bin/python`；Python 3.12.12，依赖版本与 `benchmarks/requirements.txt` 的核心计算包一致 |
 | GUI | 每次启动端口都变，从 `$DSH_WEB_URL` 读 |
 | LimiX 凭据 | `~/.limix/config.json`（已有）；也可用 `LIMIX_API_KEY` |
 
@@ -339,7 +340,10 @@ zstd -dc "$S/session.v4.jsonl.zstd" | tail -3             # 看最后几条记�
 - 验证：70 项 agent 测试、52 项 CLI 测试、13 项暂存快照的宿主契约/取消测试、TypeScript 检查与 agent 构建通过。
 - 真实历史会话验证默认收起、鼠标/键盘展开、局部归因热力图、Markdown/HTML 预览；760px 宽流程无横向溢出。
 - 最新页面截图：`../_recon/pipeline-flow-brand-tag.png`（本地证据，未纳入仓库）。
-- 边界：未重新发起生产预测。benchmark Python 完整套件因运行时缺少 scikit-learn 未通过；运行态、失败、分类/时序与三种解释模式由自动化测试覆盖。
+- 补充验证：使用上表的现有模型比较环境，29 项 benchmark Python 测试全部通过；3 项 benchmark 取消测试全部通过，无跳过。此前缺少 scikit-learn 的原因是选用了 DSH 基础 Python。
+- 复现：`../materials-datasets/.venv/bin/python -m unittest discover -s benchmarks/tests -v`；`node --test benchmarks/tests/cancellation.test.mjs`。
+- 环境版本：NumPy 2.5.4、pandas 3.1.0、scikit-learn 1.9.1、XGBoost 3.4.1；本次未安装依赖。
+- 边界：未重新发起生产预测；运行态、失败、分类/时序与三种解释模式由自动化测试覆盖。
 
 ### 每天开工前的固定检查
 

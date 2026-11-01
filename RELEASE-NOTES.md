@@ -1,14 +1,16 @@
-# LimiX Agent 0.3.2
+# LimiX Agent 0.3.3
 
-安装 preset 插件后，未保存默认选择的新环境会自动将 LimiX Agent 设为新任务默认模式。
+本版更新“分析过程”页面，让数据准备、预测、解释、模型比较和报告按实际执行顺序展示。五个插件统一更新到 0.3.3。
 
-- 已保存的用户默认选择优先保留。用户之后仍可在“设置 → Agent 预设”中切换默认模式。
-- 已有会话不切换模式。标准、PTC、极简和创造模式的配置保持不变。
-- 五个插件统一更新到 0.3.2。本版只调整默认预设，不包含开发中的分析过程界面改版。
+- 相邻辅助操作归入对应业务步骤，摘要展示已执行动作与实际产物。
+- 输入、配置、执行内容和结果按需展开；点击结果入口后显示图表。
+- Markdown 与 HTML 报告可在宿主侧栏预览，报告保存与修订分别标注。
+- 解释流程补充实际返回的任务状态、保存位置和模型信息。历史任务缺失的信息不会补造。
+- 保留 v0.3.2 的默认预设行为：未保存默认选择的新环境默认使用 LimiX Agent；已有用户选择优先保留。
 
-请依次安装 data、tool、agent、preset；cover 是可选品牌外观插件。安装器提示需要重启时，重启 DSH。
-下载本 Release 的 `.tgz` 文件，按[安装说明](https://github.com/Limitless2023/limix-dsh/blob/v0.3.2/INSTALL.md)更新。`SHA256SUMS` 提供文件校验值，`manifest.json` 记录源码提交及打包清单。
+请依次安装 data、tool、agent、preset；cover 是可选品牌外观插件。升级后完整退出并重开 DSH。
+下载本 Release 的 `.tgz` 文件，按[安装说明](https://github.com/Limitless2023/limix-dsh/blob/v0.3.3/INSTALL.md)更新。`SHA256SUMS` 提供文件校验值，`manifest.json` 记录源码提交及打包清单。
 
-验证：在 macOS 的独立 DSH 0.2.1-rc.5 环境安装五个 tarball，确认首次安装的默认模式、新建会话、手动切换、重启后保留选择及切回 LimiX 均正常。107 项自动化测试、agent 类型检查和品牌组件检查通过。
+验证：166 项自动化测试、agent 类型检查、构建及品牌组件检查通过。在 macOS 原生 DSH 0.2.1-rc.5 完整重启后，已验证分析步骤展开、HTML 报告预览、新会话默认模式及三个 LimiX 命令。
 
-本次未重新调用生产预测 API，未在 Windows 上验证。预测、解释与模型比较沿用 0.3.1 的实现和[已知边界](https://github.com/Limitless2023/limix-dsh/releases/tag/v0.3.1)。
+本次复用历史真实任务验证界面，未重新调用生产预测或解释接口；未进行 Windows 实机验证。预测、解释与模型比较的[既有服务限制](https://github.com/Limitless2023/limix-dsh/releases/tag/v0.3.1)仍适用。

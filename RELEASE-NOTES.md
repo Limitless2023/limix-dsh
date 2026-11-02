@@ -1,17 +1,27 @@
-# LimiX Agent v0.3.10
+# LimiX Agent v0.3.11
 
-本版为五个 Harness 插件增加 npm 分发，并保留 GitHub Release tgz。五包统一0.3.10；业务代码沿用已验证的v0.3.9 UI修复。
+五个 Harness 插件统一更新为0.3.11，保留 npm 与 GitHub Release tgz 两种安装方式。
 
-## 安装与授权
+## 本次变化
 
-- 五包名：dsh-limix-data、dsh-limix-tool、dsh-limix-agent、dsh-limix-preset、dsh-limix-cover。
-- 最低支持 Harness 0.2.1-rc.5；安装、升级和tgz迁移指令见 NPM-DISTRIBUTION.md。
-- 自有代码采用 PolyForm Noncommercial 1.0.0。商业用途请联系 Limitless 取得单独书面授权，见 LICENSING.md。
-- 保留第三方许可证与品牌权利。cover旧版MIT授予的权利不撤回，不宣称新版限制覆盖历史代码。
-- npm与Release上传同一批tgz，随包附许可证、商业授权入口和第三方声明。
+- LimiX Agent 定位为文理双脑智能体：梳理业务场景，定义预测任务，让 LimiX 落地业务，创造价值。
+- 提示词贯通场景梳理、任务定义、数据准备、预测与分析、结果应用；明确任务直接执行，模糊需求先协助定义。
+- 报告指引独立维护，仍在 LimiX preset 中加载；不是动态加载。预测、解释与比较区分咨询和实际执行。
+- 报告构建统一 React 来源，修复跨包图表服务端渲染中的 hooks 实例冲突。
+- 标准模式挂载边界、已有用户默认选择及配置存储方式不变。
 
-## 验证与保留边界
+## 安装
 
-发布前完成独立DSH的五包首装、npm版本升级、0.3.8/0.3.9 tgz迁移、配置保留和宿主版本检查。公共registry验收另记于 reviews/npm-distribution-review.md。五包并非原子发布，请确认五包都可用再安装。
+最低支持 DeepSeek Harness 0.2.1-rc.5。使用桌面版附带的 CLI，正常退出应用后，在原 profile 中更新：
 
-报告仍需人工审阅；Windows、第二台电脑、本隔离环境的真实预测和数据库查询未验收。光学20变量无向解释上游 EXPLANATION_FAILED 保留；3变量对照成功但0条关系。本轮未重测，不宣称修复。
+```sh
+dsh plugin --profile desktop add --save-exact --registry=https://registry.npmjs.org/ dsh-limix-data@0.3.11 dsh-limix-tool@0.3.11 dsh-limix-agent@0.3.11 dsh-limix-preset@0.3.11 dsh-limix-cover@0.3.11
+```
+
+完整安装与迁移步骤见 [NPM-DISTRIBUTION.md](NPM-DISTRIBUTION.md)。非商业许可与商业授权入口保持不变。
+
+## 验证与已知问题
+
+工作流、标准模式挂载隔离、文件保护与报告图表自动测试通过。咨询行为尚未全部通过：材料案例出现无依据的预期R²区间，咖啡案例在查看数据前判断样本足够；限定CSV检查仍追加未请求的建模判断。没有完成与0.3.10原版的重复配对测试，不声称回答质量稳定提升。详见 [提示词验收记录](docs/PROMPT-EVALUATION.md)。本版在保留这些问题的情况下发布。
+
+报告及业务建议仍需人工审阅。光学20变量无向解释上游错误保留，本轮未重测。Windows、第二台电脑及本版桌面完整预测、解释和模型比较未重新验收。

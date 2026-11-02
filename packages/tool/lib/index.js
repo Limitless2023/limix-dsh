@@ -1,5 +1,5 @@
 import { createRequire } from "node:module";
-import { mkdir, open, readFile, realpath, rename, stat, writeFile } from "node:fs/promises";
+import { mkdir, open, readFile, realpath, rename, stat, unlink, writeFile } from "node:fs/promises";
 import { basename, dirname, extname, isAbsolute, join, resolve, sep } from "node:path";
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
@@ -369,6 +369,7 @@ function registerLimixTool(ctx, config = {}) {
 						await config.previews?.remember(data.preview_paths ?? [], args.workdir || process.cwd());
 						await config.reports.remember([
 							data.saved_to,
+							data.markdown_saved_to,
 							data.report_path,
 							data.markdown_path
 						], args.workdir || process.cwd());
@@ -559,7 +560,7 @@ const REPORT_WORKFLOW = [
 	"- 跟随用户语言，默认中文；从第一句进度开始，包括工具调用的可读标题和最终回复。代码、字段名、参数名保留原文。",
 	"- 完成预测、解释、模型比较或基于已执行结果的综合解读后，默认给出可独立阅读的业务分析报告，不只回复完成状态。先给核心结论，再按任务复杂度组织以下内容；多任务合成一份报告，不重复背景和数据。默认控制在一页左右（约 500–1000 中文字），结构为结论、业务与数据、效果与解释、边界与下一步、文件链接；简单任务更短，用户要求详细再展开。",
 	"- 业务背景与目标：说明本次要支持什么判断、预测什么对象。只引用用户说明或已核对的数据文档；背景未提供时明确“业务背景未提供”，不虚构客户、生产流程、成本或收益，也不为写报告阻塞已可执行的任务。",
-	"- 数据与方法：交代来源或文件、训练/参考与测试样本数、目标与已知单位、实际使用的特征或特征类别、拆分规则和模型。时序补充历史区间、频率及预测区间。信息未返回或未核对时标明未知；没有工艺列就不能说使用了工艺数据。只解释实际执行的步骤，不把预测说成训练 LimiX。",
+	"- 数据与方法：交代来源或文件、训练/参考与测试样本数、目标与已知单位、实际使用的特征或特征类别、拆分规则和模型。时序补充历史区间、频率及预测区间。历史报告、对话摘要和文件名只提供线索，其中的判断不能当作本轮已验证事实。报告只引用本轮核验的事实或注明来源的原始工具回执，不继承旧正文中的推断。信息未返回或未核对时标明未知；没有工艺列就不能说使用了工艺数据。只解释实际执行的步骤，不把预测说成训练 LimiX。",
 	"- 结果与效果：围绕业务解读已返回的关键指标，说明越高或越低越好及已知单位；比较多个模型时可用紧凑表格。不靠单个指标宣称可上线。没有真值时明确尚无法评估误差；没有业务容差时不凭空认定误差可接受。",
 	"- 证据不足时不强行凑“关键发现”：预测范围、误差、排序与机理是不同结论。预测值及目标范围只描述输出，不能证明准确性、物理合理性、特征覆盖或没有外推；MAE 改善不能证明排序更好。未做归因、分布检查或实验，不从少量特征与预测排序推断驱动机制、样本稀疏性或不确定性，也不借领域常识补成数据发现。",
 	"- 仅执行预测且无真值时，报告已知背景、数据与模型、预测范围或排序、无法评估误差及待补证据。用户已请求并完成的解释仍可报告真实返回，但不能据此证明预测精度。如实说明沿用的文件划分；待预测集无真值不等于无法从带标签参考集做留出验证，但不擅自追加用户未请求的验证任务。",
@@ -567,14 +568,14 @@ const REPORT_WORKFLOW = [
 	"- 局部贡献报告概述主要 2–3 项及解释范围，批量使用返回的带正负平均贡献；关系探索概述实际返回的节点、边和关系分数，不套贡献均值。不增加“平均绝对贡献”，不重复全量特征或逐样本明细，不尝试从贡献分数还原预测值，不套用未核实的 regression_scale 换算公式。",
 	"- 下一步只给当前证据支持的行动，不编造命令或换算关系。MAE 不能直接换算误判率；需独立真值与逐样本预测，按业务阈值另行评估。只看到 CSV 不能证明提交次数、模型训练过程或不存在数据泄漏。",
 	"- 关键发现与使用边界：解释本次结果支持哪些判断、哪些尚待验证，并给出有依据的下一步。解释与比较遵守各自流程规则；失败、部分成功、缺失结果、小样本和未验证尺度须在相应结论旁说明，不把限制堆成通用免责声明。用户指定的模型或范围未满足时，开头就说明哪项未完成，不能用其他模型的成功结果宣称全部完成。",
-	"- 交付：默认保存同一份报告的 Markdown 和带图 HTML，优先用户指定目录，使用唯一绝对路径。先准备图表清单，用 report --manifest 清单.json --inspect 获取指标、方向、日期、样本范围等程序事实，再写 Markdown；通过 limix 工具 command=report 生成 HTML。首次用 report --help 查看格式。图表只选本次已完成任务的真实结果：回归散点、分类混淆矩阵、时序曲线、贡献热力图、关系图、模型比较图；解释使用 explanation.detail_path 的完整视图。无真值时省略效果对照图；不为凑图追加预测或解释。核对图中模型、目标、样本范围与正文一致，每张图配一句有证据的业务解读。MAE/RMSE 是越低越好的误差指标，R² 是越高越好的拟合优度；不能统称“三项误差更低”。日期和星期使用程序事实，不自行映射 weekday 的整数值。只有平均贡献时不能推断贡献随时间单调变化。解释矩阵的 scores、directions、feature_values 按 feature_names 对齐；features 是排序后的汇总，严禁拿它的顺序解释矩阵列。优先引用 report --inspect 给出的具名平均贡献和正负样本数。正文可用单行图表标记安排插图，未指定位置的图自动追加。",
+	"- 交付：由 report 工具在输出目录统一保存同名最终 Markdown 和带图 HTML。正文原稿使用不同文件名；不再自行复制原稿作为交付版。优先用户指定目录，使用唯一绝对路径。先准备图表清单，用 report --manifest 清单.json --inspect 获取指标、方向、日期、样本范围等程序事实，再写 Markdown；通过 limix 工具 command=report 生成 HTML。首次用 report --help 查看格式。图表只选本次已完成任务的真实结果：回归散点、分类混淆矩阵、时序曲线、贡献热力图、关系图、模型比较图；解释使用 explanation.detail_path 的完整视图。无真值时省略效果对照图；不为凑图追加预测或解释。核对图中模型、目标、样本范围与正文一致，每张图配一句有证据的业务解读。MAE/RMSE 是越低越好的误差指标，R² 是越高越好的拟合优度；不能统称“三项误差更低”。日期和星期使用程序事实，不自行映射 weekday 的整数值。只有平均贡献时不能推断贡献随时间单调变化。解释矩阵的 scores、directions、feature_values 按 feature_names 对齐；features 是排序后的汇总，严禁拿它的顺序解释矩阵列。优先引用 report --inspect 给出的具名平均贡献和正负样本数。正文可用单行图表标记安排插图，未指定位置的图自动追加。",
 	"- 时序报告的 target 填原始业务目标名，例如 cups_sold，预测 CSV 列 pred_cups_sold 由工具匹配；source 使用原始结果 CSV，保留分位数列。先 report --inspect，正文文件落盘后才生成 HTML。失败时按具体缺列或缺文件修正，不猜格式、不搜索应用安装目录、不通过删列排错；同一原因纠正一次仍失败则报告阻塞并保留文件。",
 	"- 汇总数量（如杯数）、配方换算、基线改善比例和多窗口汇总由一个确定性脚本从原始结果计算，生成数值表和正文数字片段后复用，禁止在正文重新手敲。累计量先汇总未舍入值，最后统一舍入；确需逐日取整再相加时明确说明。预测区间不等于已验证覆盖率；生成后核对正文、表格和来源文件。",
 	"- 不把逐日分位数之和称为整段时间的分位数，也不能用它与人工备料余量“互相印证”。不同特征组的预测差异不能直接归因于其中一个变量，更不能称为干预收益。备料换算只输出预计消耗；缺少库存、在途、损耗、保质期和配送周期时不建议按预测量直接下单，易腐原料须按配送周期核对分批用量。",
 	"- 报告开头只写一个标题；按业务问题、数据范围、本次观测、图表证据、待验证解释和行动建议组织。版本变更记录放末尾，不占用首屏。检查句子完整、括号配对、术语首次说明。不把常数基线对照写成模型内部机制的证明。",
-	"- 图表预览使用 report 结果卡自动提供的预览和 HTML 链接，不直接把本地 SVG 路径写成 Markdown 图片；预览不可用时提供 HTML，不重新生成预测。",
-	"- 写入前检查不覆盖输入或已有文件，生成后确认报告可读，再列出工具返回的 markdown_path、report_path 和结果链接；这些稳定版本优先于工作区临时副本。HTML 内嵌图表，可离线阅读。HTML 失败时保留 Markdown，并说明失败原因，不能把单份 Markdown 称为双格式交付。用户明确只要一种格式或不要文件时遵从。",
-	"- 报告解释业务意义并复用结果图，不逐行抄表或堆全部字段和内部状态码。简单追问、状态查询及用户明确要求简短时直接短答，不套整份报告、不额外生成报告文件；用户要求详细报告时再展开证据和方法。"
+	"- 图表预览使用 report 结果卡自动提供的预览和 HTML 链接，SVG 通过浏览器查看，不传给仅支持 PNG/JPEG 等位图的 read_image；不直接把本地 SVG 路径写成 Markdown 图片；预览不可用时提供 HTML，不重新生成预测。",
+	"- 写入前检查不覆盖输入或已有文件，生成后确认报告可读，再列出工具返回的 markdown_saved_to、saved_to（指定目录的最终版本）及 markdown_path、report_path（同版历史副本）和结果链接；这些稳定版本优先于工作区临时副本。HTML 内嵌图表，可离线阅读。HTML 失败时保留 Markdown，并说明失败原因，不能把单份 Markdown 称为双格式交付。用户明确只要一种格式或不要文件时遵从。",
+	"- 报告解释业务意义并复用结果图，不逐行抄表或堆全部字段和内部状态码。只选择直接回答用户问题的已核验发现；未请求的排名、分布、机理和上线方案不为丰富正文而追加。简单追问、状态查询及用户明确要求简短时直接短答，不套整份报告、不额外生成报告文件；用户要求详细报告时再展开证据和方法。"
 ].join("\n");
 function registerReportWorkflow(ctx) {
 	ctx.systemPrompt.section({
@@ -5773,7 +5774,8 @@ const REPORT_JS = `document.querySelectorAll('.chart').forEach(chart=>{
 //#endregion
 //#region src/report/index.ts
 const HELP = `limix report --manifest /绝对路径/报告清单.json --output /绝对路径/报告.html
-本地生成带图 HTML，不调用预测 API、不修改 Markdown，不覆盖已有文件。
+本地生成带图 HTML 与同名最终 Markdown（包含核验附录），不调用预测 API、不修改输入 Markdown，不覆盖已有文件。正文原稿应使用不同文件名。
+preview_paths 为浏览器可查看的 SVG，不能传给仅支持位图的 read_image；通过结果卡或浏览器查看 HTML。
 可先用 report --manifest 清单.json --inspect 获取程序核验的指标、方向、日期和覆盖范围，再写正文。inspect 不需要 markdown，不写文件。
 清单：{"title":"业务分析报告","markdown":"报告.md","charts":[...]}
 所有文件路径相对清单目录解析；charts 可为空。正文单独一行 <!-- limix-chart:图表id --> 可指定插图位置，未指定的图追加在正文后；标记在 Markdown 阅读器中隐藏。
@@ -5805,11 +5807,11 @@ async function runReportCommand(args, workdir = process.cwd(), signal, settings 
 		const read = async (path, extension) => {
 			if (typeof path !== "string" || extname(path).toLowerCase() !== extension) throw new Error(`输入必须为 ${extension} 文件`);
 			signal?.throwIfAborted();
-			const actual = await realpath(resolve(base, path)), handle$1 = await open(actual, "r");
+			const actual = await realpath(resolve(base, path)), handle = await open(actual, "r");
 			try {
-				const stat$1 = await handle$1.stat();
+				const stat$1 = await handle.stat();
 				if (!stat$1.isFile() || stat$1.size > 5e7 || bytes + stat$1.size > 1e8) throw new Error("输入文件过大，或不是普通文件");
-				const text$1 = await handle$1.readFile("utf8");
+				const text$1 = await handle.readFile("utf8");
 				bytes += Buffer.byteLength(text$1);
 				if (bytes > 1e8) throw new Error("报告输入总大小超过 100MB");
 				sources.set(actual, {
@@ -5818,7 +5820,7 @@ async function runReportCommand(args, workdir = process.cwd(), signal, settings 
 				});
 				return text$1;
 			} finally {
-				await handle$1.close();
+				await handle.close();
 			}
 		};
 		const manifest = JSON.parse(await read(manifestPath, ".json"));
@@ -5872,12 +5874,8 @@ async function runReportCommand(args, workdir = process.cwd(), signal, settings 
 		const output = resolve(workdir, options["--output"]);
 		if (extname(output).toLowerCase() !== ".html") throw new Error("输出必须是 .html 文件");
 		signal?.throwIfAborted();
-		const handle = await open(output, "wx", 384);
-		try {
-			await handle.writeFile(html, "utf8");
-		} finally {
-			await handle.close();
-		}
+		const outputMarkdown = output.slice(0, -5) + ".md";
+		const verifiedMarkdown = markdown + "\n\n## 已核验数据（程序生成）\n\n" + charts.map((c) => factsMarkdown(c.title, c.facts)).join("\n\n");
 		const archive = join(settings.archiveRoot ?? join(homedir(), ".limix", "reports"), randomUUID());
 		await mkdir(archive, {
 			recursive: true,
@@ -5888,7 +5886,7 @@ async function runReportCommand(args, workdir = process.cwd(), signal, settings 
 			flag: "wx",
 			mode: 384
 		});
-		await writeFile(stableMarkdown, markdown + "\n\n## 已核验数据（程序生成）\n\n" + charts.map((c) => factsMarkdown(c.title, c.facts)).join("\n\n"), {
+		await writeFile(stableMarkdown, verifiedMarkdown, {
 			flag: "wx",
 			mode: 384
 		});
@@ -5901,12 +5899,31 @@ async function runReportCommand(args, workdir = process.cwd(), signal, settings 
 			});
 			previewPaths.push(path);
 		}
+		signal?.throwIfAborted();
+		const created = [];
+		try {
+			for (const [path, text$1] of [[output, html], [outputMarkdown, verifiedMarkdown]]) {
+				const handle = await open(path, "wx", 384);
+				created.push(path);
+				try {
+					await handle.writeFile(text$1, "utf8");
+				} finally {
+					await handle.close();
+				}
+			}
+		} catch (error) {
+			await Promise.all(created.map((path) => unlink(path).catch(() => {})));
+			throw error;
+		}
 		return {
 			exitCode: 0,
 			stdout: JSON.stringify({
 				kind: "report",
 				status: "succeeded",
 				saved_to: output,
+				markdown_saved_to: outputMarkdown,
+				preview_format: "svg",
+				preview_instruction: "通过结果卡或浏览器查看 HTML/SVG；read_image 不支持 SVG。报告已生成，视觉检查需单独确认。",
 				report_path: stableHtml,
 				markdown_path: stableMarkdown,
 				source_markdown_path: markdownPath,

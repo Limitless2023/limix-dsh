@@ -1,6 +1,6 @@
 /**
  * [INPUT]: pipeline-model 的轮次与 pipeline-stage 的工具事实、参数和结构化结果。
- * [OUTPUT]: 收集 Markdown 与 HTML 报告路径； FlowStep、flowSteps、flowState、stepTitle、stepSummary、stepFiles、explanationMode。
+ * [OUTPUT]: 区分报告交付与预览失败；收集 Markdown 与 HTML 报告路径； FlowStep、flowSteps、flowState、stepTitle、stepSummary、stepFiles、explanationMode。
  * [POS]: 将相邻操作归并为业务步骤；仅按明确文件类型、命令与操作说明分类，不生成分析结论。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
@@ -129,7 +129,13 @@ export function flowSteps(round: Round, cwd?: string): FlowStep[] {
 
 export function flowState(stages: Stage[]): { kind: string; label: string } {
   if (stages.some(s => s.running || s.stateKind === 'running')) return { kind: 'running', label: '进行中' }
-  if (stages.some(s => s.stateKind === 'error')) return { kind: 'error', label: '有未完成步骤' }
+  const errors = stages.filter(s => s.stateKind === 'error')
+  // 只识别成功报告回执中登记的预览文件；其他失败不能被报告成功掩盖。
+  const previews = new Set(stages.filter(s => s.ok && s.data?.kind === 'report' && s.data?.status === 'succeeded')
+    .flatMap(s => Array.isArray(s.data?.preview_paths) ? s.data.preview_paths : []))
+  const previewFailure = (s: Stage) => s.toolName === 'read_image' && previews.has(s.args.path ?? s.args.file_path)
+  if (errors.length && errors.every(previewFailure)) return { kind: 'warning', label: '报告已生成，预览检查未完成' }
+  if (errors.length) return { kind: 'error', label: '有未完成步骤' }
   if (stages.some(s => s.stateKind === 'warning')) return { kind: 'warning', label: '部分完成' }
   if (stages.some(s => s.stateKind === 'idle')) return { kind: 'idle', label: stages.find(s => s.stateKind === 'idle')!.stateLabel }
   return { kind: 'done', label: '已完成' }

@@ -19,3 +19,5 @@ test_forecast.py - 时序日期、缺列、无效分位数在上传前拒绝；�
 command-args.test.mjs - 重复命令词容错、位置参数保留与宿主报告分支验证。
 
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
+
+report.test.mjs 补充双格式一致性与 Markdown 冲突回滚验证。

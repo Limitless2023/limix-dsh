@@ -16,3 +16,5 @@ fixtures/regression-node.json - T1 会话实际输出的脱敏节点。
 运行：node --test packages/agent/tests/*.test.cjs。
 
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
+
+pipeline-view.test.cjs 补充登记预览失败与其他失败区分验证。

@@ -224,3 +224,16 @@ test('正文指标方向、日期星期与残缺括号在落盘前被阻止', ()
   await put('body.md','R² 0.9145（三项中误差越低越好、R² 越高越好）。')
   assert.equal((await run()).exitCode,0)
 }))
+
+
+test('双格式交付与历史版本一致，Markdown 冲突不会留下 HTML 或覆盖原稿', () => fixture(async ({ root, put, run }) => {
+  await put('conflict.md', 'must survive')
+  assert.equal((await run('conflict.html')).exitCode, 2)
+  assert.equal(await readFile(join(root, 'conflict.md'), 'utf8'), 'must survive')
+  await assert.rejects(readFile(join(root, 'conflict.html')), {code:'ENOENT'})
+  const data = JSON.parse((await run('paired.html')).stdout)
+  assert.deepEqual(await readFile(data.markdown_saved_to), await readFile(data.markdown_path))
+  assert.deepEqual(await readFile(data.saved_to), await readFile(data.report_path))
+  assert.equal(data.preview_format, 'svg')
+  assert.match(data.preview_instruction, /read_image 不支持 SVG/)
+}))

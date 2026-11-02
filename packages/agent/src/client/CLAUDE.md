@@ -39,3 +39,5 @@ eval-csv.ts - 分类与回归 CSV 解析。
 forecast-csv.ts - 时序 CSV 解析与真值日期对齐。
 
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
+
+成功报告的已登记预览检查失败单独提示；不将其他失败降级为预览问题。

@@ -1,10 +1,10 @@
 /**
  * [INPUT]: 本地 Markdown、报告清单与真实预测/解释/比较文件。
- * [OUTPUT]: runReportCommand；生成独立 HTML，返回报告路径与来源摘要。
+ * [OUTPUT]: runReportCommand；统一生成同版 HTML/Markdown，返回交付路径、预览格式与来源摘要。
  * [POS]: limix report 的宿主入口；独占创建输出，不覆盖任何已有文件。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
-import { mkdir, open, realpath, writeFile } from 'node:fs/promises'
+import { mkdir, open, realpath, writeFile, unlink } from 'node:fs/promises'
 import { createHash, randomUUID } from 'node:crypto'
 import { homedir } from 'node:os'
 import { factsHtml, factsMarkdown, validateNarrative } from './facts'
@@ -14,7 +14,8 @@ import { escapeHtml, renderMarkdown } from './markdown'
 import { REPORT_CSS, REPORT_JS } from './styles'
 
 const HELP = `limix report --manifest /绝对路径/报告清单.json --output /绝对路径/报告.html
-本地生成带图 HTML，不调用预测 API、不修改 Markdown，不覆盖已有文件。
+本地生成带图 HTML 与同名最终 Markdown（包含核验附录），不调用预测 API、不修改输入 Markdown，不覆盖已有文件。正文原稿应使用不同文件名。
+preview_paths 为浏览器可查看的 SVG，不能传给仅支持位图的 read_image；通过结果卡或浏览器查看 HTML。
 可先用 report --manifest 清单.json --inspect 获取程序核验的指标、方向、日期和覆盖范围，再写正文。inspect 不需要 markdown，不写文件。
 清单：{"title":"业务分析报告","markdown":"报告.md","charts":[...]}
 所有文件路径相对清单目录解析；charts 可为空。正文单独一行 <!-- limix-chart:图表id --> 可指定插图位置，未指定的图追加在正文后；标记在 Markdown 阅读器中隐藏。
@@ -88,22 +89,33 @@ export async function runReportCommand(args: string[], workdir = process.cwd(), 
     const output = resolve(workdir, options['--output'])
     if (extname(output).toLowerCase() !== '.html') throw new Error('输出必须是 .html 文件')
     signal?.throwIfAborted()
-    // wx 同时拒绝已有文件、软链接与硬链接别名；所有输入和图表先核验。
-    const handle = await open(output, 'wx', 0o600)
-    try { await handle.writeFile(html, 'utf8') } finally { await handle.close() }
+    const outputMarkdown = output.slice(0, -5) + '.md'
+    const verifiedMarkdown = markdown + '\n\n## 已核验数据（程序生成）\n\n' + charts.map(c => factsMarkdown(c.title, c.facts)).join('\n\n')
     // 历史卡片使用独立副本；工作区文件被移动或清理后仍可阅读。
     const archive = join(settings.archiveRoot ?? join(homedir(), '.limix', 'reports'), randomUUID())
     await mkdir(archive, { recursive: true, mode: 0o700 })
     const stableHtml = join(archive, basename(output)), stableMarkdown = join(archive, basename(output, '.html') + '.md')
     await writeFile(stableHtml, html, { flag: 'wx', mode: 0o600 })
-    const verifiedMarkdown = markdown + '\n\n## 已核验数据（程序生成）\n\n' + charts.map(c => factsMarkdown(c.title, c.facts)).join('\n\n')
     await writeFile(stableMarkdown, verifiedMarkdown, { flag: 'wx', mode: 0o600 })
     const previewPaths = []
     for (const preview of previews) {
       const path = join(archive, preview.id + '.svg')
       await writeFile(path, preview.svg, { flag: 'wx', mode: 0o600 }); previewPaths.push(path)
     }
-    return { exitCode: 0, stdout: JSON.stringify({ kind: 'report', status: 'succeeded', saved_to: output, report_path: stableHtml, markdown_path: stableMarkdown, source_markdown_path: markdownPath, preview_paths: previewPaths, chart_count: charts.length, charts, sources: [...sources.values()] }), stderr: '' }
+    // 两份交付文件都独占创建；失败仅移除本次创建的文件，不触碰已有输入。
+    signal?.throwIfAborted()
+    const created: string[] = []
+    try {
+      for (const [path, text] of [[output, html], [outputMarkdown, verifiedMarkdown]]) {
+        const handle = await open(path, 'wx', 0o600)
+        created.push(path)
+        try { await handle.writeFile(text, 'utf8') } finally { await handle.close() }
+      }
+    } catch (error) {
+      await Promise.all(created.map(path => unlink(path).catch(() => {})))
+      throw error
+    }
+    return { exitCode: 0, stdout: JSON.stringify({ kind: 'report', status: 'succeeded', saved_to: output, markdown_saved_to: outputMarkdown, preview_format: 'svg', preview_instruction: '通过结果卡或浏览器查看 HTML/SVG；read_image 不支持 SVG。报告已生成，视觉检查需单独确认。', report_path: stableHtml, markdown_path: stableMarkdown, source_markdown_path: markdownPath, preview_paths: previewPaths, chart_count: charts.length, charts, sources: [...sources.values()] }), stderr: '' }
   } catch (error: any) {
     if (error?.name === 'AbortError') throw error
     return { exitCode: 2, stdout: JSON.stringify({ error: error?.code === 'EEXIST' ? '输出文件已存在，请使用新文件名' : String(error.message ?? error) }), stderr: '' }

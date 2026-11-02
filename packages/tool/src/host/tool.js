@@ -2,7 +2,7 @@
  * [INPUT]: Node 内建与注入的本地报告生成器；limix CLI 由本包 assets/limix.py 自带，
  *          解析链 config.cliPath > LIMIX_CLI_PATH > <包>/assets/limix.py
  * [OUTPUT]: registerLimixTool(ctx, config) 与可离线验证的 runCli；注册 `limix` 工具（16 个子命令，
- *          提供按需帮助，容错重复命令词，覆盖预测、解释与比较，并登记结果文件读取权限）
+ *          提供按需帮助，容错重复命令词，覆盖预测、解释与比较，并登记最终双格式报告及结果文件读取权限）
  * [POS]: dsh-limix-agent 的宿主工具面。**不 import @deepseek-ai/dsh-tools**：
  *        树外包在 profile 的 node_modules 下按 Node 规则解析，够不到 dsh 安装里的包；
  *        这里直接给出 register 需要的规范化定义（等价于 defineTool 的产物）。
@@ -189,7 +189,7 @@ export function registerLimixTool(ctx, config = {}) {
           const paths = [data.saved_to, data.csv_path, data.explanation?.detail_path].filter(p => typeof p === 'string')
           if (args.command === 'report' && config.reports) {
             await config.previews?.remember(data.preview_paths ?? [], args.workdir || process.cwd())
-            await config.reports.remember([data.saved_to, data.report_path, data.markdown_path], args.workdir || process.cwd())
+            await config.reports.remember([data.saved_to, data.markdown_saved_to, data.report_path, data.markdown_path], args.workdir || process.cwd())
           }
           const tokens = args.args ?? []
           if (['classify', 'regress', 'forecast'].includes(args.command)) {

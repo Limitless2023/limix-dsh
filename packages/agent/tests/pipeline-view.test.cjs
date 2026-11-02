@@ -20,7 +20,7 @@ for (const extension of ['.ts', '.tsx']) {
 const load = require
 const client = (name) => path.resolve(__dirname, '../src/client', name)
 const { parseRounds, roundDur } = load(client('pipeline-model.ts'))
-const { flowSteps, stepTitle, stepSummary, stepFiles, explanationMode } = load(client('pipeline-flow.ts'))
+const { flowSteps, flowState, stepTitle, stepSummary, stepFiles, explanationMode } = load(client('pipeline-flow.ts'))
 const { classifyLimix, parseSteps } = load(client('pipeline-stage.ts'))
 const { LimixPipelineView } = load(client('LimixPipelineView.tsx'))
 
@@ -244,4 +244,16 @@ test('报告摘要分别描述保存与修订，不把失败的后续写入算�
   const [round]=parseRounds([user(1,'核验'),tool(2,'limix',{command:'report',args:['--inspect']},'{"kind":"report_facts","ok":true}')],[])
   assert.equal(round.stages[0].outcome,'已核验图表指标与样本范围')
   assert.equal(stepFiles(flowSteps(round)[0]).length,0)
+})
+
+
+test('已生成报告的登记预览失败单独提示，不掩盖其他失败', () => {
+ const report = tool(2,'limix',{command:'report'},JSON.stringify({kind:'report',status:'succeeded',saved_to:'/d/report.html',preview_paths:['/d/chart.svg']}))
+ const preview = tool(3,'read_image',{path:'/d/chart.svg'},'unsupported SVG',{isError:true})
+ const [round]=parseRounds([user(1,'报告'),report,preview],[])
+ assert.equal(flowState(round.stages).label,'报告已生成，预览检查未完成')
+ const [other]=parseRounds([user(1,'报告'),report,tool(3,'read_image',{path:'/d/other.svg'},'failed',{isError:true})],[])
+ assert.equal(flowState(other.stages).kind,'error')
+ const [mixed]=parseRounds([user(1,'报告'),report,preview,tool(4,'write',{file_path:'/d/extra.md'},'failed',{isError:true})],[])
+ assert.equal(flowState(mixed.stages).kind,'error')
 })

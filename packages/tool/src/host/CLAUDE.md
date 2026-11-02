@@ -15,3 +15,5 @@ python-runtime.js - preset 激活时预准备 Python 依赖；安装器固定为
 report-workflow.js - 报告生成与核验指引；仅在已授权交付阶段应用。
 
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
+
+报告交付登记 markdown_saved_to；工作流引用最终版本，不复制正文原稿。

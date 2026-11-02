@@ -2,6 +2,8 @@
 
 > L2 | 父级: ../CLAUDE.md
 
+report-delivery-0312-review.md - 0.3.12 候选工程修复与真实测试；提示词未通过项保留，用户确认按工程修复发布。
+
 npm-distribution-review.md - npm候选分发交叉审查、隔离安装/升级/迁移与待确认边界。
 ui-release-review.md - v0.3.9 UI独立审查、修复与验证边界。
 coffee-release-review.md - v0.3.8 数据库咖啡演示后的调用、日期与报告修复审查；保留人工审阅和未验收边界。

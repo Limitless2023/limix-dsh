@@ -4684,7 +4684,14 @@ function flowState(stages) {
 		kind: "running",
 		label: "进行中"
 	};
-	if (stages.some((s) => s.stateKind === "error")) return {
+	const errors = stages.filter((s) => s.stateKind === "error");
+	const previews = new Set(stages.filter((s) => s.ok && s.data?.kind === "report" && s.data?.status === "succeeded").flatMap((s) => Array.isArray(s.data?.preview_paths) ? s.data.preview_paths : []));
+	const previewFailure = (s) => s.toolName === "read_image" && previews.has(s.args.path ?? s.args.file_path);
+	if (errors.length && errors.every(previewFailure)) return {
+		kind: "warning",
+		label: "报告已生成，预览检查未完成"
+	};
+	if (errors.length) return {
 		kind: "error",
 		label: "有未完成步骤"
 	};

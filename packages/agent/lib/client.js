@@ -30,6 +30,66 @@ react_jsx_runtime = __toESM(react_jsx_runtime);
 let react_dom = require("react-dom");
 react_dom = __toESM(react_dom);
 
+//#region src/client/ActionMenu.tsx
+function ActionMenu({ label, children, up = false }) {
+	const ref = (0, react.useRef)(null);
+	(0, react.useEffect)(() => {
+		const el = ref.current;
+		if (!el) return;
+		const close = (event) => {
+			if (!el.contains(event.target)) el.open = false;
+		};
+		const key = (event) => {
+			if (el.open && event.key === "Escape") {
+				event.preventDefault();
+				event.stopPropagation();
+				el.open = false;
+				el.querySelector("summary")?.focus();
+			}
+		};
+		const choose = (event) => {
+			if (event.target.closest("a,button")) {
+				el.open = false;
+				el.querySelector("summary")?.focus();
+			}
+		};
+		document.addEventListener("pointerdown", close, true);
+		document.addEventListener("keydown", key, true);
+		el.addEventListener("click", choose);
+		return () => {
+			document.removeEventListener("pointerdown", close, true);
+			document.removeEventListener("keydown", key, true);
+			el.removeEventListener("click", choose);
+		};
+	}, []);
+	return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("details", {
+		className: "lx-action-menu",
+		ref,
+		"data-up": up,
+		children: [
+			/* @__PURE__ */ (0, react_jsx_runtime.jsx)("style", { children: `.lx-action-menu{position:relative;font-size:12px}.lx-action-menu>summary{display:inline-flex;align-items:center;gap:5px;white-space:nowrap;cursor:pointer;list-style:none;color:var(--dsw-alias-state-business-primary,#3465ce);padding:3px 0}.lx-action-menu>summary::-webkit-details-marker{display:none}.lx-action-menu>summary:focus-visible{outline:2px solid #466eb9;outline-offset:3px}.lx-action-chevron{display:block;flex:none;width:12px;height:12px;transition:transform .15s ease}.lx-action-menu[open]>summary .lx-action-chevron{transform:rotate(180deg)}@media(prefers-reduced-motion:reduce){.lx-action-chevron{transition:none}}.lx-action-menu-panel{position:absolute;z-index:20;top:100%;right:0;min-width:160px;padding:6px;background:var(--dsw-alias-background-primary,#fff);border:1px solid var(--dsw-alias-border-l3,#e3e6eb);border-radius:8px;box-shadow:0 6px 22px #152b4914}.lx-action-menu[data-up=true]>.lx-action-menu-panel{top:auto;bottom:100%;left:0;right:auto}.lx-result .lx-action-menu-panel>a,.lx-result .lx-action-menu-panel>button{display:block;width:100%;padding:7px 10px;text-align:left;white-space:nowrap}.lx-action-menu-panel>a:hover,.lx-action-menu-panel>button:hover{background:var(--dsw-alias-interactive-bg-hover,#f3f5f8)}` }),
+			/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("summary", { children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { children: label }), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("svg", {
+				className: "lx-action-chevron",
+				width: "12",
+				height: "12",
+				viewBox: "0 0 16 16",
+				fill: "none",
+				stroke: "currentColor",
+				strokeWidth: "1.5",
+				strokeLinecap: "round",
+				strokeLinejoin: "round",
+				"aria-hidden": "true",
+				children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)("path", { d: "m4 6 4 4 4-4" })
+			})] }),
+			/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+				className: "lx-action-menu-panel",
+				children
+			})
+		]
+	});
+}
+
+//#endregion
 //#region src/client/ConfusionMatrix.tsx
 const ACCENT$1 = "#2563eb";
 /** 单元格边长按类别数收缩，保证整图宽度稳定在卡片内 */
@@ -942,6 +1002,123 @@ function singleSampleMatrix(data) {
 }
 
 //#endregion
+//#region src/client/ExplanationHelp.tsx
+function useExplanationHelp(enabled = true) {
+	const helpRef = (0, react.useRef)(null), helpId = (0, react.useId)(), [helpOpen, setHelpOpen] = (0, react.useState)(false);
+	(0, react.useEffect)(() => {
+		const group = helpRef.current, trigger = group?.querySelector("[data-lx-help-trigger]");
+		if (!enabled || !group || !trigger) return;
+		const doc = group.ownerDocument;
+		let pinned = false, visible = false;
+		const show = (next) => {
+			visible = next;
+			setHelpOpen(next);
+		};
+		const close = () => {
+			pinned = false;
+			show(false);
+		};
+		const enter = () => show(true);
+		const leave = () => {
+			if (!pinned && !group.contains(doc.activeElement)) show(false);
+		};
+		const blur = (event) => {
+			if (!pinned && !group.contains(event.relatedTarget)) show(false);
+		};
+		const click = (event) => {
+			event.stopPropagation();
+			pinned = !pinned;
+			show(pinned);
+		};
+		const activate = (event) => {
+			const key = event.key;
+			if (key === "Enter" || key === " ") {
+				event.preventDefault();
+				click(event);
+			}
+		};
+		const outside = (event) => {
+			if (!group.contains(event.target)) close();
+		};
+		const escape$1 = (event) => {
+			if (visible && event.key === "Escape") {
+				event.preventDefault();
+				event.stopPropagation();
+				close();
+			}
+		};
+		group.addEventListener("pointerenter", enter);
+		group.addEventListener("pointerleave", leave);
+		group.addEventListener("focusin", enter);
+		group.addEventListener("focusout", blur);
+		trigger.addEventListener("click", click);
+		trigger.addEventListener("keydown", activate);
+		doc.addEventListener("pointerdown", outside, true);
+		doc.addEventListener("keydown", escape$1, true);
+		return () => {
+			group.removeEventListener("pointerenter", enter);
+			group.removeEventListener("pointerleave", leave);
+			group.removeEventListener("focusin", enter);
+			group.removeEventListener("focusout", blur);
+			trigger.removeEventListener("click", click);
+			trigger.removeEventListener("keydown", activate);
+			doc.removeEventListener("pointerdown", outside, true);
+			doc.removeEventListener("keydown", escape$1, true);
+		};
+	}, [enabled]);
+	return {
+		helpRef,
+		helpId,
+		helpOpen
+	};
+}
+function ExplanationHelp({ label, children }) {
+	const { helpRef, helpId, helpOpen } = useExplanationHelp();
+	return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+		ref: helpRef,
+		className: "lx-explain-help",
+		children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+			type: "button",
+			className: "lx-explain-help-trigger",
+			"data-lx-help-trigger": true,
+			"aria-label": label,
+			"aria-expanded": helpOpen,
+			"aria-controls": helpId,
+			"aria-describedby": helpOpen ? helpId : void 0,
+			children: /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("svg", {
+				width: "14",
+				height: "14",
+				viewBox: "0 0 20 20",
+				fill: "none",
+				stroke: "currentColor",
+				strokeWidth: "1.3",
+				"aria-hidden": "true",
+				children: [
+					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("circle", {
+						cx: "10",
+						cy: "10",
+						r: "8"
+					}),
+					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("path", { d: "M10 9v5" }),
+					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("circle", {
+						cx: "10",
+						cy: "6",
+						r: ".65",
+						fill: "currentColor",
+						stroke: "none"
+					})
+				]
+			})
+		}), helpOpen && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+			className: "lx-explain-info-body",
+			id: helpId,
+			role: "tooltip",
+			children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("strong", { children: label }), children]
+		})]
+	});
+}
+
+//#endregion
 //#region src/client/LocalExplanation.tsx
 function LocalExplanation({ data }) {
 	const root = (0, react.useRef)(null), [expanded, setExpanded] = (0, react.useState)(false);
@@ -997,7 +1174,17 @@ function LocalExplanation({ data }) {
 			}),
 			/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 				className: "lx-explain-subtitle",
-				children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { children: "主要影响因素" }), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { children: "贡献分数 · 模型方向" })]
+				children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { children: "主要影响因素" }), /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+					style: {
+						display: "flex",
+						alignItems: "center",
+						gap: 4
+					},
+					children: ["贡献分数 · 模型方向", /* @__PURE__ */ (0, react_jsx_runtime.jsx)(ExplanationHelp, {
+						label: "贡献分数说明",
+						children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", { children: "表示各因素对本次模型预测的影响。" })
+					})]
+				})]
 			}),
 			(expanded ? factors : factors.slice(0, 6)).map((f) => /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 				className: "lx-factor",
@@ -1033,10 +1220,6 @@ function LocalExplanation({ data }) {
 				"data-lx-local-toggle": true,
 				"aria-expanded": expanded,
 				children: expanded ? "收起因素 ↑" : `查看全部 ${factors.length} 个因素 ↓`
-			}),
-			/* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
-				className: "lx-explain-foot",
-				children: "解释模型如何得到本次预测；贡献分数不代表实际调节收益。"
 			})
 		]
 	});
@@ -1465,26 +1648,24 @@ function ExplanationExport({ build, filename }) {
 	return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 		className: "lx-export",
 		ref: root,
-		children: [
-			/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { children: "导出图表" }),
-			/* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+		children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)(ActionMenu, {
+			label: "导出图表",
+			children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
 				type: "button",
 				"data-lx-export": "svg",
 				"aria-label": "导出 SVG 图表",
 				children: "SVG"
-			}),
-			/* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+			}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
 				type: "button",
 				"data-lx-export": "png",
 				"aria-label": "导出 PNG 图表",
 				children: "PNG"
-			}),
-			/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
-				role: "status",
-				className: "lx-export-status",
-				children: status
-			})
-		]
+			})]
+		}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+			role: "status",
+			className: "lx-export-status",
+			children: status
+		})]
 	});
 }
 
@@ -1568,123 +1749,6 @@ function ContributionLegend({ maximum, unknown, neutral = false }) {
 				children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("i", { style: { background: contributionColors.unknown } }), "灰色：方向未定"]
 			})
 		]
-	});
-}
-
-//#endregion
-//#region src/client/ExplanationHelp.tsx
-function useExplanationHelp(enabled = true) {
-	const helpRef = (0, react.useRef)(null), helpId = (0, react.useId)(), [helpOpen, setHelpOpen] = (0, react.useState)(false);
-	(0, react.useEffect)(() => {
-		const group = helpRef.current, trigger = group?.querySelector("[data-lx-help-trigger]");
-		if (!enabled || !group || !trigger) return;
-		const doc = group.ownerDocument;
-		let pinned = false, visible = false;
-		const show = (next) => {
-			visible = next;
-			setHelpOpen(next);
-		};
-		const close = () => {
-			pinned = false;
-			show(false);
-		};
-		const enter = () => show(true);
-		const leave = () => {
-			if (!pinned && !group.contains(doc.activeElement)) show(false);
-		};
-		const blur = (event) => {
-			if (!pinned && !group.contains(event.relatedTarget)) show(false);
-		};
-		const click = (event) => {
-			event.stopPropagation();
-			pinned = !pinned;
-			show(pinned);
-		};
-		const activate = (event) => {
-			const key = event.key;
-			if (key === "Enter" || key === " ") {
-				event.preventDefault();
-				click(event);
-			}
-		};
-		const outside = (event) => {
-			if (!group.contains(event.target)) close();
-		};
-		const escape$1 = (event) => {
-			if (visible && event.key === "Escape") {
-				event.preventDefault();
-				event.stopPropagation();
-				close();
-			}
-		};
-		group.addEventListener("pointerenter", enter);
-		group.addEventListener("pointerleave", leave);
-		group.addEventListener("focusin", enter);
-		group.addEventListener("focusout", blur);
-		trigger.addEventListener("click", click);
-		trigger.addEventListener("keydown", activate);
-		doc.addEventListener("pointerdown", outside, true);
-		doc.addEventListener("keydown", escape$1, true);
-		return () => {
-			group.removeEventListener("pointerenter", enter);
-			group.removeEventListener("pointerleave", leave);
-			group.removeEventListener("focusin", enter);
-			group.removeEventListener("focusout", blur);
-			trigger.removeEventListener("click", click);
-			trigger.removeEventListener("keydown", activate);
-			doc.removeEventListener("pointerdown", outside, true);
-			doc.removeEventListener("keydown", escape$1, true);
-		};
-	}, [enabled]);
-	return {
-		helpRef,
-		helpId,
-		helpOpen
-	};
-}
-function ExplanationHelp({ label, children }) {
-	const { helpRef, helpId, helpOpen } = useExplanationHelp();
-	return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-		ref: helpRef,
-		className: "lx-explain-help",
-		children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
-			type: "button",
-			className: "lx-explain-help-trigger",
-			"data-lx-help-trigger": true,
-			"aria-label": label,
-			"aria-expanded": helpOpen,
-			"aria-controls": helpId,
-			"aria-describedby": helpOpen ? helpId : void 0,
-			children: /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("svg", {
-				width: "14",
-				height: "14",
-				viewBox: "0 0 20 20",
-				fill: "none",
-				stroke: "currentColor",
-				strokeWidth: "1.3",
-				"aria-hidden": "true",
-				children: [
-					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("circle", {
-						cx: "10",
-						cy: "10",
-						r: "8"
-					}),
-					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("path", { d: "M10 9v5" }),
-					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("circle", {
-						cx: "10",
-						cy: "6",
-						r: ".65",
-						fill: "currentColor",
-						stroke: "none"
-					})
-				]
-			})
-		}), helpOpen && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-			className: "lx-explain-info-body",
-			id: helpId,
-			role: "tooltip",
-			children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("strong", { children: label }), children]
-		})]
 	});
 }
 
@@ -2859,6 +2923,7 @@ const CSS$3 = `
 .lx-graph-mode{display:flex;align-items:center;gap:5px}.lx-explain-help{position:relative;display:inline-flex}
 .lx-result button.lx-explain-help-trigger{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;padding:0;color:var(--dsw-alias-label-secondary);border-radius:4px}
 .lx-result button.lx-explain-help-trigger:hover,.lx-result button.lx-explain-help-trigger[aria-expanded=true]{color:var(--dsw-alias-state-business-primary,#3465ce);background:var(--dsw-alias-interactive-bg-hover,#f3f5f8)}
+.lx-explain-subtitle .lx-explain-help .lx-explain-info-body{left:auto;right:0}
 .lx-explain-help .lx-explain-info-body{top:100%;left:0;right:auto;max-width:min(280px,60cqw)}
 .lx-explain-tabs{display:flex;gap:22px;border-bottom:1px solid var(--dsw-alias-border-l3,#e7e9ed);margin-bottom:18px}
 .lx-explain-tabs button{font-size:13px!important;padding:8px 0 11px!important;color:var(--dsw-alias-label-secondary)!important;border-bottom:2px solid transparent!important;border-radius:0!important}
@@ -3268,7 +3333,32 @@ const COMMAND_LABELS = {
 	report: "业务分析报告",
 	runtime: "分析环境"
 };
+const RUNNING_LABELS = {
+	regress: "LimiX 正在预测…",
+	classify: "LimiX 正在预测类别…",
+	forecast: "LimiX 正在预测未来趋势…",
+	benchmark: "正在比较模型表现…",
+	report: "正在生成分析报告…",
+	upload: "正在上传数据…",
+	download: "正在保存结果…",
+	data: "正在读取数据…",
+	health: "正在连接 LimiX…",
+	runtime: "正在检查分析环境…",
+	task: "正在查询任务进度…",
+	tasks: "正在读取任务列表…",
+	result: "正在读取预测结果…",
+	check: "正在检查访问权限…",
+	cancel: "正在取消任务…"
+};
 const CSS$1 = `
+.lx-running{display:flex;align-items:center;gap:16px!important;padding:22px 24px!important}
+.lx-running-copy{flex:1;min-width:0}
+.lx-running-spinner{box-sizing:border-box;corner-shape:round;flex:0 0 19px;width:19px;height:19px;border:2px solid var(--dsw-alias-border-l3,#e3eaf5);border-top-color:#466eb9;border-radius:50%;animation:lx-running-spin 1.15s linear infinite}
+.lx-running-time{font-size:12px;color:var(--dsw-alias-label-tertiary,#858d99);font-variant-numeric:tabular-nums;white-space:nowrap}
+@keyframes lx-running-spin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.lx-running-spinner{animation:none}}
+@media(max-width:520px){.lx-running{flex-wrap:wrap}.lx-running-time{margin-left:35px}}
+
 .lx-result{border:1px solid var(--dsw-alias-border-l3,#e3e6eb);border-radius:12px;padding:16px 18px;margin:4px 0;font:inherit;font-size:13px;line-height:1.6;min-width:0;overflow-wrap:anywhere;color:var(--dsw-alias-label-primary)}
 .lx-result-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .lx-result-brand{font-size:11px;letter-spacing:.04em;color:var(--dsw-alias-label-tertiary);margin-bottom:5px}
@@ -3526,6 +3616,53 @@ function LimixToolCard({ callId, block, inspect, cwd, openFile }) {
 			children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)("path", { d: showRaw ? "M4 10l4-4 4 4" : "M4 6l4 4 4-4" })
 		})] }) : showRaw ? "收起详情 ↑" : "调用详情 ↓"
 	});
+	const [waitingSeconds, setWaitingSeconds] = (0, react.useState)(0);
+	(0, react.useEffect)(() => {
+		setWaitingSeconds(0);
+		if (settled) return;
+		const start$1 = Date.now();
+		const timer = setInterval(() => setWaitingSeconds(Math.floor((Date.now() - start$1) / 1e3)), 1e3);
+		return () => clearInterval(timer);
+	}, [callId, settled]);
+	if (!settled) {
+		const runningTitle = help ? "正在读取参数说明…" : command === "explain" ? ["directed", "undirected"].includes(flagValue("--mode") ?? "") ? "LimiX 正在探索变量关系…" : "LimiX 正在分析影响因素…" : RUNNING_LABELS[command] ?? "LimiX 正在执行任务…";
+		return /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+			className: "lx-card-host",
+			ref: fullscreen.hostRef,
+			children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)("dialog", {
+				className: "lx-fullscreen-dialog",
+				ref: fullscreen.dialogRef,
+				role: "presentation",
+				children: /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("section", {
+					ref: rootRef,
+					className: "lx-result lx-running",
+					"aria-label": runningTitle,
+					children: [
+						/* @__PURE__ */ (0, react_jsx_runtime.jsx)("style", { children: CSS$1 + CARD_FULLSCREEN_CSS }),
+						/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+							className: "lx-running-spinner",
+							"aria-hidden": "true"
+						}),
+						/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+							className: "lx-running-copy",
+							children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("h3", {
+								role: "status",
+								children: runningTitle
+							}), target && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
+								className: "lx-result-meta",
+								children: target
+							})]
+						}),
+						/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
+							className: "lx-running-time",
+							title: "本次界面等待时长；重新打开页面会重新计时",
+							children: ["已等待 ", waitingSeconds < 60 ? `${waitingSeconds} 秒` : `${Math.floor(waitingSeconds / 60)} 分 ${waitingSeconds % 60} 秒`]
+						})
+					]
+				})
+			})
+		});
+	}
 	return /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
 		className: "lx-card-host",
 		ref: fullscreen.hostRef,
@@ -3711,26 +3848,42 @@ function LimixToolCard({ callId, block, inspect, cwd, openFile }) {
 								"data-path": parsed.report_path,
 								children: "打开完整报告 ↗"
 							}),
-							explanation && typeof parsed?.csv_path === "string" && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("a", {
-								href: "/limix-ui/artifact?path=" + encodeURIComponent(parsed.csv_path),
-								download: true,
+							explanation && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [(typeof parsed?.csv_path === "string" || file) && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(ActionMenu, {
+								label: "下载数据",
+								up: true,
+								children: [typeof parsed?.csv_path === "string" && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("a", {
+									href: "/limix-ui/artifact?path=" + encodeURIComponent(parsed.csv_path),
+									download: true,
+									children: explanation.mode === "local" ? "贡献数据 CSV" : "关系数据 CSV"
+								}), file && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("a", {
+									href: "/limix-ui/artifact?path=" + encodeURIComponent(file),
+									download: true,
+									children: "原始结果 JSON"
+								})]
+							}), /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(ActionMenu, {
+								label: "更多",
+								up: true,
 								children: [
-									"下载",
-									explanation.mode === "local" ? "贡献" : "关系",
-									" CSV ↓"
+									file && openFile && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+										type: "button",
+										"data-lx": "file",
+										"data-path": file,
+										children: "打开结果文件 ↗"
+									}),
+									rawToggle,
+									inspect && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+										type: "button",
+										"data-lx": "inspect",
+										children: "检视调用 ↗"
+									})
 								]
-							}),
-							explanation && file && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("a", {
-								href: "/limix-ui/artifact?path=" + encodeURIComponent(file),
-								download: true,
-								children: "下载原始 JSON ↓"
-							}),
+							})] }),
 							savedCsv && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("a", {
 								href: "/limix-ui/csv?path=" + encodeURIComponent(savedCsv) + "&download=1",
 								download: savedCsv.split("/").pop(),
 								children: "下载 CSV ↓"
 							}),
-							file && (openFile ? /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("button", {
+							!explanation && file && (openFile ? /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("button", {
 								type: "button",
 								"data-lx": "file",
 								"data-path": file,
@@ -3743,7 +3896,7 @@ function LimixToolCard({ callId, block, inspect, cwd, openFile }) {
 								className: "lx-result-meta",
 								children: ["已保存 · ", file.split("/").pop()]
 							})),
-							rawToggle,
+							!explanation && rawToggle,
 							metrics.length > 0 && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
 								type: "button",
 								"data-lx": "metrics",
@@ -3751,7 +3904,7 @@ function LimixToolCard({ callId, block, inspect, cwd, openFile }) {
 								"aria-controls": metricsId,
 								children: showMetrics ? "收起指标说明 ↑" : "指标说明 ↓"
 							}),
-							showRaw && inspect && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+							!explanation && showRaw && inspect && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
 								type: "button",
 								"data-lx": "inspect",
 								children: "检视调用 ↗"
@@ -3790,6 +3943,34 @@ function LimixToolCard({ callId, block, inspect, cwd, openFile }) {
 			})
 		})
 	});
+}
+
+//#endregion
+//#region src/client/flow-navigation.ts
+/**
+* [INPUT]: 当前会话标识、目标工具节点和宿主页签。
+* [OUTPUT]: 跨视图一次性定位请求；按会话隔离。
+* [POS]: 对话尾部不具备宿主 openView，沿当前 DOM 祖先定位本会话注册页签。
+* [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
+*/
+const pending = /* @__PURE__ */ new Map();
+function openTurnFlow(root, sessionId, stageKey) {
+	const panel = root.closest("[data-slot=\"main.conversation\"]");
+	const identity = root.closest("[data-conversation-session]");
+	if (!panel || identity?.dataset.conversationSession !== sessionId) return false;
+	const tab = [...panel.querySelectorAll("[role=\"tab\"]")].find((el) => ["任务流程", "Task flow"].includes(el.textContent?.trim() ?? ""));
+	if (tab) {
+		pending.set(sessionId, stageKey);
+		tab.click();
+		return true;
+	}
+	return false;
+}
+function pendingTurnFlow(sessionId) {
+	return pending.get(sessionId);
+}
+function clearTurnFlow(sessionId) {
+	pending.delete(sessionId);
 }
 
 //#endregion
@@ -4682,7 +4863,7 @@ function TechnicalDetails({ stages }) {
 		] }, stage.key))]
 	});
 }
-function StepDetails({ step, openFile }) {
+function StepDetails({ step, openFile, expandToken }) {
 	const last = step.stages[step.stages.length - 1];
 	const fields = last.inputKv.filter(([key]) => ![
 		"子命令",
@@ -4757,9 +4938,12 @@ function StepDetails({ step, openFile }) {
 		]
 	});
 }
-function FlowStepRow({ step, openFile }) {
+function FlowStepRow({ step, openFile, expandToken }) {
 	const state = flowState(step.stages);
 	const [override, setOverride] = (0, react.useState)(null);
+	(0, react.useEffect)(() => {
+		if (expandToken) setOverride(true);
+	}, [expandToken]);
 	const [showResult, setShowResult] = (0, react.useState)(false);
 	const [fileError, setFileError] = (0, react.useState)("");
 	const open = override ?? state.kind === "running";
@@ -4872,11 +5056,35 @@ function FlowStepRow({ step, openFile }) {
 
 //#endregion
 //#region src/client/LimixPipelineView.tsx
-function LimixPipelineView({ useTrajectory, useSession, useSessions, sessionId, cwd, openFile }) {
+function LimixPipelineView({ useTrajectory, useSession, useSessions, sessionId, cwd, openFile, viewRequest, completeViewRequest }) {
 	const traj = useTrajectory((t) => t);
 	const title = useSessions?.((s) => s.byId?.[sessionId]?.title);
 	const session = useSession?.((s) => s);
 	const visible = (0, react.useMemo)(() => parseRounds(traj?.eventNodes ?? [], traj?.runningCalls ?? []).reverse(), [traj]).filter((round) => round.stages.length > 0);
+	const [focusedRound, setFocusedRound] = (0, react.useState)(null);
+	const root = (0, react.useRef)(null);
+	(0, react.useEffect)(() => {
+		const key = viewRequest?.view === "limix-pipeline" ? viewRequest.focus?.stageKey : pendingTurnFlow(sessionId);
+		if (!key) return;
+		const round = visible.find((r) => r.stages.some((s) => s.key === key));
+		const element = round && root.current?.querySelector(`[data-lx-round="${round.turn}"]`);
+		if (!element) return;
+		setFocusedRound({
+			turn: round.turn,
+			token: {}
+		});
+		const request = element.querySelector(".lx-flow-request");
+		if (request) request.open = true;
+		element.scrollIntoView({ block: "start" });
+		element.focus({ preventScroll: true });
+		clearTurnFlow(sessionId);
+		if (viewRequest?.view === "limix-pipeline") completeViewRequest?.();
+	}, [
+		viewRequest,
+		visible,
+		completeViewRequest,
+		sessionId
+	]);
 	const stages = visible.flatMap((round) => round.stages);
 	const state = session?.running ? {
 		kind: "running",
@@ -4885,6 +5093,7 @@ function LimixPipelineView({ useTrajectory, useSession, useSessions, sessionId, 
 	const current = [...stages].reverse().find((stage) => stage.running || stage.stateKind === "running");
 	return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 		className: "lx-flow",
+		ref: root,
 		children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("style", { children: PIPELINE_CSS }), /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 			className: "lx-flow-inner",
 			children: [
@@ -4911,6 +5120,8 @@ function LimixPipelineView({ useTrajectory, useSession, useSessions, sessionId, 
 					const revision = index > 0 && steps.some((s) => s.title === "报告输出" && s.stages.some((stage) => stage.toolName === "edit")) && !steps.some((s) => s.limix);
 					return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("section", {
 						className: "lx-flow-section",
+						"data-lx-round": round.turn,
+						tabIndex: -1,
 						"aria-label": `第 ${round.turn} 轮分析`,
 						children: [
 							visible.length > 1 && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
@@ -4933,7 +5144,8 @@ function LimixPipelineView({ useTrajectory, useSession, useSessions, sessionId, 
 								className: "lx-flow-list",
 								children: steps.map((step) => /* @__PURE__ */ (0, react_jsx_runtime.jsx)(FlowStepRow, {
 									step,
-									openFile
+									openFile,
+									expandToken: focusedRound?.turn === round.turn ? focusedRound.token : void 0
 								}, step.key))
 							})
 						]
@@ -4960,13 +5172,17 @@ const KIND = {
 	result: "取结果",
 	download: "下载结果",
 	api: "直调接口",
-	explain: "预测与因果解释"
+	explain: "局部解释",
+	benchmark: "模型比较",
+	report: "分析报告"
 };
 const PREDICT = new Set([
 	"classify",
 	"regress",
 	"forecast",
-	"explain"
+	"explain",
+	"benchmark",
+	"report"
 ]);
 const METRIC_OF = {
 	classify: ["accuracy", "准确率"],
@@ -4986,7 +5202,7 @@ function textOf(node) {
 	const blocks = node?.content ?? node?.blocks ?? [];
 	return (Array.isArray(blocks) ? blocks : []).filter((b) => (b?.type === "text" || b?.kind === "text") && b.text).map((b) => b.text).join("\n");
 }
-function LimixTurnStack({ turn, useTrajectory }) {
+function LimixTurnStack({ turn, useTrajectory, openView, sessionId }) {
 	const nodes = useTrajectory((t) => t?.eventNodes) ?? [];
 	const tasks = (0, react.useMemo)(() => {
 		const from = turn?.start?.seq ?? -Infinity;
@@ -5003,6 +5219,7 @@ function LimixTurnStack({ turn, useTrajectory }) {
 			} catch {}
 			if (Array.isArray(args.args) && args.args.some((arg) => arg === "--help" || arg === "-h")) continue;
 			list.push({
+				seq: n.seq,
 				command: String(args.command ?? "limix"),
 				args,
 				text: textOf(n),
@@ -5011,16 +5228,24 @@ function LimixTurnStack({ turn, useTrajectory }) {
 		}
 		const out = [];
 		const others = [];
+		const grouped = /* @__PURE__ */ new Map();
 		for (const c of list) {
-			if (!PREDICT.has(c.command)) {
+			const parsed = parseToolResult(c.text).data;
+			if (!PREDICT.has(c.command) || c.command === "report" && parsed?.kind === "report_facts") {
 				others.push(c);
 				continue;
 			}
+			const id = parsed ? deep(parsed, "task_id") : void 0;
+			const artifact = ["benchmark", "report"].includes(c.command) ? parsed?.saved_to : void 0;
+			const identity = typeof id === "string" && id ? `task:${id}` : typeof artifact === "string" && artifact ? `file:${artifact}` : `call:${c.seq}`;
+			grouped.set(`${c.command}:${identity}`, c);
+		}
+		for (const c of grouped.values()) {
 			const result = parseToolResult(c.text);
 			const parsed = result.data;
 			const [mk, ml] = METRIC_OF[c.command] ?? ["", ""];
 			const metric = c.isError || result.failed ? void 0 : metricEntries(parsed).find((item) => item.key === mk);
-			const tid = parsed ? deep(parsed, "task_id") : void 0;
+			parsed && deep(parsed, "task_id");
 			const state = resultState(true, c.isError || result.failed, parsed);
 			const ok = state.kind !== "error";
 			const rows$1 = parsed ? deep(parsed, "rows") : void 0;
@@ -5034,8 +5259,17 @@ function LimixTurnStack({ turn, useTrajectory }) {
 				c.args?.horizon ? `horizon ${c.args.horizon}` : ""
 			].filter(Boolean).join(" · ");
 			out.push({
-				key: `${c.command}:${String(tid ?? out.length)}`,
-				kind: KIND[c.command] ?? c.command,
+				key: `s${c.seq}`,
+				kind: (() => {
+					const args = Array.isArray(c.args.args) ? c.args.args : [];
+					const flag$1 = (name) => {
+						const i = args.indexOf(name);
+						return i >= 0 ? args[i + 1] : void 0;
+					};
+					const mode = flag$1("--mode"), target = parsed?.explanation?.target_label ?? flag$1("--target");
+					const label = c.command === "explain" ? ["directed", "undirected"].includes(mode) ? "关系探索" : "局部解释" : KIND[c.command] ?? c.command;
+					return target ? `${label} · ${target}` : label;
+				})(),
 				ok,
 				metric: metric?.value ?? state.label,
 				unit: metric ? ml : "",
@@ -5056,8 +5290,40 @@ function LimixTurnStack({ turn, useTrajectory }) {
 		}
 		return out;
 	}, [nodes, turn]);
+	const [expanded, setExpanded] = (0, react.useState)(false);
+	const [navigationError, setNavigationError] = (0, react.useState)("");
+	const root = (0, react.useRef)(null);
+	const business = tasks.filter((task) => task.key !== "others");
+	const auxiliary = tasks.find((task) => task.key === "others");
+	const hidden = business.slice(3);
+	const failures = hidden.filter((task) => !task.ok).length;
+	(0, react.useEffect)(() => {
+		setExpanded(false);
+	}, [turn?.start?.seq]);
+	(0, react.useEffect)(() => {
+		const el = root.current;
+		const click = (event) => {
+			const action = event.target.closest("[data-lx-turn]")?.dataset.lxTurn;
+			if (action === "expand") setExpanded((value) => !value);
+			if (action === "flow") {
+				const first = nodes.find((n) => typeof n?.seq === "number" && n.seq >= (turn?.start?.seq ?? -Infinity) && n.seq <= (turn?.end?.seq ?? Infinity) && (n.call?.name ?? n.block?.call?.name) === "limix");
+				const key = tasks.find((task) => task.key !== "others")?.key ?? (first ? `s${first.seq}` : "");
+				if (openView) openView("limix-pipeline", { stageKey: key });
+				else if (el && !openTurnFlow(el, sessionId, key)) setNavigationError("请打开上方「任务流程」查看本轮。");
+			}
+		};
+		el?.addEventListener("click", click);
+		return () => el?.removeEventListener("click", click);
+	}, [
+		openView,
+		tasks,
+		turn,
+		sessionId,
+		nodes
+	]);
 	if (tasks.length === 0) return null;
 	return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("section", {
+		ref: root,
 		className: "lx-turn-summary",
 		"aria-label": "本轮 LimiX 结果",
 		style: {
@@ -5065,45 +5331,63 @@ function LimixTurnStack({ turn, useTrajectory }) {
 			fontSize: 12,
 			color: "var(--dsw-alias-label-secondary)"
 		},
-		children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-			style: {
-				marginBottom: 5,
-				fontSize: 11,
-				color: "var(--dsw-alias-label-tertiary)"
-			},
-			children: [
-				"本轮 LimiX · ",
-				tasks.length,
-				" 个任务"
-			]
-		}), tasks.map((task) => /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-			style: {
-				display: "flex",
-				flexWrap: "wrap",
-				gap: "4px 16px",
-				alignItems: "baseline",
-				padding: "5px 0"
-			},
-			children: [
-				/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { children: task.kind }),
-				/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
-					style: {
-						fontWeight: 500,
-						fontVariantNumeric: "tabular-nums",
-						color: task.ok ? "var(--dsw-alias-label-primary)" : "#cf4545"
-					},
-					children: [
-						task.metric,
-						" ",
-						task.unit
-					]
-				}),
-				task.facts && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
-					style: { color: "var(--dsw-alias-label-tertiary)" },
-					children: task.facts
-				})
-			]
-		}, task.key))]
+		children: [
+			/* @__PURE__ */ (0, react_jsx_runtime.jsx)("style", { children: `.lx-turn-summary button{border:0;background:none;padding:3px 0;font:inherit;font-size:11px;color:var(--dsw-alias-state-business-primary,#466eb9);cursor:pointer}.lx-turn-summary button:focus-visible{outline:2px solid #466eb9;outline-offset:3px}` }),
+			/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+				style: {
+					display: "flex",
+					alignItems: "center",
+					gap: 16,
+					flexWrap: "wrap",
+					marginBottom: 5,
+					fontSize: 11,
+					color: "var(--dsw-alias-label-tertiary)"
+				},
+				children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { children: business.length ? `本轮 LimiX · ${business.length} 个任务` : "本轮 LimiX · 辅助调用" }), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+					type: "button",
+					"data-lx-turn": "flow",
+					children: "查看本轮任务流程 ↗"
+				})]
+			}),
+			(expanded ? tasks : business.slice(0, 3)).map((task) => /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+				style: {
+					display: "flex",
+					flexWrap: "wrap",
+					gap: "4px 16px",
+					alignItems: "baseline",
+					padding: "5px 0"
+				},
+				children: [
+					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { children: task.kind }),
+					/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
+						style: {
+							fontWeight: 500,
+							fontVariantNumeric: "tabular-nums",
+							color: task.ok ? "var(--dsw-alias-label-primary)" : "#cf4545"
+						},
+						children: [
+							task.metric,
+							" ",
+							task.unit
+						]
+					}),
+					task.facts && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+						style: { color: "var(--dsw-alias-label-tertiary)" },
+						children: task.facts
+					})
+				]
+			}, task.key)),
+			navigationError && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
+				role: "status",
+				children: navigationError
+			}),
+			(hidden.length > 0 || auxiliary) && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+				type: "button",
+				"data-lx-turn": "expand",
+				"aria-expanded": expanded,
+				children: expanded ? "收起 ⌃" : `${hidden.length ? `展开其余 ${hidden.length} 个任务` : "查看辅助调用"}${failures ? ` · 其中 ${failures} 个未完成` : ""}${auxiliary && !auxiliary.ok ? " · 辅助调用有失败" : ""} ⌄`
+			})
+		]
 	});
 }
 
@@ -5199,8 +5483,8 @@ const inject = [
 ];
 function apply(ctx) {
 	ctx.effect(() => ctx.locale.register("limix-agent", {
-		zh: { "view.pipeline": "分析过程" },
-		en: { "view.pipeline": "Analysis" }
+		zh: { "view.pipeline": "任务流程" },
+		en: { "view.pipeline": "Task flow" }
 	}), "limix-agent: dictionaries");
 	const t = ctx.locale.bind("limix-agent");
 	ctx.slots.inject("conversation.input.dock", () => ctx.slots.register({

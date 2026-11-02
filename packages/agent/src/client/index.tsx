@@ -2,7 +2,7 @@
  * [INPUT]: 宿主 cordis 服务 slots、locale、sessions、sidebarRight（会话授权文件预览）；组件见同目录 LimixToolCard / LimixPipelineView
  * [OUTPUT]: 浏览器半 Cordis 插件（inject + apply）：
  *           ① tool.call.toolview 以 key='limix' 认领自家工具的结果卡片
- *           ② conversation.view 挂「分析过程」标签（统一业务流程）
+ *           ② conversation.view 挂「任务流程」标签（统一业务流程）
  * [POS]: dsh-limix-agent 的浏览器入口。品牌层由 dsh-limix-cover 负责。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
@@ -15,8 +15,8 @@ export const inject = ['slots', 'locale', 'sessions', 'sidebarRight']
 
 export function apply(ctx: any): void {
   ctx.effect(() => ctx.locale.register('limix-agent', {
-    zh: { 'view.pipeline': '分析过程' },
-    en: { 'view.pipeline': 'Analysis' },
+    zh: { 'view.pipeline': '任务流程' },
+    en: { 'view.pipeline': 'Task flow' },
   }), 'limix-agent: dictionaries')
 
   const t = ctx.locale.bind('limix-agent')

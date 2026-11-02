@@ -4,7 +4,7 @@
  * [POS]: 分析流程的展示层。文件交给宿主预览；完整图表只在用户请求时挂载。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { LimixToolCard } from './LimixToolCard.tsx'
 import { explanationMode, fileName, flowState, stepFiles, stepSummary, stepTitle, type FlowStep } from './pipeline-flow.ts'
 import type { Stage } from './pipeline-stage.ts'
@@ -76,7 +76,7 @@ function TechnicalDetails({ stages }: { stages: Stage[] }) {
     {stages.map(stage => <div key={stage.key}><p>{stage.title} · {stage.stateLabel}</p><pre>{stage.inputRaw}</pre><pre>{stage.output}</pre></div>)}
   </details>
 }
-function StepDetails({ step, openFile }: { step: FlowStep; openFile?: OpenFile }) {
+function StepDetails({ step, openFile, expandToken }: { step: FlowStep; openFile?: OpenFile; expandToken?: object }) {
   const last = step.stages[step.stages.length - 1]
   const fields = last.inputKv.filter(([key]) => !['子命令', '命令', '说明', '参数', '解释方式'].includes(key) && !/文件|环境/.test(key))
   if (typeof last.data?.model_type === 'string' && !fields.some(([key]) => key === '模型')) fields.unshift(['模型', last.data.model_type])
@@ -103,9 +103,10 @@ function StepDetails({ step, openFile }: { step: FlowStep; openFile?: OpenFile }
   </div>
 }
 
-export function FlowStepRow({ step, openFile }: { step: FlowStep; openFile?: OpenFile }) {
+export function FlowStepRow({ step, openFile, expandToken }: { step: FlowStep; openFile?: OpenFile; expandToken?: object }) {
   const state = flowState(step.stages)
   const [override, setOverride] = useState<boolean | null>(null)
+  useEffect(() => { if (expandToken) setOverride(true) }, [expandToken])
   const [showResult, setShowResult] = useState(false)
   const [fileError, setFileError] = useState('')
   const open = override ?? state.kind === 'running'

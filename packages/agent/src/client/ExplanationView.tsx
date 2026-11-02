@@ -45,6 +45,7 @@ const CSS = `
 .lx-graph-mode{display:flex;align-items:center;gap:5px}.lx-explain-help{position:relative;display:inline-flex}
 .lx-result button.lx-explain-help-trigger{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;padding:0;color:var(--dsw-alias-label-secondary);border-radius:4px}
 .lx-result button.lx-explain-help-trigger:hover,.lx-result button.lx-explain-help-trigger[aria-expanded=true]{color:var(--dsw-alias-state-business-primary,#3465ce);background:var(--dsw-alias-interactive-bg-hover,#f3f5f8)}
+.lx-explain-subtitle .lx-explain-help .lx-explain-info-body{left:auto;right:0}
 .lx-explain-help .lx-explain-info-body{top:100%;left:0;right:auto;max-width:min(280px,60cqw)}
 .lx-explain-tabs{display:flex;gap:22px;border-bottom:1px solid var(--dsw-alias-border-l3,#e7e9ed);margin-bottom:18px}
 .lx-explain-tabs button{font-size:13px!important;padding:8px 0 11px!important;color:var(--dsw-alias-label-secondary)!important;border-bottom:2px solid transparent!important;border-radius:0!important}

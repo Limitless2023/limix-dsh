@@ -32,7 +32,8 @@ test('真实局部归因默认显示六个因素，同时展示重算差异', ()
   assert.match(html, /解释时预测/)
   assert.match(html, /重算差异/)
   assert.match(html, /全部 13 个因素/)
-  assert.match(html, /贡献分数不代表实际调节收益/)
+  assert.match(html, /贡献分数说明/)
+  assert.doesNotMatch(html, /解释模型如何得到本次预测；贡献分数不代表实际调节收益/)
 })
 
 test('真实光学图展示两条实际有向边和中文变量', () => {
@@ -168,7 +169,7 @@ test('只有真实解释卡提供全屏入口，入口保留标题和下载', ()
     }))
     assert.match(html,/aria-label="全屏查看解释"/)
     assert.match(html,/class="lx-fullscreen-dialog" role="presentation"/)
-    assert.match(html,/下载原始 JSON/)
+    assert.match(html,/原始结果 JSON/)
     assert.doesNotMatch(html, /aria-modal="true"/)
   }
   assert.doesNotMatch(render(fixture.content[0].text),/aria-label="全屏查看解释"/)
@@ -217,4 +218,36 @@ test('CSV 数字字符串可以按原值范围筛选，空值不当零，分类�
   assert.equal(filterFields(data)[1].numeric,true)
   assert.deepEqual(filterSamples(data,{...emptyFilter,field:'feature:0',min:'9.8',max:'10'}).map(s=>s.row_number),[2])
   assert.deepEqual(filterSamples(data,{...emptyFilter,field:'feature:0',max:'0'}),[])
+})
+
+test('运行态按真实参数区分预测、局部解释、关系探索和比较，未知任务安全回退', () => {
+  for (const [command,args,label] of [
+    ['regress',[],'LimiX 正在预测'],['classify',[],'LimiX 正在预测类别'],
+    ['forecast',[],'LimiX 正在预测未来趋势'],['explain',['--mode','local'],'LimiX 正在分析影响因素'],
+    ['explain',['--mode','directed'],'LimiX 正在探索变量关系'],['explain',['--mode','undirected'],'LimiX 正在探索变量关系'],
+    ['benchmark',[],'正在比较模型表现'],['unknown',[],'LimiX 正在执行任务'],['forecast',['--help'],'正在读取参数说明'],
+  ]) {
+    const html=renderToStaticMarkup(React.createElement(LimixToolCard,{callId:'running-test',toolName:'limix',block:{argsRaw:JSON.stringify({command,args})}}))
+    assert.ok(html.includes(label),command)
+    assert.match(html,/class="lx-running-spinner"/)
+    assert.doesNotMatch(html,/class="lx-result-actions"|工具结果/)
+  }
+})
+
+test('轮尾默认三项，折叠失败可见，辅助调用不计入业务任务数', () => {
+  const { LimixTurnStack }=require('../src/client/LimixTurnStack.tsx')
+  const nodes=Array.from({length:6},(_,i)=>({seq:i+1,call:{name:'limix',argsRaw:JSON.stringify({command:'regress',args:['--target',`target${i}`]})},isError:i===4,content:[{type:'text',text:JSON.stringify({status:i===4?'failed':'finished'})}]}))
+  nodes.push({seq:7,call:{name:'limix',argsRaw:JSON.stringify({command:'health'})},content:[{type:'text',text:'{}'}]})
+  const html=renderToStaticMarkup(React.createElement(LimixTurnStack,{turn:{start:{seq:0},end:{seq:8}},sessionId:'test',useTrajectory:fn=>fn({eventNodes:nodes})}))
+  assert.match(html,/6 个任务/);assert.match(html,/展开其余 3 个任务 · 其中 1 个未完成/)
+  assert.match(html,/target2/);assert.doesNotMatch(html,/target3|其它调用/)
+  assert.match(html,/查看本轮任务流程/)
+})
+
+test('同一比较续查只显示最新结果，报告核验归辅助调用', () => {
+  const {LimixTurnStack}=require('../src/client/LimixTurnStack.tsx')
+  const results=[['report',{kind:'report_facts'}],['benchmark',{kind:'benchmark',saved_to:'/tmp/comparison.json',status:'pending'}],['benchmark',{kind:'benchmark',saved_to:'/tmp/comparison.json',status:'finished'}]]
+  const nodes=results.map(([command,data],i)=>({seq:i+1,call:{name:'limix',argsRaw:JSON.stringify({command,args:[]})},content:[{type:'text',text:JSON.stringify(data)}]}))
+  const html=renderToStaticMarkup(React.createElement(LimixTurnStack,{turn:{start:{seq:0},end:{seq:4}},sessionId:'test',useTrajectory:fn=>fn({eventNodes:nodes})}))
+  assert.match(html,/1 个任务/);assert.doesNotMatch(html,/分析报告|处理中/);assert.match(html,/查看辅助调用/)
 })

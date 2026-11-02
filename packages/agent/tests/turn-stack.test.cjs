@@ -14,12 +14,12 @@ const { renderToStaticMarkup } = require('react-dom/server')
 const fixture = require('./fixtures/regression-node.json')
 const source = fs.readFileSync(require.resolve('../src/client/LimixTurnStack.tsx'), 'utf8')
 const code = ts.transpileModule(source, { compilerOptions: {
-  module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX,
+  target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX,
 } }).outputText
 const exports_ = {}
 vm.runInNewContext(code, { exports: exports_, require: (name) => name === 'react'
-  ? { ...React, useMemo: (f) => f(), useState: (v) => [v, () => {}], useEffect: () => {} }
-  : name === './tool-result.ts' ? (() => {
+  ? { ...React, useMemo: (f) => f(), useState: (v) => [v, () => {}], useEffect: () => {}, useRef: () => ({current:null}) }
+  : name === './flow-navigation' ? {openTurnFlow:()=>false} : name === './tool-result.ts' ? (() => {
     const helper = {}
     vm.runInNewContext(ts.transpileModule(fs.readFileSync(require.resolve('../src/client/tool-result.ts'), 'utf8'),
       { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText, { exports: helper })

@@ -2,6 +2,7 @@
  * [INPUT]: 依赖 react（宿主 external）；props 由 tool.call.toolview 插槽 owner 提供
  *          （结构对齐官方 ToolCallOwnerProps：callId/toolName/block/cwd/openFile/inspect——
  *           为守构建纯度门禁不 value-import 官方包，此处以最小结构类型自持）
+ * 运行态展示任务文案、小圆环和本次界面等待时间；显式 round 隔离宿主超椭圆样式。
  * [OUTPUT]: 报告支持 HTML/Markdown 附件下载； 对外提供 LimixToolCard 组件——limix 工具调用在对话流里的富卡片：
  *           任务名称（因果解释沿用官方口径）+ 指标 + 文件下载与打开；指标说明和调用详情默认折叠
  *           + 三类预测图、可全屏的解释/模型比较卡及 JSON/CSV 下载；参数帮助不显示预测完成。
@@ -11,6 +12,7 @@
  *        三类结果图共用 /limix-ui/csv 一条只读通道，取数失败一律静默降级为纯文本卡片
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
+import { ActionMenu } from './ActionMenu'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { ConfusionMatrix } from './ConfusionMatrix.tsx'
 import { ForecastChart, type ForecastChartData } from './ForecastChart.tsx'
@@ -62,7 +64,16 @@ const COMMAND_LABELS: Record<string, string> = {
   task: '任务进度', tasks: '任务列表', result: '预测结果', data: '数据查询', cancel: '取消任务',
   explain: '因果解释', benchmark: '多模型效果比较', report: '业务分析报告', runtime: '分析环境',
 }
+const RUNNING_LABELS: Record<string, string> = { regress:'LimiX 正在预测…', classify:'LimiX 正在预测类别…', forecast:'LimiX 正在预测未来趋势…', benchmark:'正在比较模型表现…', report:'正在生成分析报告…', upload:'正在上传数据…', download:'正在保存结果…', data:'正在读取数据…', health:'正在连接 LimiX…', runtime:'正在检查分析环境…', task:'正在查询任务进度…', tasks:'正在读取任务列表…', result:'正在读取预测结果…', check:'正在检查访问权限…', cancel:'正在取消任务…' }
 const CSS = `
+.lx-running{display:flex;align-items:center;gap:16px!important;padding:22px 24px!important}
+.lx-running-copy{flex:1;min-width:0}
+.lx-running-spinner{box-sizing:border-box;corner-shape:round;flex:0 0 19px;width:19px;height:19px;border:2px solid var(--dsw-alias-border-l3,#e3eaf5);border-top-color:#466eb9;border-radius:50%;animation:lx-running-spin 1.15s linear infinite}
+.lx-running-time{font-size:12px;color:var(--dsw-alias-label-tertiary,#858d99);font-variant-numeric:tabular-nums;white-space:nowrap}
+@keyframes lx-running-spin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.lx-running-spinner{animation:none}}
+@media(max-width:520px){.lx-running{flex-wrap:wrap}.lx-running-time{margin-left:35px}}
+
 .lx-result{border:1px solid var(--dsw-alias-border-l3,#e3e6eb);border-radius:12px;padding:16px 18px;margin:4px 0;font:inherit;font-size:13px;line-height:1.6;min-width:0;overflow-wrap:anywhere;color:var(--dsw-alias-label-primary)}
 .lx-result-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .lx-result-brand{font-size:11px;letter-spacing:.04em;color:var(--dsw-alias-label-tertiary);margin-bottom:5px}
@@ -290,6 +301,25 @@ export function LimixToolCard({ callId, block, inspect, cwd, openFile }: Props):
     {compact ? <>{showRaw ? '收起' : '详情'}<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d={showRaw ? 'M4 10l4-4 4 4' : 'M4 6l4 4 4-4'} /></svg></> : showRaw ? '收起详情 ↑' : '调用详情 ↓'}
   </button>
 
+  const [waitingSeconds, setWaitingSeconds] = useState(0)
+  useEffect(() => {
+    setWaitingSeconds(0)
+    if (settled) return
+    const start = Date.now()
+    const timer = setInterval(() => setWaitingSeconds(Math.floor((Date.now() - start) / 1000)), 1000)
+    return () => clearInterval(timer)
+  }, [callId, settled])
+  if (!settled) {
+    const runningTitle = help ? '正在读取参数说明…' : command === 'explain'
+      ? (['directed','undirected'].includes(flagValue('--mode') ?? '') ? 'LimiX 正在探索变量关系…' : 'LimiX 正在分析影响因素…')
+      : RUNNING_LABELS[command] ?? 'LimiX 正在执行任务…'
+    return <div className="lx-card-host" ref={fullscreen.hostRef}><dialog className="lx-fullscreen-dialog" ref={fullscreen.dialogRef} role="presentation"><section ref={rootRef} className="lx-result lx-running" aria-label={runningTitle}>
+      <style>{CSS + CARD_FULLSCREEN_CSS}</style><span className="lx-running-spinner" aria-hidden="true" />
+      <div className="lx-running-copy"><h3 role="status">{runningTitle}</h3>{target && <p className="lx-result-meta">{target}</p>}</div>
+      <span className="lx-running-time" title="本次界面等待时长；重新打开页面会重新计时">已等待 {waitingSeconds < 60 ? `${waitingSeconds} 秒` : `${Math.floor(waitingSeconds / 60)} 分 ${waitingSeconds % 60} 秒`}</span>
+    </section></dialog></div>
+  }
+
   return (
     <div className="lx-card-host" ref={fullscreen.hostRef}>
     <dialog className="lx-fullscreen-dialog" ref={fullscreen.dialogRef} role={fullscreen.expanded ? 'dialog' : 'presentation'} aria-modal={fullscreen.expanded} aria-label={fullscreen.expanded ? `${title}${target ? ` · ${target}` : ''}` : undefined}>
@@ -336,17 +366,26 @@ export function LimixToolCard({ callId, block, inspect, cwd, openFile }: Props):
         {benchmark && typeof parsed?.csv_path === 'string' && <a href={'/limix-ui/artifact?path=' + encodeURIComponent(parsed.csv_path)} download>下载比较 CSV ↓</a>}
         {benchmark && file && <a href={'/limix-ui/artifact?path=' + encodeURIComponent(file)} download>下载比较 JSON ↓</a>}
         {benchmark && typeof parsed?.report_path === 'string' && openFile && <button type="button" data-lx="file" data-path={parsed.report_path}>打开完整报告 ↗</button>}
-        {explanation && typeof parsed?.csv_path === 'string' && <a href={'/limix-ui/artifact?path=' + encodeURIComponent(parsed.csv_path)} download>下载{explanation.mode === 'local' ? '贡献' : '关系'} CSV ↓</a>}
-        {explanation && file && <a href={'/limix-ui/artifact?path=' + encodeURIComponent(file)} download>下载原始 JSON ↓</a>}
+        {explanation && <>
+          {(typeof parsed?.csv_path === 'string' || file) && <ActionMenu label="下载数据" up>
+            {typeof parsed?.csv_path === 'string' && <a href={'/limix-ui/artifact?path=' + encodeURIComponent(parsed.csv_path)} download>{explanation.mode === 'local' ? '贡献数据 CSV' : '关系数据 CSV'}</a>}
+            {file && <a href={'/limix-ui/artifact?path=' + encodeURIComponent(file)} download>原始结果 JSON</a>}
+          </ActionMenu>}
+          <ActionMenu label="更多" up>
+            {file && openFile && <button type="button" data-lx="file" data-path={file}>打开结果文件 ↗</button>}
+            {rawToggle}
+            {inspect && <button type="button" data-lx="inspect">检视调用 ↗</button>}
+          </ActionMenu>
+        </>}
         {savedCsv && <a href={'/limix-ui/csv?path=' + encodeURIComponent(savedCsv) + '&download=1'} download={savedCsv.split('/').pop()}>下载 CSV ↓</a>}
-        {file && (openFile
+        {!explanation && file && (openFile
           ? <button type="button" data-lx="file" data-path={file}>打开结果 · {file.split('/').pop()} ↗</button>
           : <span className="lx-result-meta">已保存 · {file.split('/').pop()}</span>)}
-        {rawToggle}
+        {!explanation && rawToggle}
         {metrics.length > 0 && <button type="button" data-lx="metrics" aria-expanded={showMetrics} aria-controls={metricsId}>
           {showMetrics ? '收起指标说明 ↑' : '指标说明 ↓'}
         </button>}
-        {showRaw && inspect && <button type="button" data-lx="inspect">检视调用 ↗</button>}
+        {!explanation && showRaw && inspect && <button type="button" data-lx="inspect">检视调用 ↗</button>}
       </div>}
       {showMetrics && <dl id={metricsId} className="lx-result-note">
         {metrics.map(metric => <div key={metric.key} style={{ marginTop: 8 }}>

@@ -1,12 +1,12 @@
-# 安装 LimiX Agent 0.3.8
+# 安装 LimiX Agent 0.3.9
 
-从 [GitHub Releases](https://github.com/Limitless2023/limix-dsh/releases) 下载 0.3.8 的插件文件。请保留现有 profile，按顺序安装或更新：
+从 [GitHub Releases](https://github.com/Limitless2023/limix-dsh/releases) 下载 0.3.9 的插件文件。请保留现有 profile，按顺序安装或更新：
 
-1. `dsh-limix-data-0.3.8.tgz`
-2. `dsh-limix-tool-0.3.8.tgz`
-3. `dsh-limix-agent-0.3.8.tgz`
-4. `dsh-limix-preset-0.3.8.tgz`
-5. 可选品牌外观：`dsh-limix-cover-0.3.8.tgz`
+1. `dsh-limix-data-0.3.9.tgz`
+2. `dsh-limix-tool-0.3.9.tgz`
+3. `dsh-limix-agent-0.3.9.tgz`
+4. `dsh-limix-preset-0.3.9.tgz`
+5. 可选品牌外观：`dsh-limix-cover-0.3.9.tgz`
 
 在 DeepSeek Harness 的“插件 → 添加插件”中选择文件；也可让 DSH Agent 使用 `plugin_manager` 的 `install_bundle`，`target` 传 tarball 的绝对路径。升级时使用同名包的新版，无需手动删配置。
 
@@ -25,7 +25,7 @@
 ## 安装后验证
 
 1. 新建会话，选择 **LimiX Agent**，输入“用 LimiX 检查服务连接”。
-2. 确认出现服务连接卡片，以及“分析过程”页签。
+2. 确认出现服务连接卡片，以及“任务流程”页签。
 3. 输入 `/limix-predict`、`/limix-explain`、`/limix-compare`，确认命令存在。
 4. 用公开演示数据执行一次预测与解释，确认图表、全屏与下载可用。
 5. 新建标准模式会话，确认其首屏和工具组合保持标准模式。

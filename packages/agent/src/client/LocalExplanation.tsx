@@ -4,6 +4,7 @@
  * [POS]: 单条解释及批量逐条查看的共用视图。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
+import { ExplanationHelp } from './ExplanationHelp'
 import { useEffect, useRef, useState } from 'react'
 import { directionLabel, explanationPrediction, number, sampleLabel, type ExplanationData } from './explanation-data'
 
@@ -27,13 +28,12 @@ export function LocalExplanation({ data }: { data: ExplanationData }) {
           : typeof data.prediction_delta === 'number' && <div>重算差异 {data.prediction_delta > 0 ? '+' : ''}{number(data.prediction_delta)} {prediction.unit}</div>}
       </div>}
     </div>
-    <div className="lx-explain-subtitle"><span>主要影响因素</span><span>贡献分数 · 模型方向</span></div>
+    <div className="lx-explain-subtitle"><span>主要影响因素</span><div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>贡献分数 · 模型方向<ExplanationHelp label="贡献分数说明"><p>表示各因素对本次模型预测的影响。</p></ExplanationHelp></div></div>
     {(expanded ? factors : factors.slice(0, 6)).map(f => <div className="lx-factor" key={f.name}>
       <span className="lx-factor-name">{f.label}{f.label !== f.name && <span className="lx-factor-key">{f.name}</span>}</span>
       <div className="lx-factor-track"><div className="lx-factor-bar" data-direction={f.direction} style={{ width: `${Math.abs(f.score) / maximum * 100}%` }} /></div>
       <span className="lx-factor-score">{number(f.score)}</span><span className="lx-factor-direction">{directionLabel(f.direction)}{f.direction === 1 ? ' ↑' : f.direction === -1 ? ' ↓' : ''}</span>
     </div>)}
     {factors.length > 6 && <button type="button" className="lx-explain-toggle" data-lx-local-toggle aria-expanded={expanded}>{expanded ? '收起因素 ↑' : `查看全部 ${factors.length} 个因素 ↓`}</button>}
-    <p className="lx-explain-foot">解释模型如何得到本次预测；贡献分数不代表实际调节收益。</p>
   </div>
 }

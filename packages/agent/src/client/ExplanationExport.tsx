@@ -4,6 +4,7 @@
  * [POS]: 解释图表导出交互；原生事件适配普通卡和 dialog。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
+import { ActionMenu } from './ActionMenu'
 import { useEffect, useRef, useState } from 'react'
 import { defaultExportTheme, type ExportTheme } from './explanation-export'
 
@@ -48,5 +49,5 @@ export function ExplanationExport({ build, filename }: { build: (theme: ExportTh
     element?.addEventListener('click', click)
     return () => element?.removeEventListener('click', click)
   }, [build, filename])
-  return <div className="lx-export" ref={root}><span>导出图表</span><button type="button" data-lx-export="svg" aria-label="导出 SVG 图表">SVG</button><button type="button" data-lx-export="png" aria-label="导出 PNG 图表">PNG</button><span role="status" className="lx-export-status">{status}</span></div>
+  return <div className="lx-export" ref={root}><ActionMenu label="导出图表"><button type="button" data-lx-export="svg" aria-label="导出 SVG 图表">SVG</button><button type="button" data-lx-export="png" aria-label="导出 PNG 图表">PNG</button></ActionMenu><span role="status" className="lx-export-status">{status}</span></div>
 }

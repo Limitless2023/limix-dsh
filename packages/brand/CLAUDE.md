@@ -12,6 +12,7 @@ build.mjs - 将两份品牌 PNG 内联进浏览器模块。
 lib/ - 构建产物；客户端刷新后加载。
 locale/ - 插件列表名称与说明。
 cordis.patch.yml - 全局品牌插件席位。
+LICENSE / LICENSING.md / THIRD-PARTY-NOTICES.md - 非商业许可、商业授权入口及历史/第三方权利。
 package.json - npm 公开分发元数据、最低 Harness rc.5 声明；资源清单与构建命令。
 README.md - 品牌槽位、构建和安装约束。
 smoke.mjs - 静态渲染检查。

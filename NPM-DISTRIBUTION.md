@@ -1,18 +1,18 @@
-# LimiX 五插件 npm 分发准备
+# LimiX 五插件 npm 分发
 
-状态：**0.3.10 候选包尚未发布 npm**。当前公开版本是 GitHub Release v0.3.9。本文件中的 0.3.10 命令须在发布获批、五包均可从公共 npm 下载后使用。
+版本：**0.3.10**。使用命令前确认公共 npm 的五包版本均可用；GitHub Release tgz 分发继续保留。
 
 ## 发布方案
 
 保留五个包名：`dsh-limix-data`、`dsh-limix-tool`、`dsh-limix-agent`、`dsh-limix-preset`、`dsh-limix-cover`。五包统一版本；npm 与 GitHub Release 使用同一批 tgz，SHA256SUMS 校验这些文件。
 
-0.3.9 已发布，本次 npm 准备另用 0.3.10，避免同一版本存在不同包内容。候选代码保存在 `npm-distribution-prep` 分支，未合并到正式版。
+0.3.9 已发布，本次 npm 准备另用 0.3.10，避免同一版本存在不同包内容。发布前从干净提交打包，并核对源码提交与包清单。
 
 五包没有互相声明 npm 依赖，需一次安装全部五包。preset 在 LimiX 模式中加载 tool；tool 的空 bundle patch 是有意设计，不额外挂载全局工具。data 保留 mysql2、pg 运行依赖；其余包随包提供构建产物，使用者无需编译。不会打包另一份 Harness。
 
-包名在 2026-11-02 查询公共 registry 均不存在。这不代表已保留名称或已取得发布权限。当前 npm 登录检查返回 E401，发布前需使用有权限的账号登录；不要在聊天中发送 token。
+包名在 2026-11-02 查询公共 registry 均不存在。这不代表已保留名称或已取得发布权限。发布账号为 `limix2026`。不要在聊天中发送 token。
 
-四包尚无许可证声明，cover 保留已有 MIT。本次没有擅自给其余代码添加开源授权。**发布前必须确认许可证和发布账号。**
+用户已批准公开发布，并选择非商业许可。五包自有代码统一采用 PolyForm Noncommercial 1.0.0；商业授权联系 Limitless。保留第三方许可、品牌权利及 cover 历史 MIT 权利，详见 LICENSING.md。发布仍需通过包内容预检与 npm 身份验证。
 
 ## 支持条件
 
@@ -31,7 +31,7 @@ DSH='/Applications/DeepSeek Harness.app/Contents/Resources/runtime/cli/bin/dsh'
 
 其他平台使用安装时配置的 `dsh` 命令；本轮未做 Windows 实机验收。
 
-## 可供 GTM 与飞书使用的安装说明（发布后启用）
+## 安装、更新与迁移
 
 先完全退出 DeepSeek Harness。在终端执行以下**一条命令**，安装五个同版本插件：
 
@@ -79,12 +79,12 @@ mysql2 解析到 3.24.6 时，pnpm 提示缺少类型 peer `@types/node`。它�
 
 ## 维护者发布前步骤
 
-1. 确认四包许可证、npm 账号与公开发布授权。
+1. 核对 LICENSING.md 与五包许可文件，登录有发布权限的 npm 账号。
 2. 将确认后的元数据提交；在干净提交运行 `./release.sh`，再运行 `node scripts/npm-preflight.mjs`。清单必须 `source_dirty: false`。
 3. 用户批准后，发布这批已经核验的五个 tgz；不要临时从目录重新打出不同内容。
 4. 从公共 npm 按固定版本安装到新 profile，核对五包版本与 tarball integrity，再创建对应 GitHub Release，上传同一批 tgz、manifest 和 SHA256SUMS。
 5. 两种渠道均可用后，将上方安装说明同步到 GTM 和飞书；去掉“发布后启用”。
 
-当前没有执行第3步，也没有修改线上 GTM 或飞书安装说明。
+公共 npm 验收记录在 reviews/npm-distribution-review.md 更新。本文可供 GTM 与飞书同步，本轮不自动修改线上页面。
 
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md

@@ -6,7 +6,10 @@
   "files": [
     "cordis.patch.yml",
     "locale/*.json",
-    "assets/icon.png"
+    "assets/icon.png",
+    "LICENSE",
+    "LICENSING.md",
+    "THIRD-PARTY-NOTICES.md"
   ],
   "dsh": {
     "bundle": {
@@ -33,5 +36,6 @@
   "homepage": "https://github.com/Limitless2023/limix-dsh#readme",
   "bugs": {
     "url": "https://github.com/Limitless2023/limix-dsh/issues"
-  }
+  },
+  "license": "PolyForm-Noncommercial-1.0.0"
 }

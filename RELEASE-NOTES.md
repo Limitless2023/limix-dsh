@@ -1,21 +1,17 @@
-# LimiX Agent v0.3.9
+# LimiX Agent v0.3.10
 
-本版优化对话中的任务状态、解释卡操作与本轮摘要。功能改动位于 agent 插件；data、tool、preset、cover 随套件统一升版打包，业务逻辑不变。
+本版为五个 Harness 插件增加 npm 分发，并保留 GitHub Release tgz。五包统一0.3.10；业务代码沿用已验证的v0.3.9 UI修复。
 
-## 本轮改动
+## 安装与授权
 
-- 运行中按预测、解释、关系探索等任务显示文案与正圆加载动画；等待时间表示本次界面停留时长。
-- 解释卡说明移入信息图标，下载数据、文件操作与图表导出收进菜单。
-- “分析过程”改名“任务流程”。本轮默认展示三项业务任务；其余折叠并提示隐藏失败，辅助调用单独收起。
-- 本轮流程入口定位当前会话对应轮次并展开业务步骤；技术详情保持折叠。
-- 同一任务的查询更新保留最新状态；报告数据核验归辅助调用。
+- 五包名：dsh-limix-data、dsh-limix-tool、dsh-limix-agent、dsh-limix-preset、dsh-limix-cover。
+- 最低支持 Harness 0.2.1-rc.5；安装、升级和tgz迁移指令见 NPM-DISTRIBUTION.md。
+- 自有代码采用 PolyForm Noncommercial 1.0.0。商业用途请联系 Limitless 取得单独书面授权，见 LICENSING.md。
+- 保留第三方许可证与品牌权利。cover旧版MIT授予的权利不撤回，不宣称新版限制覆盖历史代码。
+- npm与Release上传同一批tgz，随包附许可证、商业授权入口和第三方声明。
 
-## 安装
+## 验证与保留边界
 
-五包统一 0.3.9，保留原 profile，更新后重启 DSH。详见 INSTALL.md。GitHub Release tgz 分发继续保留。本次尚未发布 npm。
+发布前完成独立DSH的五包首装、npm版本升级、0.3.8/0.3.9 tgz迁移、配置保留和宿主版本检查。公共registry验收另记于 reviews/npm-distribution-review.md。五包并非原子发布，请确认五包都可用再安装。
 
-## 验证与边界
-
-交叉审查记录见 reviews/ui-release-review.md。自动检查、类型检查、现有 DSH 真调用与卡片交互已验证。报告仍需人工审阅；第二台电脑、Windows 实机与完整连续录像未验收。
-
-光学 20 变量无向解释仍是上游 EXPLANATION_FAILED，失败 task_id `13c42588efbd1ae41bad547423dc41fc`；3变量对照成功但0条关系，task_id `dd0201b8fe16629b7688232a31a03112`。本轮未重测，不宣称修复。时序解释尺度与7M局部解释4103差异仍待上游确认。
+报告仍需人工审阅；Windows、第二台电脑、本隔离环境的真实预测和数据库查询未验收。光学20变量无向解释上游 EXPLANATION_FAILED 保留，失败 task_id `13c42588efbd1ae41bad547423dc41fc`；3变量对照成功但0条关系，task_id `dd0201b8fe16629b7688232a31a03112`。本轮未重测，不宣称修复。

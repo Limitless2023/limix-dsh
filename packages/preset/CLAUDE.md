@@ -2,6 +2,7 @@
 
 > L2 | 父级: ../../CLAUDE.md
 
+LICENSE / LICENSING.md / THIRD-PARTY-NOTICES.md - 非商业许可、商业授权入口及历史/第三方权利。
 package.json - npm 公开分发元数据、最低 Harness rc.5 声明；preset bundle 清单，以及插件名称、描述与图标的分发入口。
 locale/ - 中英文插件名称与职责说明。
 assets/ - 插件列表使用的官方 LimiX 图标。

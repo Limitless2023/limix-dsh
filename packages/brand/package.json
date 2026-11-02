@@ -26,7 +26,10 @@
     "build.mjs",
     "README.md",
     "assets/limix-logo.png",
-    "assets/SOURCES.md"
+    "assets/SOURCES.md",
+    "LICENSE",
+    "LICENSING.md",
+    "THIRD-PARTY-NOTICES.md"
   ],
   "dsh": {
     "bundle": {
@@ -44,7 +47,7 @@
   "scripts": {
     "build": "node build.mjs"
   },
-  "license": "MIT",
+  "license": "PolyForm-Noncommercial-1.0.0",
   "engines": {
     "dsh": ">=0.2.1-rc.5"
   },

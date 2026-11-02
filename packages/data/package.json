@@ -22,7 +22,10 @@
     "locale/*.json",
     "assets/icon.png",
     "src",
-    "tsdown.config.ts"
+    "tsdown.config.ts",
+    "LICENSE",
+    "LICENSING.md",
+    "THIRD-PARTY-NOTICES.md"
   ],
   "dsh": {
     "client": {
@@ -64,5 +67,6 @@
   "homepage": "https://github.com/Limitless2023/limix-dsh#readme",
   "bugs": {
     "url": "https://github.com/Limitless2023/limix-dsh/issues"
-  }
+  },
+  "license": "PolyForm-Noncommercial-1.0.0"
 }

@@ -33,6 +33,7 @@ for (const { dir, manifest } of definitions) {
   assert.equal(manifest.engines?.dsh, '>=0.2.1-rc.5')
   assert.equal(manifest.publishConfig?.registry, 'https://registry.npmjs.org/')
   assert.equal(manifest.publishConfig?.access, 'public')
+  assert.equal(manifest.license, 'PolyForm-Noncommercial-1.0.0')
   assert.equal(manifest.repository?.directory, `packages/${dir}`)
   assert.ok(!manifest.scripts?.prepublishOnly && !manifest.scripts?.publish)
   for (const [name, spec] of Object.entries(manifest.dependencies || {})) {
@@ -45,13 +46,17 @@ for (const { dir, manifest } of definitions) {
   assert.equal(createHash('sha256').update(await readFile(tarball)).digest('hex'), entry.sha256)
   const packedManifest = JSON.parse(execFileSync('tar', ['-xOf', tarball, 'package/package.json'], { encoding: 'utf8' }))
   assert.deepEqual(packedManifest, manifest)
+  for (const filename of ['LICENSE', 'LICENSING.md', 'THIRD-PARTY-NOTICES.md']) {
+    const packaged = execFileSync('tar', ['-xOf', tarball, `package/${filename}`], { encoding: 'utf8' })
+    assert.equal(packaged, await readFile(resolve(root, filename), 'utf8'), `${expected}: ${filename} 须随包分发且与根目录一致`)
+  }
   const result = JSON.parse(execFileSync('npm', ['publish', tarball, '--dry-run', '--ignore-scripts', '--json'], { encoding: 'utf8' }))
   assert.equal(result.id, `${expected}@${version}`)
   checks.push({ name: expected, version, dry_run: 'passed', license: manifest.license || 'UNDECLARED' })
 }
 await writeFile(resolve(output, 'npm-preflight.json'), JSON.stringify({
   status: 'prepared-not-published', checks,
-  approval_required: true,
-  remaining: ['确认发布账号及权限', '确认四包许可证', '用户批准后才可 npm publish', '公共 registry 安装验收'],
+  publication_performed: false,
+  remaining: ['发布账号登录及2FA', '实际发布与公共 registry 安装验收'],
 }, null, 2) + '\n')
 console.log(`五包 dry-run 通过；未发布：${output}`)

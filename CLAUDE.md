@@ -15,6 +15,7 @@ dist/ - 本地分发压缩包；发布前按源码重建。
 </directory>
 
 <config>
+LICENSE / LICENSING.md / THIRD-PARTY-NOTICES.md - 非商业授权原文、联系入口与第三方/历史权利。
 README.md - 安装步骤、构建入口和已知边界。
 INSTALL.md - 同事安装说明。
 HANDOVER.md - 开发接手入口与历史调试记录。
@@ -25,8 +26,8 @@ TODO.md - 插件迁移进度。
 DECISION-AGENT-PLAN.md - 产业决策与因果解释方案；记录接口边界、案例和验收顺序。
 SYSTEM-PROMPT-REVIEW.md - LimiX 专属五段提示词原文、工具说明与调优验证记录。
 GOAL-PLAN.md - 本轮因果模块、多数据集、多模型比较、审查与发版验收清单。
-NPM-DISTRIBUTION.md - npm 0.3.10 候选分发方案、隔离验收与待批准安装文案。
-RELEASE-NOTES.md - 0.3.9公开发布说明、安装入口与已知边界。
+NPM-DISTRIBUTION.md - npm 0.3.10 分发方案、隔离验收与安装文案。
+RELEASE-NOTES.md - 0.3.10公开发布说明、安装入口与已知边界。
 release.sh - 构建并核验五个插件，输出版本清单与 SHA256；不上传产物。
 </config>
 

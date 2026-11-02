@@ -14,4 +14,4 @@
 
 发布前完成独立DSH的五包首装、npm版本升级、0.3.8/0.3.9 tgz迁移、配置保留和宿主版本检查。公共registry验收另记于 reviews/npm-distribution-review.md。五包并非原子发布，请确认五包都可用再安装。
 
-报告仍需人工审阅；Windows、第二台电脑、本隔离环境的真实预测和数据库查询未验收。光学20变量无向解释上游 EXPLANATION_FAILED 保留，失败 task_id `13c42588efbd1ae41bad547423dc41fc`；3变量对照成功但0条关系，task_id `dd0201b8fe16629b7688232a31a03112`。本轮未重测，不宣称修复。
+报告仍需人工审阅；Windows、第二台电脑、本隔离环境的真实预测和数据库查询未验收。光学20变量无向解释上游 EXPLANATION_FAILED 保留；3变量对照成功但0条关系。本轮未重测，不宣称修复。

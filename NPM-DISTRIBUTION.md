@@ -10,9 +10,7 @@
 
 五包没有互相声明 npm 依赖，需一次安装全部五包。preset 在 LimiX 模式中加载 tool；tool 的空 bundle patch 是有意设计，不额外挂载全局工具。data 保留 mysql2、pg 运行依赖；其余包随包提供构建产物，使用者无需编译。不会打包另一份 Harness。
 
-包名在 2026-11-02 查询公共 registry 均不存在。这不代表已保留名称或已取得发布权限。发布账号为 `limix2026`。不要在聊天中发送 token。
-
-用户已批准公开发布，并选择非商业许可。五包自有代码统一采用 PolyForm Noncommercial 1.0.0；商业授权联系 Limitless。保留第三方许可、品牌权利及 cover 历史 MIT 权利，详见 LICENSING.md。已使用 limix2026 完成发布。
+五包已由 npm 账号 `limix2026` 发布。自有代码采用 PolyForm Noncommercial 1.0.0；商业授权与第三方权利见 [许可说明](LICENSING.md)。
 
 ## 支持条件
 
@@ -57,31 +55,11 @@ dsh plugin --profile desktop list --depth 0
 
 GitHub tgz 安装继续支持：从对应 Release 下载五个文件，在“插件 → 添加插件”逐个安装；也可在上述 `add --save-exact` 后传五个 tgz 的绝对路径。回退时同样安装完整上一版五包，不清空配置。
 
-## 本次验收
+## 验证范围
 
-使用独立 `DSH_HOME` 和 `npm-fresh`、`npm-upgrade`、`tgz-migration` 三个 profile；未修改日常使用的 desktop profile。测试 registry 只监听本机，只有读取接口，不接受发布。
+公共 npm 五包下载与 GitHub Release 的 SHA256 一致。独立环境已验证公共 npm 首装和 0.3.9 tgz 迁移；跨 npm 版本升级使用本地测试 registry 验证。配置保留不等于验证数据库真实连接。
 
-| 项目 | 结果与范围 |
-| --- | --- |
-| npm 首次安装 | 本地 registry 安装五个 0.3.10 包；独立 DSH 启动，插件页显示五包，tool 详情显示 npm 包名与版本。 |
-| npm 升级 | 0.3.8 → 0.3.10；五包版本一致、bundle 无重复、宿主组合配置通过。 |
-| tgz 转 npm | 分别安装 0.3.8 和 0.3.9 tgz，再安装 npm 0.3.10；依赖由 file 路径改为精确版本，重启成功。 |
-| API Key 保留 | 安装后的真实 CLI 凭据读取器识别测试环境 Key；真实 `~/.limix/config.json` 前后哈希不变。未向服务发送测试 Key。 |
-| 数据源保留 | 配置文件字节不变；重启后设置页仍显示测试连接，配置路由返回 200。此项验证配置保留，未连接该虚拟数据库。 |
-| 默认模式保留 | profile 中 standard 选择未改写；重启后新会话显示 Standard mode。 |
-| 最低版本 | 当前 rc.5 实际启动；调用宿主原生兼容检查，rc.4 与 0.2.0 被拒绝。 |
-| 打包内容 | 五包入口/资源/Python 模块、版本、哈希、公开发布配置检查通过；无 node_modules、缓存、环境文件或本机绝对路径。 |
-| 发布预演 | 五包 `npm publish --dry-run --ignore-scripts --json` 通过；没有实际 publish。 |
-
-mysql2 解析到 3.24.6 时，pnpm 提示缺少类型 peer `@types/node`。它不影响已验证的 JavaScript 宿主加载和数据源配置页，本次保留记录，未给使用者强加 TypeScript 开发依赖。
-
-**未验收：**Windows/第二台电脑、独立环境中的真实预测和数据库查询。已有 UI 真实调用与 v0.3.9 完整回归另见 UI review。报告仍需人工审阅；光学20变量无向解释上游失败未修复。
-
-## 公共 npm 发布后验收
-
-2026-11-02：五包均已发布为0.3.10。逐包从公共registry读取版本、许可证与integrity，再下载tarball核对SHA256；与GitHub Release全部一致。使用全新DSH_HOME完成公共npm首装和0.3.9 tgz→npm迁移，五包版本、配置与默认模式保留。重启DSH后，插件页显示npm包来源，数据源配置页加载成功。无需私人MCP即可安装插件。
-
-发布过程中npm先返回“正在处理”，公共下载曾短暂404；待五包均可下载后才执行最终验收，没有把提交成功当成安装成功。当前还没有上一版公共npm版本，npm→npm跨版本升级仍以本地registry测试为依据。
+详细历史结果、peer 提示和未验收项见 [分发审查](reviews/npm-distribution-review.md)。Windows、第二台电脑及隔离环境的真实预测和数据库查询尚未验收。报告仍需人工审阅；光学 20 变量无向解释上游错误未修复。
 
 ## 维护者发布步骤
 
@@ -89,8 +67,8 @@ mysql2 解析到 3.24.6 时，pnpm 提示缺少类型 peer `@types/node`。它�
 2. 将确认后的元数据提交；在干净提交运行 `./release.sh`，再运行 `node scripts/npm-preflight.mjs`。清单必须 `source_dirty: false`。
 3. 用户批准后，发布这批已经核验的五个 tgz；不要临时从目录重新打出不同内容。
 4. 从公共 npm 按固定版本安装到新 profile，核对五包版本与 tarball integrity，再创建对应 GitHub Release，上传同一批 tgz、manifest 和 SHA256SUMS。
-5. 两种渠道均可用后，将上方安装说明同步到 GTM 和飞书；去掉“发布后启用”。
+5. 两种渠道均可用后，将上方安装说明同步到 GTM 和飞书。
 
-公共 npm 验收记录在 reviews/npm-distribution-review.md 更新。本文可供 GTM 与飞书同步，本轮不自动修改线上页面。
+公共 npm 验收记录在 reviews/npm-distribution-review.md 更新。对外安装页面应引用本文的同版本安装指令。
 
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md

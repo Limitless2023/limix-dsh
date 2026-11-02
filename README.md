@@ -16,7 +16,7 @@
 
 安装步骤见 [INSTALL.md](INSTALL.md)。下载预构建 tarball 后无需在用户机器编译。
 
-v0.3.10 延续“任务流程”页面，新增数据库日期和演示标识修复、时序输入预检及报告指引。
+v0.3.10 新增 npm 分发与许可说明；业务代码沿用 v0.3.9。
 
 v0.3.7 包含新版“任务流程”页面，按实际执行顺序展示数据准备、预测、解释、模型比较和报告。步骤详情与结果图表按需展开，报告可在侧栏预览。
 
@@ -40,7 +40,7 @@ v0.3.7：LimiX Agent 默认交付 Markdown 和带图 HTML。`limix report` 从�
 
 ## 运行依赖
 
-- DeepSeek Harness 桌面端；本次兼容验证针对 DSH 0.2.1 的插件接口。
+- DeepSeek Harness 0.2.1-rc.5 或以上；当前实机验证版本为 0.2.1-rc.5。
 - Python 3.8+；预测、解释仅用标准库。
 - LimiX API 凭据：环境变量 `LIMIX_API_KEY`，或已有 `~/.limix/config.json`。不要将密钥粘贴到聊天或提交仓库。
 - 自动分析环境需要 Python 3.12+，默认安装固定依赖；不代装 Python 本体或系统原生库。已有环境可通过比较命令的 `--python` 指定。
@@ -75,7 +75,7 @@ npm install --prefix packages/data
 
 `release.sh` 构建五个插件，核验 tarball 入口与全部 CLI 模块，写入 `dist/v<版本>/`，同时生成 `manifest.json` 和 `SHA256SUMS`。不自动上传或发布。
 
-已按 [HANDOVER.md](HANDOVER.md) §5 软链工具链的机器跳过 `npm install`；它会把软链换成真实目录。
+开发环境与插件挂载边界见 [开发指南](docs/DEVELOPMENT.md)。不要复用维护者机器上的依赖软链接。
 
 离线验证：
 
@@ -88,7 +88,7 @@ node --test benchmarks/tests/*.test.mjs
 .venv-benchmark/bin/python -m unittest discover -s benchmarks/tests -v
 ```
 
-代码边界见 [CLAUDE.md](CLAUDE.md)；本轮验收与真实界面证据见 [GOAL-PLAN.md](GOAL-PLAN.md)。
+代码边界见 [CLAUDE.md](CLAUDE.md)；用户验收方法见 [验收清单](docs/ACCEPTANCE.md)，历史审查结论见 [reviews](reviews/CLAUDE.md)。
 
 ## 自动环境与验证
 

@@ -3,3 +3,8 @@ dist/
 __pycache__/
 
 .DS_Store
+
+# 本机 PRD、内部交付记录和临时草稿不公开
+/docs/prd/
+/draft_*_folder/
+/.local/

@@ -45,3 +45,13 @@ UI reviewer 复核三项修复：按轮次展开业务步骤、同任务查询�
 独立DSH rc.5启动通过，浏览器插件页显示五包，tool详情显示dsh-limix-tool@0.3.10来源，数据源配置路由200且设置页显示保留的连接。证据：registry-verification.json、migration-results-039.json、public-five-plugins.png、public-tool-version.png、public-datasource-preserved.png，均位于Coffee/_recon/npm-public-validation。
 
 npm提交后有数分钟的处理期，期间404如实记录；待全部可下载才标记公共验收通过。尚无旧公共npm版本，跨npm版本升级仍是本地registry验收。Windows、真实API/数据库业务调用和后端解释问题保持原有未验收状态。
+
+## 0.3.11 发布与升级
+
+2026-11-02：用户明确要求在保留提示词已知问题的情况下发布。五包从干净提交0bf1988构建，完整自动检查与发布预检通过；npm五包固定版本和latest均为0.3.11，registry integrity与发布清单一致。GitHub Release v0.3.11上传同一批五个tgz、manifest及SHA256SUMS。
+
+独立DSH_HOME完成公共npm0.3.10→0.3.11升级，五包实际版本与精确依赖一致，无重复bundle。标准模式选择、数据源文件保持一致；假凭据通过实际读取器校验，用户真实API配置哈希不变。首次尝试时preset尚未完成npm处理而返回404；保留失败日志，待公共版本可用后重试通过。
+
+本机desktop五包已升级0.3.11，并正常退出、重开DSH。升级前备份；443个原有配置、凭据、会话、附件及其他文件哈希不变。package.json、pnpm-lock.yaml更新版本；pnpm-workspace.yaml仅将五包的新版本加入安装器生成的minimumReleaseAgeExclude，其他设置未变。桌面profile禁止CLI dump-config，未绕过此限制；没有将安装验证表述为桌面新会话实际预测验证。
+
+本轮没有重新做第二台电脑、Windows、完整业务API流程或截图验收；咨询推断、报告人工审阅与上游光学无向解释问题继续保留。独立升级证据位于Coffee/_recon/npm-0311-validation，构建测试位于Coffee/_recon/release-0.3.11-validation；不上传用户备份或凭据。

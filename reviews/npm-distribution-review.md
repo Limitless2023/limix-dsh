@@ -35,3 +35,13 @@ UI reviewer 复核三项修复：按轮次展开业务步骤、同任务查询�
 ## 2026-11-02 发布授权后
 
 用户批准npm发布并要求非商业用途授权。五包加入PolyForm Noncommercial 1.0.0原文、商业授权联系入口与第三方许可全文；cover历史MIT权利保留。预检增加许可证字段与三份许可文件逐字节检查。当前等待npm账号登录，不把dry-run记为已发布。
+
+## 公共 npm 验收完成
+
+2026-11-02：账号limix2026发布五包0.3.10；源码提交b9e282c，GitHub标签v0.3.10。五包公共registry元数据与真实下载均核对通过，integrity/SHA256与Release一致。
+
+全新DSH_HOME在Coffee/_recon/npm-public-validation/home：public-fresh首装通过；tgz039-migration从0.3.9 tgz迁移到公共npm0.3.10通过。五个实际安装版本与精确依赖一致，无重复bundle；profile标准模式选择、数据源文件和凭据读取检查通过，用户真实API配置哈希不变。
+
+独立DSH rc.5启动通过，浏览器插件页显示五包，tool详情显示dsh-limix-tool@0.3.10来源，数据源配置路由200且设置页显示保留的连接。证据：registry-verification.json、migration-results-039.json、public-five-plugins.png、public-tool-version.png、public-datasource-preserved.png，均位于Coffee/_recon/npm-public-validation。
+
+npm提交后有数分钟的处理期，期间404如实记录；待全部可下载才标记公共验收通过。尚无旧公共npm版本，跨npm版本升级仍是本地registry验收。Windows、真实API/数据库业务调用和后端解释问题保持原有未验收状态。

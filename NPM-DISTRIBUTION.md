@@ -1,6 +1,6 @@
 # LimiX 五插件 npm 分发
 
-版本：**0.3.10**。使用命令前确认公共 npm 的五包版本均可用；GitHub Release tgz 分发继续保留。
+版本：**0.3.10，五包已发布并通过公共 npm 下载、首装与 tgz 迁移验收**。GitHub Release tgz 分发继续保留。
 
 ## 发布方案
 
@@ -12,7 +12,7 @@
 
 包名在 2026-11-02 查询公共 registry 均不存在。这不代表已保留名称或已取得发布权限。发布账号为 `limix2026`。不要在聊天中发送 token。
 
-用户已批准公开发布，并选择非商业许可。五包自有代码统一采用 PolyForm Noncommercial 1.0.0；商业授权联系 Limitless。保留第三方许可、品牌权利及 cover 历史 MIT 权利，详见 LICENSING.md。发布仍需通过包内容预检与 npm 身份验证。
+用户已批准公开发布，并选择非商业许可。五包自有代码统一采用 PolyForm Noncommercial 1.0.0；商业授权联系 Limitless。保留第三方许可、品牌权利及 cover 历史 MIT 权利，详见 LICENSING.md。已使用 limix2026 完成发布。
 
 ## 支持条件
 
@@ -75,9 +75,15 @@ GitHub tgz 安装继续支持：从对应 Release 下载五个文件，在“插
 
 mysql2 解析到 3.24.6 时，pnpm 提示缺少类型 peer `@types/node`。它不影响已验证的 JavaScript 宿主加载和数据源配置页，本次保留记录，未给使用者强加 TypeScript 开发依赖。
 
-**未验收：**公共 npm 发布后的下载与安装权限、Windows/第二台电脑、独立环境中的真实预测和数据库查询。已有 UI 真实调用与 v0.3.9 完整回归另见 UI review。报告仍需人工审阅；光学20变量无向解释上游失败未修复。
+**未验收：**Windows/第二台电脑、独立环境中的真实预测和数据库查询。已有 UI 真实调用与 v0.3.9 完整回归另见 UI review。报告仍需人工审阅；光学20变量无向解释上游失败未修复。
 
-## 维护者发布前步骤
+## 公共 npm 发布后验收
+
+2026-11-02：五包均已发布为0.3.10。逐包从公共registry读取版本、许可证与integrity，再下载tarball核对SHA256；与GitHub Release全部一致。使用全新DSH_HOME完成公共npm首装和0.3.9 tgz→npm迁移，五包版本、配置与默认模式保留。重启DSH后，插件页显示npm包来源，数据源配置页加载成功。无需私人MCP即可安装插件。
+
+发布过程中npm先返回“正在处理”，公共下载曾短暂404；待五包均可下载后才执行最终验收，没有把提交成功当成安装成功。当前还没有上一版公共npm版本，npm→npm跨版本升级仍以本地registry测试为依据。
+
+## 维护者发布步骤
 
 1. 核对 LICENSING.md 与五包许可文件，登录有发布权限的 npm 账号。
 2. 将确认后的元数据提交；在干净提交运行 `./release.sh`，再运行 `node scripts/npm-preflight.mjs`。清单必须 `source_dirty: false`。

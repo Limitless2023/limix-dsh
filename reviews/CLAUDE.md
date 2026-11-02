@@ -2,6 +2,7 @@
 
 > L2 | 父级: ../CLAUDE.md
 
+npm-distribution-review.md - npm候选分发交叉审查、隔离安装/升级/迁移与待确认边界。
 ui-release-review.md - v0.3.9 UI独立审查、修复与验证边界。
 coffee-release-review.md - v0.3.8 数据库咖啡演示后的调用、日期与报告修复审查；保留人工审阅和未验收边界。
 scenarios-release-review.md - v0.3.7 报告、环境、输入与分发交叉审查；记录修复、最终检查和未验收项。

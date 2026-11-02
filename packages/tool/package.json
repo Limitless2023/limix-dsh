@@ -1,7 +1,6 @@
 {
   "name": "dsh-limix-tool",
-  "version": "0.3.9",
-  "private": true,
+  "version": "0.3.10",
   "description": "在 LimiX Agent 模式中执行数据上传、预测、解释和模型比较，并保存结果文件。",
   "type": "module",
   "main": "lib/index.js",
@@ -36,5 +35,21 @@
     "bundle": {
       "patch": "./cordis.patch.yml"
     }
+  },
+  "engines": {
+    "dsh": ">=0.2.1-rc.5"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Limitless2023/limix-dsh.git",
+    "directory": "packages/tool"
+  },
+  "homepage": "https://github.com/Limitless2023/limix-dsh#readme",
+  "bugs": {
+    "url": "https://github.com/Limitless2023/limix-dsh/issues"
   }
 }

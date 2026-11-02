@@ -1,7 +1,6 @@
 {
   "name": "dsh-limix-cover",
-  "version": "0.3.9",
-  "private": true,
+  "version": "0.3.10",
   "description": "LimiX brand cover for the blank-session hero and the sidebar brand row.",
   "type": "module",
   "main": "lib/index.js",
@@ -45,5 +44,21 @@
   "scripts": {
     "build": "node build.mjs"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "engines": {
+    "dsh": ">=0.2.1-rc.5"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Limitless2023/limix-dsh.git",
+    "directory": "packages/brand"
+  },
+  "homepage": "https://github.com/Limitless2023/limix-dsh#readme",
+  "bugs": {
+    "url": "https://github.com/Limitless2023/limix-dsh/issues"
+  }
 }

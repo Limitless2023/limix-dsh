@@ -8,7 +8,7 @@ tests/ - 对构建产物执行工具契约回归检查。
 assets/icon.png - 插件图标。
 locale/en.json - 英文插件名称与说明。
 locale/zh.json - 中文插件名称与说明。
-package.json - 插件入口、依赖与 build/test 命令。
+package.json - npm 公开分发元数据、最低 Harness rc.5 声明；插件入口、依赖与 build/test 命令。
 cordis.patch.yml - 挂载全局设置页与路由；不注册会话工具。
 tsdown.config.ts - 构建宿主 ESM 与浏览器工厂；数据库驱动保持 external。
 tsconfig.json - TypeScript 编译约束。

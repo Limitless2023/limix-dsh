@@ -5,7 +5,7 @@ TypeScript + React 18 + tsdown + Node.js + Python 3
 <directory>
 packages/agent/ - 预测、全量贡献热力图与完整关系网络，任务流程与 LimiX 专属首屏。
 packages/tool/ - preset 专用 API 工具与命令；复用 Agent 图表生成离线报告，受控下载结果。
-packages/preset/ - 声明 LimiX Agent 工具组合与新任务默认值；保留 profile 中的用户选择。
+packages/preset/ - 定义业务到 LimiX 任务落地的角色和工具组合；保留用户默认选择。
 packages/data/ - 数据源工具与设置页；局部地图见 CLAUDE.md。
 packages/brand/ - 会话封面与侧边栏品牌。
 benchmarks/ - 公开数据制备、固定拆分与多模型比较入口。

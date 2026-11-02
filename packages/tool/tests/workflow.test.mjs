@@ -13,7 +13,7 @@ import { registerPredictCommand } from '../src/host/predict-command.js'
 import { createCsvAccess } from '../src/host/csv-access.js'
 import { registerExplainCommand } from '../src/host/explain-command.js'
 
-test('构建产物在挂载时只注册一次三类流程，工具 schema 包含全部执行入口', async () => {
+test('构建产物在挂载时只注册一次四段流程，工具 schema 包含全部执行入口', async () => {
   const { apply } = await import('../lib/index.js')
   const sections = [], commands = [], tools = [], effects = []
   const ctx = {
@@ -26,7 +26,7 @@ test('构建产物在挂载时只注册一次三类流程，工具 schema 包含
   assert.equal(sections.length, 0, '导入模块不向全局注册提示词')
   apply(ctx)
   assert.deepEqual(sections.map(s => [s.name, s.order]), [
-    ['limix:predict-workflow', 500], ['limix:explain-workflow', 510], ['limix:benchmark-workflow', 520],
+    ['limix:predict-workflow', 500], ['limix:explain-workflow', 510], ['limix:benchmark-workflow', 520], ['limix:report-workflow', 530],
   ])
   assert.ok(sections.every(s => s.interpolate === false))
   assert.deepEqual(commands.map(c => c.name), ['limix-predict', 'limix-explain', 'limix-compare'])

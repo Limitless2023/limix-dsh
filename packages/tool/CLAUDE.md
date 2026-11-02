@@ -15,7 +15,7 @@ tests/ - 指标、命令入口、附件与 CSV 读取边界验证。
 LICENSE / LICENSING.md / THIRD-PARTY-NOTICES.md - 非商业许可、商业授权入口及历史/第三方权利。
 package.json - npm 公开分发元数据、最低 Harness rc.5 声明；宿主入口与分发文件清单。
 cordis.patch.yml - 空补丁；宿主仅由 LimiX preset 挂载。
-tsdown.config.ts - 构建宿主 ESM。
+tsdown.config.ts - 构建宿主 ESM；跨包图表统一 React 来源，避免服务端 hooks 实例分离。
 locale/ - 插件名称与说明。
 
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md

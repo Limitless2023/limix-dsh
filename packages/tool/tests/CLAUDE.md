@@ -7,7 +7,7 @@ test_upload.py - Unicode 与特殊上传文件名兼容；校验原文件、内�
 test_explain.py - 单条样本与原值对齐、异常参数、回执续查输入签名、降级和进度日志验证。
 test_explain_batch.py - 行选择、缺索引/错位拒绝、未知方向、带符号平均及全量导出。
 test_explain_timeseries.py - 预测版本、参数覆盖、矩阵长表校验、未知输出尺度、时间与续查契约。
-workflow.test.mjs - 验证构建后的三类流程注册、preset 默认配置与隔离、附件、取消、文件边界与超过1000条登记后的历史报告保留。
+workflow.test.mjs - 验证构建后的三类命令与报告工作流注册、preset 默认配置与隔离、附件、取消、文件边界与超过1000条登记后的历史报告保留。
 report.test.mjs - 六类图表、精确目标列与缺列指引、时序日期/历史边界、Markdown 保留、错位拒绝、输出保护、转义及已登记报告下载。
 运行：node --test packages/tool/tests/*.test.mjs；python3 -m unittest discover -s packages/tool/tests -v。
 

@@ -1,7 +1,7 @@
 /**
  * [INPUT]: 文件系统；宿主 webServer、tools、commands、systemPrompt 与 limixDatasource
  * [OUTPUT]: Cordis 插件 —— ① 注册 `limix` 与 `datasource`，限于当前 preset
- *           ② 注册三类命令、带图报告生成器与受控结果通道
+ *           ② 注册三类命令、带图报告生成器、报告工作流与受控结果通道
  * [POS]: dsh-limix-tool 的 preset 宿主入口；数据源设置与连接工厂由全局 data 包提供。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
@@ -12,6 +12,7 @@ import { registerLimixTool } from './host/tool.js'
 import { registerPredictCommand } from './host/predict-command.js'
 import { registerExplainCommand } from './host/explain-command.js'
 import { registerBenchmarkCommand } from './host/benchmark-command.js'
+import { registerReportWorkflow } from './host/report-workflow.js'
 import { createCsvAccess } from './host/csv-access.js'
 import { runReportCommand } from './report/index'
 export { runReportCommand } from './report/index'
@@ -42,6 +43,7 @@ export function apply(ctx: any, config: Config = {}): void {
   registerPredictCommand(ctx)
   registerExplainCommand(ctx)
   registerBenchmarkCommand(ctx)
+  registerReportWorkflow(ctx)
 
   ctx.effect(() => ctx.webServer.register({
     kind: 'exact', path: '/limix-ui/report-status',

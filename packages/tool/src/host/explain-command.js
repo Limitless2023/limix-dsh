@@ -1,12 +1,13 @@
 /**
  * [INPUT]: 宿主 commands、systemPrompt 与 Agent.followup；已接纳附件。
  * [OUTPUT]: 注册 /limix-explain，区分预测解释与关系探索，约束模型、范围、尺度与证据。
- * [POS]: LimiX preset 专属解释入口；复用 limix explain 工具与结果卡。
+ * [POS]: 区分咨询与已授权执行；LimiX preset 专属解释入口；复用 limix explain 工具与结果卡。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
 import { randomUUID } from 'node:crypto'
 
-const WORKFLOW = `当用户要求解释预测、分析影响因素、探索变量关系或使用 /limix-explain，先区分预测解释与关系探索：
+const WORKFLOW = `以下是执行指引，仅在用户已要求实际执行对应任务时应用；咨询能否做、讨论方法或只读检查不触发提交，也不需要先检查运行环境。已有执行授权继续有效，不重复确认。
+当用户要求解释预测、分析影响因素、探索变量关系或使用 /limix-explain，先区分预测解释与关系探索：
 1. 表格局部归因用 limix explain --mode local --train 参考CSV --data 待解释CSV --target 目标 --task-type regression或classification；单行用 --row，行号从1开始、不含表头。指定多行用 --rows 1-10 或 --rows 1,3,5-8，全部用 --rows all；row 与 rows 互斥。遵守本轮样本范围，不用数据说明中的示例行数覆盖需求，不额外先提交10行任务。工具会预检有限数值并识别具有唯一值证据的常见标识列；--features 可显式覆盖，返回 excluded_identifiers 保留追踪信息。不静默删除业务分类字段；非数值业务列须使用与原预测一致的编码。用户指定前10行就按原行号执行；用户只说“看一些典型样本”且已授权抽样时，分类可用 --sample-count 10 --sample-seed 42 --prediction 原预测CSV 按预测类别抽样。不能把这种均衡抽样当全体分布，更不能当误判抽样。
 2. 时序局部归因用 explain --mode local --task-type timeseries --result-version-id 已完成时序预测的结果版本ID。沿用原预测数据、目标、特征、窗口、步长和模型，不能再传 data/train/target/features/model/row/rows/prediction；行代表预测步。按任务类型补充必要参数：时序已有结果版本时不追问数据、目标或样本范围；表格缺数据、目标或样本范围时只问缺项。
 3. 全局关系探索用 explain --mode directed或undirected --data 含目标的CSV --target 目标 --features 特征1,特征2。所选列须为完整有限数值。保持默认阈值，不为让图更复杂而调阈值。边权是模型关系分数，不是增益、实验效应或已验证概率；与物理机制相符只称“一致”，不能声称证明因果或个体反事实。实验记录与模型发现分开，不自动请求预留自然语言报告接口。

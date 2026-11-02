@@ -5,6 +5,8 @@
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
 import { defineConfig } from 'tsdown'
+import { createRequire } from 'node:module'
+const require = createRequire(import.meta.url)
 
 export default defineConfig([
   {
@@ -15,6 +17,8 @@ export default defineConfig([
     dts: false,
     clean: false,
     fixedExtension: false,
+    // 跨包复用图表必须共用同一份 React，避免 hooks 与服务端 renderer 分离。
+    alias: { react: require.resolve('react'), 'react-dom': require.resolve('react-dom') },
     noExternal: [/^react(?:-dom)?(?:\/|$)/],
     define: { 'process.env.NODE_ENV': '"production"' },
   },

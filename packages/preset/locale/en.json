@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "LimiX Agent Preset",
-    "description": "Combines LimiX tools and prompts, defines how the agent works, and sets the default mode for new tasks while preserving saved user choices."
+    "description": "Combines language understanding and LimiX data intelligence to clarify business scenarios, define prediction tasks, and turn model results into business value; preserves saved default modes."
   }
 }

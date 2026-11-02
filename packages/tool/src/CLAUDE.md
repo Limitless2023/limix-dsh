@@ -11,4 +11,6 @@ host/csv-access.js - 持久记录成功结果，普通 CSV 限5MB，已登记解
 host/tool.js - Python CLI 与宿主 report 分流，登记报告副本和预览；比较等待独立环境。
 host/python-runtime.js - 激活预准备、状态、重试与取消等待。
 
+host/report-workflow.js - 将报告技术约束与核心角色分离，保持 preset 内注册。
+
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md

@@ -2,7 +2,7 @@
   "name": "dsh-limix-preset",
   "version": "0.3.10",
   "type": "module",
-  "description": "组合 LimiX 工具与提示词，定义 Agent 工作方式，并设置新任务默认模式；保留用户已保存的默认选择。",
+  "description": "文理双脑智能体：梳理业务场景，定义预测任务，让 LimiX 落地业务，创造价值；保留用户已保存的默认模式。",
   "files": [
     "cordis.patch.yml",
     "locale/*.json",

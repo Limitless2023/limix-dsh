@@ -18,10 +18,10 @@ var __commonJS = (cb$2, mod) => function() {
 	return mod || (0, cb$2[__getOwnPropNames(cb$2)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
 };
 var __copyProps = (to, from, except, desc) => {
-	if (from && typeof from === "object" || typeof from === "function") for (var keys = __getOwnPropNames(from), i = 0, n$3 = keys.length, key; i < n$3; i++) {
+	if (from && typeof from === "object" || typeof from === "function") for (var keys = __getOwnPropNames(from), i = 0, n$4 = keys.length, key; i < n$4; i++) {
 		key = keys[i];
 		if (!__hasOwnProp.call(to, key) && key !== except) __defProp(to, key, {
-			get: ((k$2) => from[k$2]).bind(null, key),
+			get: ((k$3) => from[k$3]).bind(null, key),
 			enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable
 		});
 	}
@@ -140,7 +140,7 @@ function resolveCli(config) {
 		process.env.LIMIX_CLI_PATH,
 		bundled
 	].filter(Boolean);
-	const found = tried.find((p$2) => existsSync(p$2));
+	const found = tried.find((p$3) => existsSync(p$3));
 	if (!found) throw new Error("limix CLI 未找到：包内 assets/limix.py 缺失。可用 LIMIX_CLI_PATH 指向 scripts/limix.py 覆盖。已尝试：" + (tried.join(" , ") || "（无候选）"));
 	return found;
 }
@@ -364,7 +364,7 @@ function registerLimixTool(ctx, config = {}) {
 						data.saved_to,
 						data.csv_path,
 						data.explanation?.detail_path
-					].filter((p$2) => typeof p$2 === "string");
+					].filter((p$3) => typeof p$3 === "string");
 					if (args.command === "report" && config.reports) {
 						await config.previews?.remember(data.preview_paths ?? [], args.workdir || process.cwd());
 						await config.reports.remember([
@@ -411,7 +411,8 @@ function registerLimixTool(ctx, config = {}) {
 
 //#endregion
 //#region src/host/predict-command.js
-const WORKFLOW$2 = `当用户要求预测、分类、回归、时序外推，或使用 /limix-predict，执行预测流程：
+const WORKFLOW$2 = `以下是执行指引，仅在用户已要求实际执行对应任务时应用；咨询能否做、讨论方法或只读检查不触发提交，也不需要先检查运行环境。已有执行授权继续有效，不重复确认。
+当用户要求预测、分类、回归、时序外推，或使用 /limix-predict，执行预测流程：
 1. 识别业务目标、训练数据、待预测数据与目标列，查看列名、样本和行数。任务类型由你根据数据判断：classify（类别）、regress（连续数值）、forecast（时间序列）。用户尚未给数据时只问必要信息，不要求用户选择内部命令。
 2. 核对特征在业务预测时点是否可获得，排除目标泄漏、事后信息和纯标识列。保留待预测数据的真实目标值供本地评估，不能把训练集直接当测试集。需要拆分时，分类分层，同一实体或重复样本按组，时序按时间；拆分规则不能按测试成绩调整。
 3. 通过一次 limix classify/regress/forecast 调用完成上传、提交、轮询和保存。直接传本地绝对路径给 --train 和 --predict，不先 upload 换成版本 ID，以保留本地评估来源。必须传 --target、--output，workdir 传会话工作目录；输出文件采用 limix-<目标列>-<时间戳>.csv。用户指定模型时必须显式传 --model（如 LIMIX_7M），不能遗漏后使用服务默认模型；未指定才使用默认。提交后核对回执中的实际模型，未知时不把期望模型写成已使用的模型；模型不符时如实说明并纠正，不混入指定模型的报告结论。
@@ -455,7 +456,8 @@ function registerPredictCommand(ctx) {
 
 //#endregion
 //#region src/host/explain-command.js
-const WORKFLOW$1 = `当用户要求解释预测、分析影响因素、探索变量关系或使用 /limix-explain，先区分预测解释与关系探索：
+const WORKFLOW$1 = `以下是执行指引，仅在用户已要求实际执行对应任务时应用；咨询能否做、讨论方法或只读检查不触发提交，也不需要先检查运行环境。已有执行授权继续有效，不重复确认。
+当用户要求解释预测、分析影响因素、探索变量关系或使用 /limix-explain，先区分预测解释与关系探索：
 1. 表格局部归因用 limix explain --mode local --train 参考CSV --data 待解释CSV --target 目标 --task-type regression或classification；单行用 --row，行号从1开始、不含表头。指定多行用 --rows 1-10 或 --rows 1,3,5-8，全部用 --rows all；row 与 rows 互斥。遵守本轮样本范围，不用数据说明中的示例行数覆盖需求，不额外先提交10行任务。工具会预检有限数值并识别具有唯一值证据的常见标识列；--features 可显式覆盖，返回 excluded_identifiers 保留追踪信息。不静默删除业务分类字段；非数值业务列须使用与原预测一致的编码。用户指定前10行就按原行号执行；用户只说“看一些典型样本”且已授权抽样时，分类可用 --sample-count 10 --sample-seed 42 --prediction 原预测CSV 按预测类别抽样。不能把这种均衡抽样当全体分布，更不能当误判抽样。
 2. 时序局部归因用 explain --mode local --task-type timeseries --result-version-id 已完成时序预测的结果版本ID。沿用原预测数据、目标、特征、窗口、步长和模型，不能再传 data/train/target/features/model/row/rows/prediction；行代表预测步。按任务类型补充必要参数：时序已有结果版本时不追问数据、目标或样本范围；表格缺数据、目标或样本范围时只问缺项。
 3. 全局关系探索用 explain --mode directed或undirected --data 含目标的CSV --target 目标 --features 特征1,特征2。所选列须为完整有限数值。保持默认阈值，不为让图更复杂而调阈值。边权是模型关系分数，不是增益、实验效应或已验证概率；与物理机制相符只称“一致”，不能声称证明因果或个体反事实。实验记录与模型发现分开，不自动请求预留自然语言报告接口。
@@ -502,7 +504,8 @@ function registerExplainCommand(ctx) {
 
 //#endregion
 //#region src/host/benchmark-command.js
-const WORKFLOW = `比较依赖由插件激活时预装到独立 Python 环境；先用 runtime status 查看状态，失败用 runtime prepare 重试。不得临时向系统 Python 安装依赖；需要自定义环境时才用 --python。
+const WORKFLOW = `以下是执行指引，仅在用户已要求实际执行对应任务时应用；咨询能否做、讨论方法或只读检查不触发提交，也不需要先检查运行环境。已有执行授权继续有效，不重复确认。
+比较依赖由插件激活时预装到独立 Python 环境；先用 runtime status 查看状态，失败用 runtime prepare 重试。不得临时向系统 Python 安装依赖；需要自定义环境时才用 --python。
 当用户要求比较 LimiX 与其他模型、比较不同 LimiX 模型，或使用 /limix-compare，执行固定拆分模型比较：
 1. 当前 benchmark 仅支持 regression/classification。时序比较尚未接入；收到时序比较请求时先说明边界，不能将任务伪装成回归比较或承诺自动完成。先明确数据、目标和独立测试集；同一数据集的所有模型使用完全相同的训练/测试拆分和特征，真值只用于本地评估。分类分层，同一实体或重复样本放在同组；不按成绩挑样本或删除差结果。
 2. 用 limix 工具 command=benchmark；manifest JSON 的 datasets 数组包含 id/name/task_type/target/train/predict/truth，文件相对 manifest 所在目录解析。遵守用户指定模型范围，未指定时默认 LIMIX_7M、LIMIX_16M、XGBoost 与均值/多数类 BASELINE；固定 --seed，保存唯一 --output 路径。核对特征在业务预测时点可获得，不能使用目标泄漏或事后信息。
@@ -544,6 +547,45 @@ function registerBenchmarkCommand(ctx) {
 }
 
 //#endregion
+//#region src/host/report-workflow.js
+/**
+* [INPUT]: preset 上下文的 systemPrompt 服务。
+* [OUTPUT]: registerReportWorkflow，注册报告生成、事实核验与文件交付指引。
+* [POS]: tool 报告工作流；仅在 LimiX preset 挂载，不注册额外工具或命令。
+* [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
+*/
+const REPORT_WORKFLOW = [
+	"仅在交付已执行任务的报告、或用户明确要求报告文件时应用以下规则；咨询与可行性初探不生成文件，不因本规则触发任何额外分析。",
+	"- 跟随用户语言，默认中文；从第一句进度开始，包括工具调用的可读标题和最终回复。代码、字段名、参数名保留原文。",
+	"- 完成预测、解释、模型比较或基于已执行结果的综合解读后，默认给出可独立阅读的业务分析报告，不只回复完成状态。先给核心结论，再按任务复杂度组织以下内容；多任务合成一份报告，不重复背景和数据。默认控制在一页左右（约 500–1000 中文字），结构为结论、业务与数据、效果与解释、边界与下一步、文件链接；简单任务更短，用户要求详细再展开。",
+	"- 业务背景与目标：说明本次要支持什么判断、预测什么对象。只引用用户说明或已核对的数据文档；背景未提供时明确“业务背景未提供”，不虚构客户、生产流程、成本或收益，也不为写报告阻塞已可执行的任务。",
+	"- 数据与方法：交代来源或文件、训练/参考与测试样本数、目标与已知单位、实际使用的特征或特征类别、拆分规则和模型。时序补充历史区间、频率及预测区间。信息未返回或未核对时标明未知；没有工艺列就不能说使用了工艺数据。只解释实际执行的步骤，不把预测说成训练 LimiX。",
+	"- 结果与效果：围绕业务解读已返回的关键指标，说明越高或越低越好及已知单位；比较多个模型时可用紧凑表格。不靠单个指标宣称可上线。没有真值时明确尚无法评估误差；没有业务容差时不凭空认定误差可接受。",
+	"- 证据不足时不强行凑“关键发现”：预测范围、误差、排序与机理是不同结论。预测值及目标范围只描述输出，不能证明准确性、物理合理性、特征覆盖或没有外推；MAE 改善不能证明排序更好。未做归因、分布检查或实验，不从少量特征与预测排序推断驱动机制、样本稀疏性或不确定性，也不借领域常识补成数据发现。",
+	"- 仅执行预测且无真值时，报告已知背景、数据与模型、预测范围或排序、无法评估误差及待补证据。用户已请求并完成的解释仍可报告真实返回，但不能据此证明预测精度。如实说明沿用的文件划分；待预测集无真值不等于无法从带标签参考集做留出验证，但不擅自追加用户未请求的验证任务。",
+	"- 已明确范围的执行任务，其结果报告围绕已核对的输入和工具结果，不为丰富报告额外追加数据审计、分位统计、排序检验、残差诊断或机理推断。可行性评估允许必要的只读数据检查和方法调研；用户已要求的诊断或验证按授权范围开展，不必等待再次追问。粗分组样本数不能排除覆盖不足，也不能证明残差原因。",
+	"- 局部贡献报告概述主要 2–3 项及解释范围，批量使用返回的带正负平均贡献；关系探索概述实际返回的节点、边和关系分数，不套贡献均值。不增加“平均绝对贡献”，不重复全量特征或逐样本明细，不尝试从贡献分数还原预测值，不套用未核实的 regression_scale 换算公式。",
+	"- 下一步只给当前证据支持的行动，不编造命令或换算关系。MAE 不能直接换算误判率；需独立真值与逐样本预测，按业务阈值另行评估。只看到 CSV 不能证明提交次数、模型训练过程或不存在数据泄漏。",
+	"- 关键发现与使用边界：解释本次结果支持哪些判断、哪些尚待验证，并给出有依据的下一步。解释与比较遵守各自流程规则；失败、部分成功、缺失结果、小样本和未验证尺度须在相应结论旁说明，不把限制堆成通用免责声明。用户指定的模型或范围未满足时，开头就说明哪项未完成，不能用其他模型的成功结果宣称全部完成。",
+	"- 交付：默认保存同一份报告的 Markdown 和带图 HTML，优先用户指定目录，使用唯一绝对路径。先准备图表清单，用 report --manifest 清单.json --inspect 获取指标、方向、日期、样本范围等程序事实，再写 Markdown；通过 limix 工具 command=report 生成 HTML。首次用 report --help 查看格式。图表只选本次已完成任务的真实结果：回归散点、分类混淆矩阵、时序曲线、贡献热力图、关系图、模型比较图；解释使用 explanation.detail_path 的完整视图。无真值时省略效果对照图；不为凑图追加预测或解释。核对图中模型、目标、样本范围与正文一致，每张图配一句有证据的业务解读。MAE/RMSE 是越低越好的误差指标，R² 是越高越好的拟合优度；不能统称“三项误差更低”。日期和星期使用程序事实，不自行映射 weekday 的整数值。只有平均贡献时不能推断贡献随时间单调变化。解释矩阵的 scores、directions、feature_values 按 feature_names 对齐；features 是排序后的汇总，严禁拿它的顺序解释矩阵列。优先引用 report --inspect 给出的具名平均贡献和正负样本数。正文可用单行图表标记安排插图，未指定位置的图自动追加。",
+	"- 时序报告的 target 填原始业务目标名，例如 cups_sold，预测 CSV 列 pred_cups_sold 由工具匹配；source 使用原始结果 CSV，保留分位数列。先 report --inspect，正文文件落盘后才生成 HTML。失败时按具体缺列或缺文件修正，不猜格式、不搜索应用安装目录、不通过删列排错；同一原因纠正一次仍失败则报告阻塞并保留文件。",
+	"- 汇总数量（如杯数）、配方换算、基线改善比例和多窗口汇总由一个确定性脚本从原始结果计算，生成数值表和正文数字片段后复用，禁止在正文重新手敲。累计量先汇总未舍入值，最后统一舍入；确需逐日取整再相加时明确说明。预测区间不等于已验证覆盖率；生成后核对正文、表格和来源文件。",
+	"- 不把逐日分位数之和称为整段时间的分位数，也不能用它与人工备料余量“互相印证”。不同特征组的预测差异不能直接归因于其中一个变量，更不能称为干预收益。备料换算只输出预计消耗；缺少库存、在途、损耗、保质期和配送周期时不建议按预测量直接下单，易腐原料须按配送周期核对分批用量。",
+	"- 报告开头只写一个标题；按业务问题、数据范围、本次观测、图表证据、待验证解释和行动建议组织。版本变更记录放末尾，不占用首屏。检查句子完整、括号配对、术语首次说明。不把常数基线对照写成模型内部机制的证明。",
+	"- 图表预览使用 report 结果卡自动提供的预览和 HTML 链接，不直接把本地 SVG 路径写成 Markdown 图片；预览不可用时提供 HTML，不重新生成预测。",
+	"- 写入前检查不覆盖输入或已有文件，生成后确认报告可读，再列出工具返回的 markdown_path、report_path 和结果链接；这些稳定版本优先于工作区临时副本。HTML 内嵌图表，可离线阅读。HTML 失败时保留 Markdown，并说明失败原因，不能把单份 Markdown 称为双格式交付。用户明确只要一种格式或不要文件时遵从。",
+	"- 报告解释业务意义并复用结果图，不逐行抄表或堆全部字段和内部状态码。简单追问、状态查询及用户明确要求简短时直接短答，不套整份报告、不额外生成报告文件；用户要求详细报告时再展开证据和方法。"
+].join("\n");
+function registerReportWorkflow(ctx) {
+	ctx.systemPrompt.section({
+		name: "limix:report-workflow",
+		order: 530,
+		text: REPORT_WORKFLOW,
+		interpolate: false
+	});
+}
+
+//#endregion
 //#region src/host/csv-access.js
 let writes = Promise.resolve();
 const DEFAULT_MAX_BYTES = 5e6;
@@ -556,7 +598,7 @@ function createCsvAccess(roots, receiptPath = join(homedir(), ".limix", "dsh-csv
 	const readReceipts = async () => {
 		try {
 			const data = JSON.parse(await readFile(receiptPath, "utf8"));
-			return new Set(Array.isArray(data) ? data.filter((p$2) => typeof p$2 === "string" && isAbsolute(p$2)) : []);
+			return new Set(Array.isArray(data) ? data.filter((p$3) => typeof p$3 === "string" && isAbsolute(p$3)) : []);
 		} catch {
 			return /* @__PURE__ */ new Set();
 		}
@@ -645,8 +687,8 @@ function renderMarkdown(markdown, figures) {
 		}
 		const heading = line.match(/^(#{1,6})\s+(.+)$/);
 		if (heading) {
-			const n$3 = heading[1].length;
-			blocks.push(`<h${n$3}>${inline(heading[2])}</h${n$3}>`);
+			const n$4 = heading[1].length;
+			blocks.push(`<h${n$4}>${inline(heading[2])}</h${n$4}>`);
 			continue;
 		}
 		if (/^[-*_]{3,}$/.test(line)) {
@@ -708,11 +750,11 @@ function weekday(date) {
 }
 function factsMarkdown(title, facts) {
 	const cell = (s$1) => String(s$1).replace(/\|/g, "／").replace(/[\r\n]/g, " ");
-	return `### ${cell(title)}\n\n| 项目 | 本次结果 | 说明 |\n| --- | --- | --- |\n` + facts.map((f$1) => `| ${cell(f$1.name)} | ${cell(f$1.value)} | ${cell(f$1.meaning ?? "")} |`).join("\n");
+	return `### ${cell(title)}\n\n| 项目 | 本次结果 | 说明 |\n| --- | --- | --- |\n` + facts.map((f$2) => `| ${cell(f$2.name)} | ${cell(f$2.value)} | ${cell(f$2.meaning ?? "")} |`).join("\n");
 }
 function factsHtml(facts) {
 	if (!facts.length) return "";
-	return "<details class=\"verified-facts\" open><summary>已核验数据 · 程序生成</summary><div class=\"table-scroll\"><table><thead><tr><th>项目</th><th>本次结果</th><th>说明</th></tr></thead><tbody>" + facts.map((f$1) => `<tr><td>${escapeHtml(f$1.name)}</td><td>${escapeHtml(f$1.value)}</td><td>${escapeHtml(f$1.meaning ?? "")}</td></tr>`).join("") + "</tbody></table></div></details>";
+	return "<details class=\"verified-facts\" open><summary>已核验数据 · 程序生成</summary><div class=\"table-scroll\"><table><thead><tr><th>项目</th><th>本次结果</th><th>说明</th></tr></thead><tbody>" + facts.map((f$2) => `<tr><td>${escapeHtml(f$2.name)}</td><td>${escapeHtml(f$2.value)}</td><td>${escapeHtml(f$2.meaning ?? "")}</td></tr>`).join("") + "</tbody></table></div></details>";
 }
 /** 确定性文案检查；只拦截明确冲突，不把自然语言审查冒充完整事实验证。 */
 function validateNarrative(markdown) {
@@ -733,9 +775,9 @@ function validateNarrative(markdown) {
 }
 
 //#endregion
-//#region ../../../../DeepSeek_Harness/packages/limix-ui/node_modules/.pnpm/react@18.3.1/node_modules/react/cjs/react.production.min.js
-var require_react_production_min = /* @__PURE__ */ __commonJS({ "../../../../DeepSeek_Harness/packages/limix-ui/node_modules/.pnpm/react@18.3.1/node_modules/react/cjs/react.production.min.js": ((exports) => {
-	var l$3 = Symbol.for("react.element"), n$2 = Symbol.for("react.portal"), p$1 = Symbol.for("react.fragment"), q$3 = Symbol.for("react.strict_mode"), r$2 = Symbol.for("react.profiler"), t$2 = Symbol.for("react.provider"), u$2 = Symbol.for("react.context"), v$1 = Symbol.for("react.forward_ref"), w$2 = Symbol.for("react.suspense"), x$2 = Symbol.for("react.memo"), y$1 = Symbol.for("react.lazy"), z$2 = Symbol.iterator;
+//#region node_modules/react/cjs/react.production.min.js
+var require_react_production_min = /* @__PURE__ */ __commonJS({ "node_modules/react/cjs/react.production.min.js": ((exports) => {
+	var l$4 = Symbol.for("react.element"), n$3 = Symbol.for("react.portal"), p$2 = Symbol.for("react.fragment"), q$4 = Symbol.for("react.strict_mode"), r$2 = Symbol.for("react.profiler"), t$2 = Symbol.for("react.provider"), u$2 = Symbol.for("react.context"), v$1 = Symbol.for("react.forward_ref"), w$2 = Symbol.for("react.suspense"), x$2 = Symbol.for("react.memo"), y$1 = Symbol.for("react.lazy"), z$2 = Symbol.iterator;
 	function A$2(a) {
 		if (null === a || "object" !== typeof a) return null;
 		a = z$2 && a[z$2] || a["@@iterator"];
@@ -782,19 +824,19 @@ var require_react_production_min = /* @__PURE__ */ __commonJS({ "../../../../Dee
 		__source: !0
 	};
 	function M$2(a, b, e) {
-		var d, c = {}, k$2 = null, h = null;
-		if (null != b) for (d in void 0 !== b.ref && (h = b.ref), void 0 !== b.key && (k$2 = "" + b.key), b) J$2.call(b, d) && !L$2.hasOwnProperty(d) && (c[d] = b[d]);
+		var d, c = {}, k$3 = null, h = null;
+		if (null != b) for (d in void 0 !== b.ref && (h = b.ref), void 0 !== b.key && (k$3 = "" + b.key), b) J$2.call(b, d) && !L$2.hasOwnProperty(d) && (c[d] = b[d]);
 		var g = arguments.length - 2;
 		if (1 === g) c.children = e;
 		else if (1 < g) {
-			for (var f$1 = Array(g), m$1 = 0; m$1 < g; m$1++) f$1[m$1] = arguments[m$1 + 2];
-			c.children = f$1;
+			for (var f$2 = Array(g), m$2 = 0; m$2 < g; m$2++) f$2[m$2] = arguments[m$2 + 2];
+			c.children = f$2;
 		}
 		if (a && a.defaultProps) for (d in g = a.defaultProps, g) void 0 === c[d] && (c[d] = g[d]);
 		return {
-			$$typeof: l$3,
+			$$typeof: l$4,
 			type: a,
-			key: k$2,
+			key: k$3,
 			ref: h,
 			props: c,
 			_owner: K$2.current
@@ -802,7 +844,7 @@ var require_react_production_min = /* @__PURE__ */ __commonJS({ "../../../../Dee
 	}
 	function N$2(a, b) {
 		return {
-			$$typeof: l$3,
+			$$typeof: l$4,
 			type: a.type,
 			key: b,
 			ref: a.ref,
@@ -811,7 +853,7 @@ var require_react_production_min = /* @__PURE__ */ __commonJS({ "../../../../Dee
 		};
 	}
 	function O$2(a) {
-		return "object" === typeof a && null !== a && a.$$typeof === l$3;
+		return "object" === typeof a && null !== a && a.$$typeof === l$4;
 	}
 	function escape$1(a) {
 		var b = {
@@ -827,18 +869,18 @@ var require_react_production_min = /* @__PURE__ */ __commonJS({ "../../../../Dee
 		return "object" === typeof a && null !== a && null != a.key ? escape$1("" + a.key) : b.toString(36);
 	}
 	function R$2(a, b, e, d, c) {
-		var k$2 = typeof a;
-		if ("undefined" === k$2 || "boolean" === k$2) a = null;
+		var k$3 = typeof a;
+		if ("undefined" === k$3 || "boolean" === k$3) a = null;
 		var h = !1;
 		if (null === a) h = !0;
-		else switch (k$2) {
+		else switch (k$3) {
 			case "string":
 			case "number":
 				h = !0;
 				break;
 			case "object": switch (a.$$typeof) {
-				case l$3:
-				case n$2: h = !0;
+				case l$4:
+				case n$3: h = !0;
 			}
 		}
 		if (h) return h = a, c = c(h), a = "" === d ? "." + Q$2(h, 0) : d, I$2(c) ? (e = "", null != a && (e = a.replace(P$2, "$&/") + "/"), R$2(c, b, e, "", function(a$1) {
@@ -847,12 +889,12 @@ var require_react_production_min = /* @__PURE__ */ __commonJS({ "../../../../Dee
 		h = 0;
 		d = "" === d ? "." : d + ":";
 		if (I$2(a)) for (var g = 0; g < a.length; g++) {
-			k$2 = a[g];
-			var f$1 = d + Q$2(k$2, g);
-			h += R$2(k$2, b, e, f$1, c);
+			k$3 = a[g];
+			var f$2 = d + Q$2(k$3, g);
+			h += R$2(k$3, b, e, f$2, c);
 		}
-		else if (f$1 = A$2(a), "function" === typeof f$1) for (a = f$1.call(a), g = 0; !(k$2 = a.next()).done;) k$2 = k$2.value, f$1 = d + Q$2(k$2, g++), h += R$2(k$2, b, e, f$1, c);
-		else if ("object" === k$2) throw b = String(a), Error("Objects are not valid as a React child (found: " + ("[object Object]" === b ? "object with keys {" + Object.keys(a).join(", ") + "}" : b) + "). If you meant to render a collection of children, use an array instead.");
+		else if (f$2 = A$2(a), "function" === typeof f$2) for (a = f$2.call(a), g = 0; !(k$3 = a.next()).done;) k$3 = k$3.value, f$2 = d + Q$2(k$3, g++), h += R$2(k$3, b, e, f$2, c);
+		else if ("object" === k$3) throw b = String(a), Error("Objects are not valid as a React child (found: " + ("[object Object]" === b ? "object with keys {" + Object.keys(a).join(", ") + "}" : b) + "). If you meant to render a collection of children, use an array instead.");
 		return h;
 	}
 	function S$2(a, b, e) {
@@ -910,34 +952,34 @@ var require_react_production_min = /* @__PURE__ */ __commonJS({ "../../../../Dee
 		}
 	};
 	exports.Component = E$1;
-	exports.Fragment = p$1;
+	exports.Fragment = p$2;
 	exports.Profiler = r$2;
 	exports.PureComponent = G$2;
-	exports.StrictMode = q$3;
+	exports.StrictMode = q$4;
 	exports.Suspense = w$2;
 	exports.__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED = W$4;
 	exports.act = X$2;
 	exports.cloneElement = function(a, b, e) {
 		if (null === a || void 0 === a) throw Error("React.cloneElement(...): The argument must be a React element, but you passed " + a + ".");
-		var d = C({}, a.props), c = a.key, k$2 = a.ref, h = a._owner;
+		var d = C({}, a.props), c = a.key, k$3 = a.ref, h = a._owner;
 		if (null != b) {
-			void 0 !== b.ref && (k$2 = b.ref, h = K$2.current);
+			void 0 !== b.ref && (k$3 = b.ref, h = K$2.current);
 			void 0 !== b.key && (c = "" + b.key);
 			if (a.type && a.type.defaultProps) var g = a.type.defaultProps;
-			for (f$1 in b) J$2.call(b, f$1) && !L$2.hasOwnProperty(f$1) && (d[f$1] = void 0 === b[f$1] && void 0 !== g ? g[f$1] : b[f$1]);
+			for (f$2 in b) J$2.call(b, f$2) && !L$2.hasOwnProperty(f$2) && (d[f$2] = void 0 === b[f$2] && void 0 !== g ? g[f$2] : b[f$2]);
 		}
-		var f$1 = arguments.length - 2;
-		if (1 === f$1) d.children = e;
-		else if (1 < f$1) {
-			g = Array(f$1);
-			for (var m$1 = 0; m$1 < f$1; m$1++) g[m$1] = arguments[m$1 + 2];
+		var f$2 = arguments.length - 2;
+		if (1 === f$2) d.children = e;
+		else if (1 < f$2) {
+			g = Array(f$2);
+			for (var m$2 = 0; m$2 < f$2; m$2++) g[m$2] = arguments[m$2 + 2];
 			d.children = g;
 		}
 		return {
-			$$typeof: l$3,
+			$$typeof: l$4,
 			type: a.type,
 			key: c,
-			ref: k$2,
+			ref: k$3,
 			props: d,
 			_owner: h
 		};
@@ -1049,26 +1091,26 @@ var require_react_production_min = /* @__PURE__ */ __commonJS({ "../../../../Dee
 }) });
 
 //#endregion
-//#region ../../../../DeepSeek_Harness/packages/limix-ui/node_modules/.pnpm/react@18.3.1/node_modules/react/index.js
-var require_react = /* @__PURE__ */ __commonJS({ "../../../../DeepSeek_Harness/packages/limix-ui/node_modules/.pnpm/react@18.3.1/node_modules/react/index.js": ((exports, module) => {
+//#region node_modules/react/index.js
+var require_react = /* @__PURE__ */ __commonJS({ "node_modules/react/index.js": ((exports, module) => {
 	module.exports = require_react_production_min();
 }) });
 
 //#endregion
-//#region ../../../../DeepSeek_Harness/packages/limix-ui/node_modules/.pnpm/react-dom@18.3.1_react@18.3.1/node_modules/react-dom/cjs/react-dom-server-legacy.node.production.min.js
-var require_react_dom_server_legacy_node_production_min = /* @__PURE__ */ __commonJS({ "../../../../DeepSeek_Harness/packages/limix-ui/node_modules/.pnpm/react-dom@18.3.1_react@18.3.1/node_modules/react-dom/cjs/react-dom-server-legacy.node.production.min.js": ((exports) => {
-	var ea$1 = require_react(), fa$1 = __require("stream"), n$1 = Object.prototype.hasOwnProperty, ha$1 = /^[:A-Z_a-z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u02FF\u0370-\u037D\u037F-\u1FFF\u200C-\u200D\u2070-\u218F\u2C00-\u2FEF\u3001-\uD7FF\uF900-\uFDCF\uFDF0-\uFFFD][:A-Z_a-z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u02FF\u0370-\u037D\u037F-\u1FFF\u200C-\u200D\u2070-\u218F\u2C00-\u2FEF\u3001-\uD7FF\uF900-\uFDCF\uFDF0-\uFFFD\-.0-9\u00B7\u0300-\u036F\u203F-\u2040]*$/, ia$1 = {}, ja$1 = {};
+//#region node_modules/react-dom/cjs/react-dom-server-legacy.node.production.min.js
+var require_react_dom_server_legacy_node_production_min = /* @__PURE__ */ __commonJS({ "node_modules/react-dom/cjs/react-dom-server-legacy.node.production.min.js": ((exports) => {
+	var ea$1 = require_react(), fa$1 = __require("stream"), n$2 = Object.prototype.hasOwnProperty, ha$1 = /^[:A-Z_a-z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u02FF\u0370-\u037D\u037F-\u1FFF\u200C-\u200D\u2070-\u218F\u2C00-\u2FEF\u3001-\uD7FF\uF900-\uFDCF\uFDF0-\uFFFD][:A-Z_a-z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u02FF\u0370-\u037D\u037F-\u1FFF\u200C-\u200D\u2070-\u218F\u2C00-\u2FEF\u3001-\uD7FF\uF900-\uFDCF\uFDF0-\uFFFD\-.0-9\u00B7\u0300-\u036F\u203F-\u2040]*$/, ia$1 = {}, ja$1 = {};
 	function ka$1(a) {
-		if (n$1.call(ja$1, a)) return !0;
-		if (n$1.call(ia$1, a)) return !1;
+		if (n$2.call(ja$1, a)) return !0;
+		if (n$2.call(ia$1, a)) return !1;
 		if (ha$1.test(a)) return ja$1[a] = !0;
 		ia$1[a] = !0;
 		return !1;
 	}
-	function q$2(a, b, c, d, f$1, e, g) {
+	function q$3(a, b, c, d, f$2, e, g) {
 		this.acceptsBooleans = 2 === b || 3 === b || 4 === b;
 		this.attributeName = d;
-		this.attributeNamespace = f$1;
+		this.attributeNamespace = f$2;
 		this.mustUseProperty = c;
 		this.propertyName = a;
 		this.type = b;
@@ -1077,7 +1119,7 @@ var require_react_dom_server_legacy_node_production_min = /* @__PURE__ */ __comm
 	}
 	var r$1 = {};
 	"children dangerouslySetInnerHTML defaultValue defaultChecked innerHTML suppressContentEditableWarning suppressHydrationWarning style".split(" ").forEach(function(a) {
-		r$1[a] = new q$2(a, 0, !1, a, null, !1, !1);
+		r$1[a] = new q$3(a, 0, !1, a, null, !1, !1);
 	});
 	[
 		["acceptCharset", "accept-charset"],
@@ -1086,7 +1128,7 @@ var require_react_dom_server_legacy_node_production_min = /* @__PURE__ */ __comm
 		["httpEquiv", "http-equiv"]
 	].forEach(function(a) {
 		var b = a[0];
-		r$1[b] = new q$2(b, 1, !1, a[1], null, !1, !1);
+		r$1[b] = new q$3(b, 1, !1, a[1], null, !1, !1);
 	});
 	[
 		"contentEditable",
@@ -1094,7 +1136,7 @@ var require_react_dom_server_legacy_node_production_min = /* @__PURE__ */ __comm
 		"spellCheck",
 		"value"
 	].forEach(function(a) {
-		r$1[a] = new q$2(a, 2, !1, a.toLowerCase(), null, !1, !1);
+		r$1[a] = new q$3(a, 2, !1, a.toLowerCase(), null, !1, !1);
 	});
 	[
 		"autoReverse",
@@ -1102,10 +1144,10 @@ var require_react_dom_server_legacy_node_production_min = /* @__PURE__ */ __comm
 		"focusable",
 		"preserveAlpha"
 	].forEach(function(a) {
-		r$1[a] = new q$2(a, 2, !1, a, null, !1, !1);
+		r$1[a] = new q$3(a, 2, !1, a, null, !1, !1);
 	});
 	"allowFullScreen async autoFocus autoPlay controls default defer disabled disablePictureInPicture disableRemotePlayback formNoValidate hidden loop noModule noValidate open playsInline readOnly required reversed scoped seamless itemScope".split(" ").forEach(function(a) {
-		r$1[a] = new q$2(a, 3, !1, a.toLowerCase(), null, !1, !1);
+		r$1[a] = new q$3(a, 3, !1, a.toLowerCase(), null, !1, !1);
 	});
 	[
 		"checked",
@@ -1113,10 +1155,10 @@ var require_react_dom_server_legacy_node_production_min = /* @__PURE__ */ __comm
 		"muted",
 		"selected"
 	].forEach(function(a) {
-		r$1[a] = new q$2(a, 3, !0, a, null, !1, !1);
+		r$1[a] = new q$3(a, 3, !0, a, null, !1, !1);
 	});
 	["capture", "download"].forEach(function(a) {
-		r$1[a] = new q$2(a, 4, !1, a, null, !1, !1);
+		r$1[a] = new q$3(a, 4, !1, a, null, !1, !1);
 	});
 	[
 		"cols",
@@ -1124,10 +1166,10 @@ var require_react_dom_server_legacy_node_production_min = /* @__PURE__ */ __comm
 		"size",
 		"span"
 	].forEach(function(a) {
-		r$1[a] = new q$2(a, 6, !1, a, null, !1, !1);
+		r$1[a] = new q$3(a, 6, !1, a, null, !1, !1);
 	});
 	["rowSpan", "start"].forEach(function(a) {
-		r$1[a] = new q$2(a, 5, !1, a.toLowerCase(), null, !1, !1);
+		r$1[a] = new q$3(a, 5, !1, a.toLowerCase(), null, !1, !1);
 	});
 	var la$1 = /[\-:]([a-z])/g;
 	function ma$1(a) {
@@ -1135,11 +1177,11 @@ var require_react_dom_server_legacy_node_production_min = /* @__PURE__ */ __comm
 	}
 	"accent-height alignment-baseline arabic-form baseline-shift cap-height clip-path clip-rule color-interpolation color-interpolation-filters color-profile color-rendering dominant-baseline enable-background fill-opacity fill-rule flood-color flood-opacity font-family font-size font-size-adjust font-stretch font-style font-variant font-weight glyph-name glyph-orientation-horizontal glyph-orientation-vertical horiz-adv-x horiz-origin-x image-rendering letter-spacing lighting-color marker-end marker-mid marker-start overline-position overline-thickness paint-order panose-1 pointer-events rendering-intent shape-rendering stop-color stop-opacity strikethrough-position strikethrough-thickness stroke-dasharray stroke-dashoffset stroke-linecap stroke-linejoin stroke-miterlimit stroke-opacity stroke-width text-anchor text-decoration text-rendering underline-position underline-thickness unicode-bidi unicode-range units-per-em v-alphabetic v-hanging v-ideographic v-mathematical vector-effect vert-adv-y vert-origin-x vert-origin-y word-spacing writing-mode xmlns:xlink x-height".split(" ").forEach(function(a) {
 		var b = a.replace(la$1, ma$1);
-		r$1[b] = new q$2(b, 1, !1, a, null, !1, !1);
+		r$1[b] = new q$3(b, 1, !1, a, null, !1, !1);
 	});
 	"xlink:actuate xlink:arcrole xlink:role xlink:show xlink:title xlink:type".split(" ").forEach(function(a) {
 		var b = a.replace(la$1, ma$1);
-		r$1[b] = new q$2(b, 1, !1, a, "http://www.w3.org/1999/xlink", !1, !1);
+		r$1[b] = new q$3(b, 1, !1, a, "http://www.w3.org/1999/xlink", !1, !1);
 	});
 	[
 		"xml:base",
@@ -1147,19 +1189,19 @@ var require_react_dom_server_legacy_node_production_min = /* @__PURE__ */ __comm
 		"xml:space"
 	].forEach(function(a) {
 		var b = a.replace(la$1, ma$1);
-		r$1[b] = new q$2(b, 1, !1, a, "http://www.w3.org/XML/1998/namespace", !1, !1);
+		r$1[b] = new q$3(b, 1, !1, a, "http://www.w3.org/XML/1998/namespace", !1, !1);
 	});
 	["tabIndex", "crossOrigin"].forEach(function(a) {
-		r$1[a] = new q$2(a, 1, !1, a.toLowerCase(), null, !1, !1);
+		r$1[a] = new q$3(a, 1, !1, a.toLowerCase(), null, !1, !1);
 	});
-	r$1.xlinkHref = new q$2("xlinkHref", 1, !1, "xlink:href", "http://www.w3.org/1999/xlink", !0, !1);
+	r$1.xlinkHref = new q$3("xlinkHref", 1, !1, "xlink:href", "http://www.w3.org/1999/xlink", !0, !1);
 	[
 		"src",
 		"href",
 		"action",
 		"formAction"
 	].forEach(function(a) {
-		r$1[a] = new q$2(a, 1, !1, a.toLowerCase(), null, !0, !0);
+		r$1[a] = new q$3(a, 1, !1, a.toLowerCase(), null, !0, !0);
 	});
 	var t$1 = {
 		animationIterationCount: !0,
@@ -1223,7 +1265,7 @@ var require_react_dom_server_legacy_node_production_min = /* @__PURE__ */ __comm
 		a = "" + a;
 		var b = oa.exec(a);
 		if (b) {
-			var c = "", d, f$1 = 0;
+			var c = "", d, f$2 = 0;
 			for (d = b.index; d < a.length; d++) {
 				switch (a.charCodeAt(d)) {
 					case 34:
@@ -1243,11 +1285,11 @@ var require_react_dom_server_legacy_node_production_min = /* @__PURE__ */ __comm
 						break;
 					default: continue;
 				}
-				f$1 !== d && (c += a.substring(f$1, d));
-				f$1 = d + 1;
+				f$2 !== d && (c += a.substring(f$2, d));
+				f$2 = d + 1;
 				c += b;
 			}
-			a = f$1 !== d ? c + a.substring(f$1, d) : c;
+			a = f$2 !== d ? c + a.substring(f$2, d) : c;
 		}
 		return a;
 	}
@@ -1277,19 +1319,19 @@ var require_react_dom_server_legacy_node_production_min = /* @__PURE__ */ __comm
 	function ua$1(a, b, c) {
 		if ("object" !== typeof c) throw Error("The `style` prop expects a mapping from style properties to values, not a string. For example, style={{marginRight: spacing + 'em'}} when using JSX.");
 		b = !0;
-		for (var d in c) if (n$1.call(c, d)) {
-			var f$1 = c[d];
-			if (null != f$1 && "boolean" !== typeof f$1 && "" !== f$1) {
+		for (var d in c) if (n$2.call(c, d)) {
+			var f$2 = c[d];
+			if (null != f$2 && "boolean" !== typeof f$2 && "" !== f$2) {
 				if (0 === d.indexOf("--")) {
 					var e = u$1(d);
-					f$1 = u$1(("" + f$1).trim());
+					f$2 = u$1(("" + f$2).trim());
 				} else {
 					e = d;
 					var g = ta$1.get(e);
 					void 0 !== g ? e = g : (g = u$1(e.replace(pa$1, "-$1").toLowerCase().replace(qa$1, "-ms-")), ta$1.set(e, g), e = g);
-					f$1 = "number" === typeof f$1 ? 0 === f$1 || n$1.call(t$1, d) ? "" + f$1 : f$1 + "px" : u$1(("" + f$1).trim());
+					f$2 = "number" === typeof f$2 ? 0 === f$2 || n$2.call(t$1, d) ? "" + f$2 : f$2 + "px" : u$1(("" + f$2).trim());
 				}
-				b ? (b = !1, a.push(" style=\"", e, ":", f$1)) : a.push(";", e, ":", f$1);
+				b ? (b = !1, a.push(" style=\"", e, ":", f$2)) : a.push(";", e, ":", f$2);
 			}
 		}
 		b || a.push("\"");
@@ -1355,21 +1397,21 @@ var require_react_dom_server_legacy_node_production_min = /* @__PURE__ */ __comm
 	}
 	function wa$1(a, b, c, d) {
 		a.push(z$1(c));
-		var f$1 = c = null, e;
-		for (e in b) if (n$1.call(b, e)) {
+		var f$2 = c = null, e;
+		for (e in b) if (n$2.call(b, e)) {
 			var g = b[e];
 			if (null != g) switch (e) {
 				case "children":
 					c = g;
 					break;
 				case "dangerouslySetInnerHTML":
-					f$1 = g;
+					f$2 = g;
 					break;
 				default: w$1(a, d, e, g);
 			}
 		}
 		a.push(">");
-		x$1(a, f$1, c);
+		x$1(a, f$2, c);
 		return "string" === typeof c ? (a.push(u$1(c)), null) : c;
 	}
 	var xa$1 = /^[a-zA-Z][a-zA-Z:_\.\-\d]*$/, ya$1 = /* @__PURE__ */ new Map();
@@ -1382,14 +1424,14 @@ var require_react_dom_server_legacy_node_production_min = /* @__PURE__ */ __comm
 		}
 		return b;
 	}
-	function za$1(a, b, c, d, f$1) {
+	function za$1(a, b, c, d, f$2) {
 		switch (b) {
 			case "select":
 				a.push(z$1("select"));
 				var e = null, g = null;
-				for (l$4 in c) if (n$1.call(c, l$4)) {
-					var h = c[l$4];
-					if (null != h) switch (l$4) {
+				for (l$5 in c) if (n$2.call(c, l$5)) {
+					var h = c[l$5];
+					if (null != h) switch (l$5) {
 						case "children":
 							e = h;
 							break;
@@ -1398,96 +1440,96 @@ var require_react_dom_server_legacy_node_production_min = /* @__PURE__ */ __comm
 							break;
 						case "defaultValue":
 						case "value": break;
-						default: w$1(a, d, l$4, h);
+						default: w$1(a, d, l$5, h);
 					}
 				}
 				a.push(">");
 				x$1(a, g, e);
 				return e;
 			case "option":
-				g = f$1.selectedValue;
+				g = f$2.selectedValue;
 				a.push(z$1("option"));
-				var k$2 = h = null, m$1 = null;
-				var l$4 = null;
-				for (e in c) if (n$1.call(c, e)) {
-					var p$2 = c[e];
-					if (null != p$2) switch (e) {
+				var k$3 = h = null, m$2 = null;
+				var l$5 = null;
+				for (e in c) if (n$2.call(c, e)) {
+					var p$3 = c[e];
+					if (null != p$3) switch (e) {
 						case "children":
-							h = p$2;
+							h = p$3;
 							break;
 						case "selected":
-							m$1 = p$2;
+							m$2 = p$3;
 							break;
 						case "dangerouslySetInnerHTML":
-							l$4 = p$2;
+							l$5 = p$3;
 							break;
-						case "value": k$2 = p$2;
-						default: w$1(a, d, e, p$2);
+						case "value": k$3 = p$3;
+						default: w$1(a, d, e, p$3);
 					}
 				}
-				if (null != g) if (c = null !== k$2 ? "" + k$2 : va$1(h), ra$1(g)) {
+				if (null != g) if (c = null !== k$3 ? "" + k$3 : va$1(h), ra$1(g)) {
 					for (d = 0; d < g.length; d++) if ("" + g[d] === c) {
 						a.push(" selected=\"\"");
 						break;
 					}
 				} else "" + g === c && a.push(" selected=\"\"");
-				else m$1 && a.push(" selected=\"\"");
+				else m$2 && a.push(" selected=\"\"");
 				a.push(">");
-				x$1(a, l$4, h);
+				x$1(a, l$5, h);
 				return h;
 			case "textarea":
 				a.push(z$1("textarea"));
-				l$4 = g = e = null;
-				for (h in c) if (n$1.call(c, h) && (k$2 = c[h], null != k$2)) switch (h) {
+				l$5 = g = e = null;
+				for (h in c) if (n$2.call(c, h) && (k$3 = c[h], null != k$3)) switch (h) {
 					case "children":
-						l$4 = k$2;
+						l$5 = k$3;
 						break;
 					case "value":
-						e = k$2;
+						e = k$3;
 						break;
 					case "defaultValue":
-						g = k$2;
+						g = k$3;
 						break;
 					case "dangerouslySetInnerHTML": throw Error("`dangerouslySetInnerHTML` does not make sense on <textarea>.");
-					default: w$1(a, d, h, k$2);
+					default: w$1(a, d, h, k$3);
 				}
 				null === e && null !== g && (e = g);
 				a.push(">");
-				if (null != l$4) {
+				if (null != l$5) {
 					if (null != e) throw Error("If you supply `defaultValue` on a <textarea>, do not pass children.");
-					if (ra$1(l$4) && 1 < l$4.length) throw Error("<textarea> can only have at most one child.");
-					e = "" + l$4;
+					if (ra$1(l$5) && 1 < l$5.length) throw Error("<textarea> can only have at most one child.");
+					e = "" + l$5;
 				}
 				"string" === typeof e && "\n" === e[0] && a.push("\n");
 				null !== e && a.push(u$1("" + e));
 				return null;
 			case "input":
 				a.push(z$1("input"));
-				k$2 = l$4 = h = e = null;
-				for (g in c) if (n$1.call(c, g) && (m$1 = c[g], null != m$1)) switch (g) {
+				k$3 = l$5 = h = e = null;
+				for (g in c) if (n$2.call(c, g) && (m$2 = c[g], null != m$2)) switch (g) {
 					case "children":
 					case "dangerouslySetInnerHTML": throw Error("input is a self-closing tag and must neither have `children` nor use `dangerouslySetInnerHTML`.");
 					case "defaultChecked":
-						k$2 = m$1;
+						k$3 = m$2;
 						break;
 					case "defaultValue":
-						h = m$1;
+						h = m$2;
 						break;
 					case "checked":
-						l$4 = m$1;
+						l$5 = m$2;
 						break;
 					case "value":
-						e = m$1;
+						e = m$2;
 						break;
-					default: w$1(a, d, g, m$1);
+					default: w$1(a, d, g, m$2);
 				}
-				null !== l$4 ? w$1(a, d, "checked", l$4) : null !== k$2 && w$1(a, d, "checked", k$2);
+				null !== l$5 ? w$1(a, d, "checked", l$5) : null !== k$3 && w$1(a, d, "checked", k$3);
 				null !== e ? w$1(a, d, "value", e) : null !== h && w$1(a, d, "value", h);
 				a.push("/>");
 				return null;
 			case "menuitem":
 				a.push(z$1("menuitem"));
-				for (var B$2 in c) if (n$1.call(c, B$2) && (e = c[B$2], null != e)) switch (B$2) {
+				for (var B$2 in c) if (n$2.call(c, B$2) && (e = c[B$2], null != e)) switch (B$2) {
 					case "children":
 					case "dangerouslySetInnerHTML": throw Error("menuitems cannot have `children` nor `dangerouslySetInnerHTML`.");
 					default: w$1(a, d, B$2, e);
@@ -1497,12 +1539,12 @@ var require_react_dom_server_legacy_node_production_min = /* @__PURE__ */ __comm
 			case "title":
 				a.push(z$1("title"));
 				e = null;
-				for (p$2 in c) if (n$1.call(c, p$2) && (g = c[p$2], null != g)) switch (p$2) {
+				for (p$3 in c) if (n$2.call(c, p$3) && (g = c[p$3], null != g)) switch (p$3) {
 					case "children":
 						e = g;
 						break;
 					case "dangerouslySetInnerHTML": throw Error("`dangerouslySetInnerHTML` does not make sense on <title>.");
-					default: w$1(a, d, p$2, g);
+					default: w$1(a, d, p$3, g);
 				}
 				a.push(">");
 				return e;
@@ -1510,14 +1552,14 @@ var require_react_dom_server_legacy_node_production_min = /* @__PURE__ */ __comm
 			case "pre":
 				a.push(z$1(b));
 				g = e = null;
-				for (k$2 in c) if (n$1.call(c, k$2) && (h = c[k$2], null != h)) switch (k$2) {
+				for (k$3 in c) if (n$2.call(c, k$3) && (h = c[k$3], null != h)) switch (k$3) {
 					case "children":
 						e = h;
 						break;
 					case "dangerouslySetInnerHTML":
 						g = h;
 						break;
-					default: w$1(a, d, k$2, h);
+					default: w$1(a, d, k$3, h);
 				}
 				a.push(">");
 				if (null != g) {
@@ -1543,7 +1585,7 @@ var require_react_dom_server_legacy_node_production_min = /* @__PURE__ */ __comm
 			case "track":
 			case "wbr":
 				a.push(z$1(b));
-				for (var C$1 in c) if (n$1.call(c, C$1) && (e = c[C$1], null != e)) switch (C$1) {
+				for (var C$1 in c) if (n$2.call(c, C$1) && (e = c[C$1], null != e)) switch (C$1) {
 					case "children":
 					case "dangerouslySetInnerHTML": throw Error(b + " is a self-closing tag and must neither have `children` nor use `dangerouslySetInnerHTML`.");
 					default: w$1(a, d, C$1, e);
@@ -1558,12 +1600,12 @@ var require_react_dom_server_legacy_node_production_min = /* @__PURE__ */ __comm
 			case "font-face-format":
 			case "font-face-name":
 			case "missing-glyph": return wa$1(a, c, b, d);
-			case "html": return 0 === f$1.insertionMode && a.push("<!DOCTYPE html>"), wa$1(a, c, b, d);
+			case "html": return 0 === f$2.insertionMode && a.push("<!DOCTYPE html>"), wa$1(a, c, b, d);
 			default:
 				if (-1 === b.indexOf("-") && "string" !== typeof c.is) return wa$1(a, c, b, d);
 				a.push(z$1(b));
 				g = e = null;
-				for (m$1 in c) if (n$1.call(c, m$1) && (h = c[m$1], null != h)) switch (m$1) {
+				for (m$2 in c) if (n$2.call(c, m$2) && (h = c[m$2], null != h)) switch (m$2) {
 					case "children":
 						e = h;
 						break;
@@ -1575,7 +1617,7 @@ var require_react_dom_server_legacy_node_production_min = /* @__PURE__ */ __comm
 						break;
 					case "suppressContentEditableWarning":
 					case "suppressHydrationWarning": break;
-					default: ka$1(m$1) && "function" !== typeof h && "symbol" !== typeof h && a.push(" ", m$1, "=\"", u$1(h), "\"");
+					default: ka$1(m$2) && "function" !== typeof h && "symbol" !== typeof h && a.push(" ", m$2, "=\"", u$1(h), "\"");
 				}
 				a.push(">");
 				x$1(a, g, e);
@@ -1748,10 +1790,10 @@ var require_react_dom_server_legacy_node_production_min = /* @__PURE__ */ __comm
 		enqueueForceUpdate: function() {}
 	};
 	function gb$1(a, b, c, d) {
-		var f$1 = void 0 !== a.state ? a.state : null;
+		var f$2 = void 0 !== a.state ? a.state : null;
 		a.updater = fb$1;
 		a.props = c;
-		a.state = f$1;
+		a.state = f$2;
 		var e = {
 			queue: [],
 			replace: !1
@@ -1760,15 +1802,15 @@ var require_react_dom_server_legacy_node_production_min = /* @__PURE__ */ __comm
 		var g = b.contextType;
 		a.context = "object" === typeof g && null !== g ? g._currentValue2 : d;
 		g = b.getDerivedStateFromProps;
-		"function" === typeof g && (g = g(c, f$1), f$1 = null === g || void 0 === g ? f$1 : A$1({}, f$1, g), a.state = f$1);
+		"function" === typeof g && (g = g(c, f$2), f$2 = null === g || void 0 === g ? f$2 : A$1({}, f$2, g), a.state = f$2);
 		if ("function" !== typeof b.getDerivedStateFromProps && "function" !== typeof a.getSnapshotBeforeUpdate && ("function" === typeof a.UNSAFE_componentWillMount || "function" === typeof a.componentWillMount)) if (b = a.state, "function" === typeof a.componentWillMount && a.componentWillMount(), "function" === typeof a.UNSAFE_componentWillMount && a.UNSAFE_componentWillMount(), b !== a.state && fb$1.enqueueReplaceState(a, a.state, null), null !== e.queue && 0 < e.queue.length) if (b = e.queue, g = e.replace, e.queue = null, e.replace = !1, g && 1 === b.length) a.state = b[0];
 		else {
 			e = g ? b[0] : a.state;
-			f$1 = !0;
+			f$2 = !0;
 			for (g = g ? 1 : 0; g < b.length; g++) {
 				var h = b[g];
 				h = "function" === typeof h ? h.call(a, e, c, d) : h;
-				null != h && (f$1 ? (f$1 = !1, e = A$1({}, e, h)) : A$1(e, h));
+				null != h && (f$2 ? (f$2 = !1, e = A$1({}, e, h)) : A$1(e, h));
 			}
 			a.state = e;
 		}
@@ -1781,22 +1823,22 @@ var require_react_dom_server_legacy_node_production_min = /* @__PURE__ */ __comm
 	function ib$1(a, b, c) {
 		var d = a.id;
 		a = a.overflow;
-		var f$1 = 32 - G$1(d) - 1;
-		d &= ~(1 << f$1);
+		var f$2 = 32 - G$1(d) - 1;
+		d &= ~(1 << f$2);
 		c += 1;
-		var e = 32 - G$1(b) + f$1;
+		var e = 32 - G$1(b) + f$2;
 		if (30 < e) {
-			var g = f$1 - f$1 % 5;
+			var g = f$2 - f$2 % 5;
 			e = (d & (1 << g) - 1).toString(32);
 			d >>= g;
-			f$1 -= g;
+			f$2 -= g;
 			return {
-				id: 1 << 32 - G$1(b) + f$1 | c << f$1 | d,
+				id: 1 << 32 - G$1(b) + f$2 | c << f$2 | d,
 				overflow: e + a
 			};
 		}
 		return {
-			id: 1 << e | c << f$1 | d,
+			id: 1 << e | c << f$2 | d,
 			overflow: a
 		};
 	}
@@ -1871,7 +1913,7 @@ var require_react_dom_server_legacy_node_production_min = /* @__PURE__ */ __comm
 				var d = c[1];
 				a: if (null === d) d = !1;
 				else {
-					for (var f$1 = 0; f$1 < d.length && f$1 < b.length; f$1++) if (!nb$1(b[f$1], d[f$1])) {
+					for (var f$2 = 0; f$2 < d.length && f$2 < b.length; f$2++) if (!nb$1(b[f$2], d[f$2])) {
 						d = !1;
 						break a;
 					}
@@ -1962,8 +2004,8 @@ var require_react_dom_server_legacy_node_production_min = /* @__PURE__ */ __comm
 		return null;
 	}
 	function S$1() {}
-	function Cb$1(a, b, c, d, f$1, e, g, h, k$2) {
-		var m$1 = [], l$4 = /* @__PURE__ */ new Set();
+	function Cb$1(a, b, c, d, f$2, e, g, h, k$3) {
+		var m$2 = [], l$5 = /* @__PURE__ */ new Set();
 		b = {
 			destination: null,
 			responseState: b,
@@ -1974,44 +2016,44 @@ var require_react_dom_server_legacy_node_production_min = /* @__PURE__ */ __comm
 			allPendingTasks: 0,
 			pendingRootTasks: 0,
 			completedRootSegment: null,
-			abortableTasks: l$4,
-			pingedTasks: m$1,
+			abortableTasks: l$5,
+			pingedTasks: m$2,
 			clientRenderedBoundaries: [],
 			completedBoundaries: [],
 			partialBoundaries: [],
-			onError: void 0 === f$1 ? Bb$1 : f$1,
+			onError: void 0 === f$2 ? Bb$1 : f$2,
 			onAllReady: void 0 === e ? S$1 : e,
 			onShellReady: void 0 === g ? S$1 : g,
 			onShellError: void 0 === h ? S$1 : h,
-			onFatalError: void 0 === k$2 ? S$1 : k$2
+			onFatalError: void 0 === k$3 ? S$1 : k$3
 		};
 		c = T$1(b, 0, null, c, !1, !1);
 		c.parentFlushed = !0;
-		a = Db$1(b, a, null, c, l$4, $a$1, null, hb$1);
-		m$1.push(a);
+		a = Db$1(b, a, null, c, l$5, $a$1, null, hb$1);
+		m$2.push(a);
 		return b;
 	}
-	function Db$1(a, b, c, d, f$1, e, g, h) {
+	function Db$1(a, b, c, d, f$2, e, g, h) {
 		a.allPendingTasks++;
 		null === c ? a.pendingRootTasks++ : c.pendingTasks++;
-		var k$2 = {
+		var k$3 = {
 			node: b,
 			ping: function() {
 				var b$1 = a.pingedTasks;
-				b$1.push(k$2);
+				b$1.push(k$3);
 				1 === b$1.length && Eb(a);
 			},
 			blockedBoundary: c,
 			blockedSegment: d,
-			abortSet: f$1,
+			abortSet: f$2,
 			legacyContext: e,
 			context: g,
 			treeContext: h
 		};
-		f$1.add(k$2);
-		return k$2;
+		f$2.add(k$3);
+		return k$3;
 	}
-	function T$1(a, b, c, d, f$1, e) {
+	function T$1(a, b, c, d, f$2, e) {
 		return {
 			status: 0,
 			id: -1,
@@ -2021,7 +2063,7 @@ var require_react_dom_server_legacy_node_production_min = /* @__PURE__ */ __comm
 			children: [],
 			formatContext: d,
 			boundary: c,
-			lastPushedText: f$1,
+			lastPushedText: f$2,
 			textEmbedded: e
 		};
 	}
@@ -2037,16 +2079,16 @@ var require_react_dom_server_legacy_node_production_min = /* @__PURE__ */ __comm
 		c(b);
 		null !== a.destination ? (a.status = 2, a.destination.destroy(b)) : (a.status = 1, a.fatalError = b);
 	}
-	function Fb$1(a, b, c, d, f$1) {
+	function Fb$1(a, b, c, d, f$2) {
 		H$3 = {};
 		ob$1 = b;
 		M$1 = 0;
-		for (a = c(d, f$1); L$1;) L$1 = !1, M$1 = 0, O$1 += 1, J$1 = null, a = c(d, f$1);
+		for (a = c(d, f$2); L$1;) L$1 = !1, M$1 = 0, O$1 += 1, J$1 = null, a = c(d, f$2);
 		tb$1();
 		return a;
 	}
 	function Gb$1(a, b, c, d) {
-		var f$1 = c.render(), e = d.childContextTypes;
+		var f$2 = c.render(), e = d.childContextTypes;
 		if (null !== e && void 0 !== e) {
 			var g = b.legacyContext;
 			if ("function" !== typeof c.getChildContext) d = g;
@@ -2056,9 +2098,9 @@ var require_react_dom_server_legacy_node_production_min = /* @__PURE__ */ __comm
 				d = A$1({}, g, c);
 			}
 			b.legacyContext = d;
-			W$3(a, b, f$1);
+			W$3(a, b, f$2);
 			b.legacyContext = g;
-		} else W$3(a, b, f$1);
+		} else W$3(a, b, f$2);
 	}
 	function Hb$1(a, b) {
 		if (a && a.defaultProps) {
@@ -2069,36 +2111,36 @@ var require_react_dom_server_legacy_node_production_min = /* @__PURE__ */ __comm
 		}
 		return b;
 	}
-	function Ib$1(a, b, c, d, f$1) {
+	function Ib$1(a, b, c, d, f$2) {
 		if ("function" === typeof c) if (c.prototype && c.prototype.isReactComponent) {
-			f$1 = ab$1(c, b.legacyContext);
+			f$2 = ab$1(c, b.legacyContext);
 			var e = c.contextType;
-			e = new c(d, "object" === typeof e && null !== e ? e._currentValue2 : f$1);
-			gb$1(e, c, d, f$1);
+			e = new c(d, "object" === typeof e && null !== e ? e._currentValue2 : f$2);
+			gb$1(e, c, d, f$2);
 			Gb$1(a, b, e, c);
 		} else {
 			e = ab$1(c, b.legacyContext);
-			f$1 = Fb$1(a, b, c, d, e);
+			f$2 = Fb$1(a, b, c, d, e);
 			var g = 0 !== M$1;
-			if ("object" === typeof f$1 && null !== f$1 && "function" === typeof f$1.render && void 0 === f$1.$$typeof) gb$1(f$1, c, d, e), Gb$1(a, b, f$1, c);
+			if ("object" === typeof f$2 && null !== f$2 && "function" === typeof f$2.render && void 0 === f$2.$$typeof) gb$1(f$2, c, d, e), Gb$1(a, b, f$2, c);
 			else if (g) {
 				d = b.treeContext;
 				b.treeContext = ib$1(d, 1, 0);
 				try {
-					W$3(a, b, f$1);
+					W$3(a, b, f$2);
 				} finally {
 					b.treeContext = d;
 				}
-			} else W$3(a, b, f$1);
+			} else W$3(a, b, f$2);
 		}
 		else if ("string" === typeof c) {
-			f$1 = b.blockedSegment;
-			e = za$1(f$1.chunks, c, d, a.responseState, f$1.formatContext);
-			f$1.lastPushedText = !1;
-			g = f$1.formatContext;
-			f$1.formatContext = sa$1(g, c, d);
+			f$2 = b.blockedSegment;
+			e = za$1(f$2.chunks, c, d, a.responseState, f$2.formatContext);
+			f$2.lastPushedText = !1;
+			g = f$2.formatContext;
+			f$2.formatContext = sa$1(g, c, d);
 			Jb$1(a, b, e);
-			f$1.formatContext = g;
+			f$2.formatContext = g;
 			switch (c) {
 				case "area":
 				case "base":
@@ -2115,9 +2157,9 @@ var require_react_dom_server_legacy_node_production_min = /* @__PURE__ */ __comm
 				case "source":
 				case "track":
 				case "wbr": break;
-				default: f$1.chunks.push("</", c, ">");
+				default: f$2.chunks.push("</", c, ">");
 			}
-			f$1.lastPushedText = !1;
+			f$2.lastPushedText = !1;
 		} else {
 			switch (c) {
 				case Wa$1:
@@ -2134,7 +2176,7 @@ var require_react_dom_server_legacy_node_production_min = /* @__PURE__ */ __comm
 				case Qa$1:
 					a: {
 						c = b.blockedBoundary;
-						f$1 = b.blockedSegment;
+						f$2 = b.blockedSegment;
 						e = d.fallback;
 						d = d.children;
 						g = /* @__PURE__ */ new Set();
@@ -2148,28 +2190,28 @@ var require_react_dom_server_legacy_node_production_min = /* @__PURE__ */ __comm
 							byteSize: 0,
 							fallbackAbortableTasks: g,
 							errorDigest: null
-						}, k$2 = T$1(a, f$1.chunks.length, h, f$1.formatContext, !1, !1);
-						f$1.children.push(k$2);
-						f$1.lastPushedText = !1;
-						var m$1 = T$1(a, 0, null, f$1.formatContext, !1, !1);
-						m$1.parentFlushed = !0;
+						}, k$3 = T$1(a, f$2.chunks.length, h, f$2.formatContext, !1, !1);
+						f$2.children.push(k$3);
+						f$2.lastPushedText = !1;
+						var m$2 = T$1(a, 0, null, f$2.formatContext, !1, !1);
+						m$2.parentFlushed = !0;
 						b.blockedBoundary = h;
-						b.blockedSegment = m$1;
+						b.blockedSegment = m$2;
 						try {
-							if (Jb$1(a, b, d), a.responseState.generateStaticMarkup || m$1.lastPushedText && m$1.textEmbedded && m$1.chunks.push("<!-- -->"), m$1.status = 1, X$1(h, m$1), 0 === h.pendingTasks) break a;
-						} catch (l$4) {
-							m$1.status = 4, h.forceClientRender = !0, h.errorDigest = U$1(a, l$4);
+							if (Jb$1(a, b, d), a.responseState.generateStaticMarkup || m$2.lastPushedText && m$2.textEmbedded && m$2.chunks.push("<!-- -->"), m$2.status = 1, X$1(h, m$2), 0 === h.pendingTasks) break a;
+						} catch (l$5) {
+							m$2.status = 4, h.forceClientRender = !0, h.errorDigest = U$1(a, l$5);
 						} finally {
-							b.blockedBoundary = c, b.blockedSegment = f$1;
+							b.blockedBoundary = c, b.blockedSegment = f$2;
 						}
-						b = Db$1(a, e, c, k$2, g, b.legacyContext, b.context, b.treeContext);
+						b = Db$1(a, e, c, k$3, g, b.legacyContext, b.context, b.treeContext);
 						a.pingedTasks.push(b);
 					}
 					return;
 			}
 			if ("object" === typeof c && null !== c) switch (c.$$typeof) {
 				case Pa$1:
-					d = Fb$1(a, b, c.render, d, f$1);
+					d = Fb$1(a, b, c.render, d, f$2);
 					if (0 !== M$1) {
 						c = b.treeContext;
 						b.treeContext = ib$1(c, 1, 0);
@@ -2183,10 +2225,10 @@ var require_react_dom_server_legacy_node_production_min = /* @__PURE__ */ __comm
 				case Sa$1:
 					c = c.type;
 					d = Hb$1(c, d);
-					Ib$1(a, b, c, d, f$1);
+					Ib$1(a, b, c, d, f$2);
 					return;
 				case Na$1:
-					f$1 = d.children;
+					f$2 = d.children;
 					c = c._context;
 					d = d.value;
 					e = c._currentValue2;
@@ -2200,7 +2242,7 @@ var require_react_dom_server_legacy_node_production_min = /* @__PURE__ */ __comm
 						value: d
 					};
 					b.context = d;
-					W$3(a, b, f$1);
+					W$3(a, b, f$2);
 					a = D;
 					if (null === a) throw Error("Tried to pop a Context at the root of the app. This is a bug in React.");
 					d = a.parentValue;
@@ -2214,8 +2256,8 @@ var require_react_dom_server_legacy_node_production_min = /* @__PURE__ */ __comm
 					W$3(a, b, d);
 					return;
 				case Ta$1:
-					f$1 = c._init;
-					c = f$1(c._payload);
+					f$2 = c._init;
+					c = f$2(c._payload);
 					d = Hb$1(c, d);
 					Ib$1(a, b, c, d, void 0);
 					return;
@@ -2245,11 +2287,11 @@ var require_react_dom_server_legacy_node_production_min = /* @__PURE__ */ __comm
 			if (d && (d = d.call(c))) {
 				c = d.next();
 				if (!c.done) {
-					var f$1 = [];
+					var f$2 = [];
 					do
-						f$1.push(c.value), c = d.next();
+						f$2.push(c.value), c = d.next();
 					while (!c.done);
-					Kb$1(a, b, f$1);
+					Kb$1(a, b, f$2);
 				}
 				return;
 			}
@@ -2259,33 +2301,33 @@ var require_react_dom_server_legacy_node_production_min = /* @__PURE__ */ __comm
 		"string" === typeof c ? (d = b.blockedSegment, d.lastPushedText = Ha$1(b.blockedSegment.chunks, c, a.responseState, d.lastPushedText)) : "number" === typeof c && (d = b.blockedSegment, d.lastPushedText = Ha$1(b.blockedSegment.chunks, "" + c, a.responseState, d.lastPushedText));
 	}
 	function Kb$1(a, b, c) {
-		for (var d = c.length, f$1 = 0; f$1 < d; f$1++) {
+		for (var d = c.length, f$2 = 0; f$2 < d; f$2++) {
 			var e = b.treeContext;
-			b.treeContext = ib$1(e, d, f$1);
+			b.treeContext = ib$1(e, d, f$2);
 			try {
-				Jb$1(a, b, c[f$1]);
+				Jb$1(a, b, c[f$2]);
 			} finally {
 				b.treeContext = e;
 			}
 		}
 	}
 	function Jb$1(a, b, c) {
-		var d = b.blockedSegment.formatContext, f$1 = b.legacyContext, e = b.context;
+		var d = b.blockedSegment.formatContext, f$2 = b.legacyContext, e = b.context;
 		try {
 			return W$3(a, b, c);
-		} catch (k$2) {
-			if (tb$1(), "object" === typeof k$2 && null !== k$2 && "function" === typeof k$2.then) {
-				c = k$2;
+		} catch (k$3) {
+			if (tb$1(), "object" === typeof k$3 && null !== k$3 && "function" === typeof k$3.then) {
+				c = k$3;
 				var g = b.blockedSegment, h = T$1(a, g.chunks.length, null, g.formatContext, g.lastPushedText, !0);
 				g.children.push(h);
 				g.lastPushedText = !1;
 				a = Db$1(a, b.node, b.blockedBoundary, h, b.abortSet, b.legacyContext, b.context, b.treeContext).ping;
 				c.then(a, a);
 				b.blockedSegment.formatContext = d;
-				b.legacyContext = f$1;
+				b.legacyContext = f$2;
 				b.context = e;
 				F$1(e);
-			} else throw b.blockedSegment.formatContext = d, b.legacyContext = f$1, b.context = e, F$1(e), k$2;
+			} else throw b.blockedSegment.formatContext = d, b.legacyContext = f$2, b.context = e, F$1(e), k$3;
 		}
 	}
 	function Lb$1(a) {
@@ -2328,23 +2370,23 @@ var require_react_dom_server_legacy_node_production_min = /* @__PURE__ */ __comm
 			var d = R$1;
 			R$1 = a.responseState;
 			try {
-				var f$1 = a.pingedTasks, e;
-				for (e = 0; e < f$1.length; e++) {
-					var g = f$1[e];
-					var h = a, k$2 = g.blockedSegment;
-					if (0 === k$2.status) {
+				var f$2 = a.pingedTasks, e;
+				for (e = 0; e < f$2.length; e++) {
+					var g = f$2[e];
+					var h = a, k$3 = g.blockedSegment;
+					if (0 === k$3.status) {
 						F$1(g.context);
 						try {
-							W$3(h, g, g.node), h.responseState.generateStaticMarkup || k$2.lastPushedText && k$2.textEmbedded && k$2.chunks.push("<!-- -->"), g.abortSet.delete(g), k$2.status = 1, Mb$1(h, g.blockedBoundary, k$2);
+							W$3(h, g, g.node), h.responseState.generateStaticMarkup || k$3.lastPushedText && k$3.textEmbedded && k$3.chunks.push("<!-- -->"), g.abortSet.delete(g), k$3.status = 1, Mb$1(h, g.blockedBoundary, k$3);
 						} catch (y$2) {
 							if (tb$1(), "object" === typeof y$2 && null !== y$2 && "function" === typeof y$2.then) {
-								var m$1 = g.ping;
-								y$2.then(m$1, m$1);
+								var m$2 = g.ping;
+								y$2.then(m$2, m$2);
 							} else {
 								g.abortSet.delete(g);
-								k$2.status = 4;
-								var l$4 = g.blockedBoundary, p$2 = y$2, B$2 = U$1(h, p$2);
-								null === l$4 ? V$1(h, p$2) : (l$4.pendingTasks--, l$4.forceClientRender || (l$4.forceClientRender = !0, l$4.errorDigest = B$2, l$4.parentFlushed && h.clientRenderedBoundaries.push(l$4)));
+								k$3.status = 4;
+								var l$5 = g.blockedBoundary, p$3 = y$2, B$2 = U$1(h, p$3);
+								null === l$5 ? V$1(h, p$3) : (l$5.pendingTasks--, l$5.forceClientRender || (l$5.forceClientRender = !0, l$5.errorDigest = B$2, l$5.parentFlushed && h.clientRenderedBoundaries.push(l$5)));
 								h.allPendingTasks--;
 								if (0 === h.allPendingTasks) {
 									var C$1 = h.onAllReady;
@@ -2354,7 +2396,7 @@ var require_react_dom_server_legacy_node_production_min = /* @__PURE__ */ __comm
 						}
 					}
 				}
-				f$1.splice(0, e);
+				f$2.splice(0, e);
 				null !== a.destination && Ob$1(a, a.destination);
 			} catch (y$2) {
 				U$1(a, y$2), V$1(a, y$2);
@@ -2378,17 +2420,17 @@ var require_react_dom_server_legacy_node_production_min = /* @__PURE__ */ __comm
 				return b.push("\"></template>");
 			case 1:
 				c.status = 2;
-				var f$1 = !0;
+				var f$2 = !0;
 				d = c.chunks;
 				var e = 0;
 				c = c.children;
 				for (var g = 0; g < c.length; g++) {
-					for (f$1 = c[g]; e < f$1.index; e++) b.push(d[e]);
-					f$1 = Z$1(a, b, f$1);
+					for (f$2 = c[g]; e < f$2.index; e++) b.push(d[e]);
+					f$2 = Z$1(a, b, f$2);
 				}
 				for (; e < d.length - 1; e++) b.push(d[e]);
-				e < d.length && (f$1 = b.push(d[e]));
-				return f$1;
+				e < d.length && (f$2 = b.push(d[e]));
+				return f$2;
 			default: throw Error("Aborted, errored or already flushed boundaries should not be flushed again. This is a bug in React.");
 		}
 	}
@@ -2400,10 +2442,10 @@ var require_react_dom_server_legacy_node_production_min = /* @__PURE__ */ __comm
 		if (0 < d.pendingTasks) {
 			d.rootSegmentID = a.nextSegmentId++;
 			0 < d.completedSegments.length && a.partialBoundaries.push(d);
-			var f$1 = a.responseState;
-			var e = f$1.nextSuspenseID++;
-			f$1 = f$1.boundaryPrefix + e.toString(16);
-			d = d.id = f$1;
+			var f$2 = a.responseState;
+			var e = f$2.nextSuspenseID++;
+			f$2 = f$2.boundaryPrefix + e.toString(16);
+			d = d.id = f$2;
 			Aa$1(b, a.responseState, d);
 			Y$1(a, b, c);
 			return b.push("<!--/$-->");
@@ -2422,7 +2464,7 @@ var require_react_dom_server_legacy_node_production_min = /* @__PURE__ */ __comm
 		return Ca$1(b, c.formatContext);
 	}
 	function Qb$1(a, b, c) {
-		for (var d = c.completedSegments, f$1 = 0; f$1 < d.length; f$1++) Rb$1(a, b, c, d[f$1]);
+		for (var d = c.completedSegments, f$2 = 0; f$2 < d.length; f$2++) Rb$1(a, b, c, d[f$2]);
 		d.length = 0;
 		a = a.responseState;
 		d = c.id;
@@ -2439,8 +2481,8 @@ var require_react_dom_server_legacy_node_production_min = /* @__PURE__ */ __comm
 	}
 	function Rb$1(a, b, c, d) {
 		if (2 === d.status) return !0;
-		var f$1 = d.id;
-		if (-1 === f$1) {
+		var f$2 = d.id;
+		if (-1 === f$2) {
 			if (-1 === (d.id = c.rootSegmentID)) throw Error("A root segment ID must have been assigned by now. This is a bug in React.");
 			return Pb$1(a, b, d);
 		}
@@ -2449,11 +2491,11 @@ var require_react_dom_server_legacy_node_production_min = /* @__PURE__ */ __comm
 		b.push(a.startInlineScript);
 		a.sentCompleteSegmentFunction ? b.push("$RS(\"") : (a.sentCompleteSegmentFunction = !0, b.push("function $RS(a,b){a=document.getElementById(a);b=document.getElementById(b);for(a.parentNode.removeChild(a);a.firstChild;)b.parentNode.insertBefore(a.firstChild,b);b.parentNode.removeChild(b)};$RS(\""));
 		b.push(a.segmentPrefix);
-		f$1 = f$1.toString(16);
-		b.push(f$1);
+		f$2 = f$2.toString(16);
+		b.push(f$2);
 		b.push("\",\"");
 		b.push(a.placeholderPrefix);
-		b.push(f$1);
+		b.push(f$2);
 		return b.push("\")<\/script>");
 	}
 	function Ob$1(a, b) {
@@ -2466,39 +2508,39 @@ var require_react_dom_server_legacy_node_production_min = /* @__PURE__ */ __comm
 				for (c = 0; c < d.length - 1; c++) b.push(d[c]);
 				c < d.length && b.push(d[c]);
 			}
-			var f$1 = a.clientRenderedBoundaries, e;
-			for (e = 0; e < f$1.length; e++) {
-				var g = f$1[e];
+			var f$2 = a.clientRenderedBoundaries, e;
+			for (e = 0; e < f$2.length; e++) {
+				var g = f$2[e];
 				d = b;
-				var h = a.responseState, k$2 = g.id, m$1 = g.errorDigest, l$4 = g.errorMessage, p$2 = g.errorComponentStack;
+				var h = a.responseState, k$3 = g.id, m$2 = g.errorDigest, l$5 = g.errorMessage, p$3 = g.errorComponentStack;
 				d.push(h.startInlineScript);
 				h.sentClientRenderFunction ? d.push("$RX(\"") : (h.sentClientRenderFunction = !0, d.push("function $RX(b,c,d,e){var a=document.getElementById(b);a&&(b=a.previousSibling,b.data=\"$!\",a=a.dataset,c&&(a.dgst=c),d&&(a.msg=d),e&&(a.stck=e),b._reactRetry&&b._reactRetry())};$RX(\""));
-				if (null === k$2) throw Error("An ID must have been assigned before we can complete the boundary.");
-				d.push(k$2);
+				if (null === k$3) throw Error("An ID must have been assigned before we can complete the boundary.");
+				d.push(k$3);
 				d.push("\"");
-				if (m$1 || l$4 || p$2) {
+				if (m$2 || l$5 || p$3) {
 					d.push(",");
-					var B$2 = Ea$1(m$1 || "");
+					var B$2 = Ea$1(m$2 || "");
 					d.push(B$2);
 				}
-				if (l$4 || p$2) {
+				if (l$5 || p$3) {
 					d.push(",");
-					var C$1 = Ea$1(l$4 || "");
+					var C$1 = Ea$1(l$5 || "");
 					d.push(C$1);
 				}
-				if (p$2) {
+				if (p$3) {
 					d.push(",");
-					var y$2 = Ea$1(p$2);
+					var y$2 = Ea$1(p$3);
 					d.push(y$2);
 				}
 				if (!d.push(")<\/script>")) {
 					a.destination = null;
 					e++;
-					f$1.splice(0, e);
+					f$2.splice(0, e);
 					return;
 				}
 			}
-			f$1.splice(0, e);
+			f$2.splice(0, e);
 			var aa$1 = a.completedBoundaries;
 			for (e = 0; e < aa$1.length; e++) if (!Qb$1(a, b, aa$1[e])) {
 				a.destination = null;
@@ -2511,10 +2553,10 @@ var require_react_dom_server_legacy_node_production_min = /* @__PURE__ */ __comm
 			for (e = 0; e < ba$1.length; e++) {
 				var pb$1 = ba$1[e];
 				a: {
-					f$1 = a;
+					f$2 = a;
 					g = b;
 					var ca$1 = pb$1.completedSegments;
-					for (h = 0; h < ca$1.length; h++) if (!Rb$1(f$1, g, pb$1, ca$1[h])) {
+					for (h = 0; h < ca$1.length; h++) if (!Rb$1(f$2, g, pb$1, ca$1[h])) {
 						h++;
 						ca$1.splice(0, h);
 						var qb$1 = !1;
@@ -2568,7 +2610,7 @@ var require_react_dom_server_legacy_node_production_min = /* @__PURE__ */ __comm
 	}
 	function Ub$1() {}
 	function Vb$1(a, b, c, d) {
-		var f$1 = !1, e = null, g = "", h = !1;
+		var f$2 = !1, e = null, g = "", h = !1;
 		a = Cb$1(a, Fa$1(c, b ? b.identifierPrefix : void 0), Ga$1(), Infinity, Ub$1, void 0, function() {
 			h = !0;
 		}, void 0, void 0);
@@ -2580,11 +2622,11 @@ var require_react_dom_server_legacy_node_production_min = /* @__PURE__ */ __comm
 				return !0;
 			},
 			destroy: function(a$1) {
-				f$1 = !0;
+				f$2 = !0;
 				e = a$1;
 			}
 		});
-		if (f$1) throw e;
+		if (f$2) throw e;
 		if (!h) throw Error("A component suspended while responding to synchronous input. This will cause the UI to be replaced with a loading indicator. To fix, updates that suspend should be wrapped with startTransition.");
 		return g;
 	}
@@ -2637,36 +2679,36 @@ var require_react_dom_server_legacy_node_production_min = /* @__PURE__ */ __comm
 }) });
 
 //#endregion
-//#region ../../../../DeepSeek_Harness/packages/limix-ui/node_modules/.pnpm/react-dom@18.3.1_react@18.3.1/node_modules/react-dom/cjs/react-dom-server.node.production.min.js
-var require_react_dom_server_node_production_min = /* @__PURE__ */ __commonJS({ "../../../../DeepSeek_Harness/packages/limix-ui/node_modules/.pnpm/react-dom@18.3.1_react@18.3.1/node_modules/react-dom/cjs/react-dom-server.node.production.min.js": ((exports) => {
-	var aa = __require("util"), ba = require_react(), k$1 = null, l$2 = 0, q$1 = !0;
+//#region node_modules/react-dom/cjs/react-dom-server.node.production.min.js
+var require_react_dom_server_node_production_min = /* @__PURE__ */ __commonJS({ "node_modules/react-dom/cjs/react-dom-server.node.production.min.js": ((exports) => {
+	var aa = __require("util"), ba = require_react(), k$2 = null, l$3 = 0, q$2 = !0;
 	function r(a, b) {
 		if ("string" === typeof b) {
-			if (0 !== b.length) if (2048 < 3 * b.length) 0 < l$2 && (t(a, k$1.subarray(0, l$2)), k$1 = new Uint8Array(2048), l$2 = 0), t(a, u.encode(b));
+			if (0 !== b.length) if (2048 < 3 * b.length) 0 < l$3 && (t(a, k$2.subarray(0, l$3)), k$2 = new Uint8Array(2048), l$3 = 0), t(a, u.encode(b));
 			else {
-				var c = k$1;
-				0 < l$2 && (c = k$1.subarray(l$2));
+				var c = k$2;
+				0 < l$3 && (c = k$2.subarray(l$3));
 				c = u.encodeInto(b, c);
 				var d = c.read;
-				l$2 += c.written;
-				d < b.length && (t(a, k$1), k$1 = new Uint8Array(2048), l$2 = u.encodeInto(b.slice(d), k$1).written);
-				2048 === l$2 && (t(a, k$1), k$1 = new Uint8Array(2048), l$2 = 0);
+				l$3 += c.written;
+				d < b.length && (t(a, k$2), k$2 = new Uint8Array(2048), l$3 = u.encodeInto(b.slice(d), k$2).written);
+				2048 === l$3 && (t(a, k$2), k$2 = new Uint8Array(2048), l$3 = 0);
 			}
-		} else 0 !== b.byteLength && (2048 < b.byteLength ? (0 < l$2 && (t(a, k$1.subarray(0, l$2)), k$1 = new Uint8Array(2048), l$2 = 0), t(a, b)) : (c = k$1.length - l$2, c < b.byteLength && (0 === c ? t(a, k$1) : (k$1.set(b.subarray(0, c), l$2), l$2 += c, t(a, k$1), b = b.subarray(c)), k$1 = new Uint8Array(2048), l$2 = 0), k$1.set(b, l$2), l$2 += b.byteLength, 2048 === l$2 && (t(a, k$1), k$1 = new Uint8Array(2048), l$2 = 0)));
+		} else 0 !== b.byteLength && (2048 < b.byteLength ? (0 < l$3 && (t(a, k$2.subarray(0, l$3)), k$2 = new Uint8Array(2048), l$3 = 0), t(a, b)) : (c = k$2.length - l$3, c < b.byteLength && (0 === c ? t(a, k$2) : (k$2.set(b.subarray(0, c), l$3), l$3 += c, t(a, k$2), b = b.subarray(c)), k$2 = new Uint8Array(2048), l$3 = 0), k$2.set(b, l$3), l$3 += b.byteLength, 2048 === l$3 && (t(a, k$2), k$2 = new Uint8Array(2048), l$3 = 0)));
 	}
 	function t(a, b) {
 		a = a.write(b);
-		q$1 = q$1 && a;
+		q$2 = q$2 && a;
 	}
 	function w(a, b) {
 		r(a, b);
-		return q$1;
+		return q$2;
 	}
 	function ca(a) {
-		k$1 && 0 < l$2 && a.write(k$1.subarray(0, l$2));
-		k$1 = null;
-		l$2 = 0;
-		q$1 = !0;
+		k$2 && 0 < l$3 && a.write(k$2.subarray(0, l$3));
+		k$2 = null;
+		l$3 = 0;
+		q$2 = !0;
 	}
 	var u = new aa.TextEncoder();
 	function x(a) {
@@ -2680,10 +2722,10 @@ var require_react_dom_server_node_production_min = /* @__PURE__ */ __commonJS({ 
 		ea[a] = !0;
 		return !1;
 	}
-	function z(a, b, c, d, f$1, e, g) {
+	function z(a, b, c, d, f$2, e, g) {
 		this.acceptsBooleans = 2 === b || 3 === b || 4 === b;
 		this.attributeName = d;
-		this.attributeNamespace = f$1;
+		this.attributeNamespace = f$2;
 		this.mustUseProperty = c;
 		this.propertyName = a;
 		this.type = b;
@@ -2838,7 +2880,7 @@ var require_react_dom_server_node_production_min = /* @__PURE__ */ __commonJS({ 
 		a = "" + a;
 		var b = la.exec(a);
 		if (b) {
-			var c = "", d, f$1 = 0;
+			var c = "", d, f$2 = 0;
 			for (d = b.index; d < a.length; d++) {
 				switch (a.charCodeAt(d)) {
 					case 34:
@@ -2858,11 +2900,11 @@ var require_react_dom_server_node_production_min = /* @__PURE__ */ __commonJS({ 
 						break;
 					default: continue;
 				}
-				f$1 !== d && (c += a.substring(f$1, d));
-				f$1 = d + 1;
+				f$2 !== d && (c += a.substring(f$2, d));
+				f$2 = d + 1;
 				c += b;
 			}
-			a = f$1 !== d ? c + a.substring(f$1, d) : c;
+			a = f$2 !== d ? c + a.substring(f$2, d) : c;
 		}
 		return a;
 	}
@@ -2903,18 +2945,18 @@ var require_react_dom_server_node_production_min = /* @__PURE__ */ __commonJS({ 
 		if ("object" !== typeof c) throw Error("The `style` prop expects a mapping from style properties to values, not a string. For example, style={{marginRight: spacing + 'em'}} when using JSX.");
 		b = !0;
 		for (var d in c) if (y.call(c, d)) {
-			var f$1 = c[d];
-			if (null != f$1 && "boolean" !== typeof f$1 && "" !== f$1) {
+			var f$2 = c[d];
+			if (null != f$2 && "boolean" !== typeof f$2 && "" !== f$2) {
 				if (0 === d.indexOf("--")) {
 					var e = F(d);
-					f$1 = F(("" + f$1).trim());
+					f$2 = F(("" + f$2).trim());
 				} else {
 					e = d;
 					var g = Ba.get(e);
 					void 0 !== g ? e = g : (g = x(F(e.replace(ma, "-$1").toLowerCase().replace(pa, "-ms-"))), Ba.set(e, g), e = g);
-					f$1 = "number" === typeof f$1 ? 0 === f$1 || y.call(B, d) ? "" + f$1 : f$1 + "px" : F(("" + f$1).trim());
+					f$2 = "number" === typeof f$2 ? 0 === f$2 || y.call(B, d) ? "" + f$2 : f$2 + "px" : F(("" + f$2).trim());
 				}
-				b ? (b = !1, a.push(Ca, e, Da, f$1)) : a.push(Ea, e, Da, f$1);
+				b ? (b = !1, a.push(Ca, e, Da, f$2)) : a.push(Ea, e, Da, f$2);
 			}
 		}
 		b || a.push(H$2);
@@ -2983,7 +3025,7 @@ var require_react_dom_server_node_production_min = /* @__PURE__ */ __commonJS({ 
 	var Ja = x(" selected=\"\"");
 	function Ka(a, b, c, d) {
 		a.push(N(c));
-		var f$1 = c = null, e;
+		var f$2 = c = null, e;
 		for (e in b) if (y.call(b, e)) {
 			var g = b[e];
 			if (null != g) switch (e) {
@@ -2991,13 +3033,13 @@ var require_react_dom_server_node_production_min = /* @__PURE__ */ __commonJS({ 
 					c = g;
 					break;
 				case "dangerouslySetInnerHTML":
-					f$1 = g;
+					f$2 = g;
 					break;
 				default: K(a, d, e, g);
 			}
 		}
 		a.push(L);
-		M(a, f$1, c);
+		M(a, f$2, c);
 		return "string" === typeof c ? (a.push(F(c)), null) : c;
 	}
 	var La = x("\n"), Ma = /^[a-zA-Z][a-zA-Z:_\.\-\d]*$/, Na = /* @__PURE__ */ new Map();
@@ -3011,14 +3053,14 @@ var require_react_dom_server_node_production_min = /* @__PURE__ */ __commonJS({ 
 		return b;
 	}
 	var Oa = x("<!DOCTYPE html>");
-	function Pa(a, b, c, d, f$1) {
+	function Pa(a, b, c, d, f$2) {
 		switch (b) {
 			case "select":
 				a.push(N("select"));
 				var e = null, g = null;
-				for (p$2 in c) if (y.call(c, p$2)) {
-					var h = c[p$2];
-					if (null != h) switch (p$2) {
+				for (p$3 in c) if (y.call(c, p$3)) {
+					var h = c[p$3];
+					if (null != h) switch (p$3) {
 						case "children":
 							e = h;
 							break;
@@ -3027,17 +3069,17 @@ var require_react_dom_server_node_production_min = /* @__PURE__ */ __commonJS({ 
 							break;
 						case "defaultValue":
 						case "value": break;
-						default: K(a, d, p$2, h);
+						default: K(a, d, p$3, h);
 					}
 				}
 				a.push(L);
 				M(a, g, e);
 				return e;
 			case "option":
-				g = f$1.selectedValue;
+				g = f$2.selectedValue;
 				a.push(N("option"));
-				var m$1 = h = null, n$3 = null;
-				var p$2 = null;
+				var m$2 = h = null, n$4 = null;
+				var p$3 = null;
 				for (e in c) if (y.call(c, e)) {
 					var v$2 = c[e];
 					if (null != v$2) switch (e) {
@@ -3045,72 +3087,72 @@ var require_react_dom_server_node_production_min = /* @__PURE__ */ __commonJS({ 
 							h = v$2;
 							break;
 						case "selected":
-							n$3 = v$2;
+							n$4 = v$2;
 							break;
 						case "dangerouslySetInnerHTML":
-							p$2 = v$2;
+							p$3 = v$2;
 							break;
-						case "value": m$1 = v$2;
+						case "value": m$2 = v$2;
 						default: K(a, d, e, v$2);
 					}
 				}
-				if (null != g) if (c = null !== m$1 ? "" + m$1 : Ia(h), qa(g)) {
+				if (null != g) if (c = null !== m$2 ? "" + m$2 : Ia(h), qa(g)) {
 					for (d = 0; d < g.length; d++) if ("" + g[d] === c) {
 						a.push(Ja);
 						break;
 					}
 				} else "" + g === c && a.push(Ja);
-				else n$3 && a.push(Ja);
+				else n$4 && a.push(Ja);
 				a.push(L);
-				M(a, p$2, h);
+				M(a, p$3, h);
 				return h;
 			case "textarea":
 				a.push(N("textarea"));
-				p$2 = g = e = null;
-				for (h in c) if (y.call(c, h) && (m$1 = c[h], null != m$1)) switch (h) {
+				p$3 = g = e = null;
+				for (h in c) if (y.call(c, h) && (m$2 = c[h], null != m$2)) switch (h) {
 					case "children":
-						p$2 = m$1;
+						p$3 = m$2;
 						break;
 					case "value":
-						e = m$1;
+						e = m$2;
 						break;
 					case "defaultValue":
-						g = m$1;
+						g = m$2;
 						break;
 					case "dangerouslySetInnerHTML": throw Error("`dangerouslySetInnerHTML` does not make sense on <textarea>.");
-					default: K(a, d, h, m$1);
+					default: K(a, d, h, m$2);
 				}
 				null === e && null !== g && (e = g);
 				a.push(L);
-				if (null != p$2) {
+				if (null != p$3) {
 					if (null != e) throw Error("If you supply `defaultValue` on a <textarea>, do not pass children.");
-					if (qa(p$2) && 1 < p$2.length) throw Error("<textarea> can only have at most one child.");
-					e = "" + p$2;
+					if (qa(p$3) && 1 < p$3.length) throw Error("<textarea> can only have at most one child.");
+					e = "" + p$3;
 				}
 				"string" === typeof e && "\n" === e[0] && a.push(La);
 				null !== e && a.push(F("" + e));
 				return null;
 			case "input":
 				a.push(N("input"));
-				m$1 = p$2 = h = e = null;
-				for (g in c) if (y.call(c, g) && (n$3 = c[g], null != n$3)) switch (g) {
+				m$2 = p$3 = h = e = null;
+				for (g in c) if (y.call(c, g) && (n$4 = c[g], null != n$4)) switch (g) {
 					case "children":
 					case "dangerouslySetInnerHTML": throw Error("input is a self-closing tag and must neither have `children` nor use `dangerouslySetInnerHTML`.");
 					case "defaultChecked":
-						m$1 = n$3;
+						m$2 = n$4;
 						break;
 					case "defaultValue":
-						h = n$3;
+						h = n$4;
 						break;
 					case "checked":
-						p$2 = n$3;
+						p$3 = n$4;
 						break;
 					case "value":
-						e = n$3;
+						e = n$4;
 						break;
-					default: K(a, d, g, n$3);
+					default: K(a, d, g, n$4);
 				}
-				null !== p$2 ? K(a, d, "checked", p$2) : null !== m$1 && K(a, d, "checked", m$1);
+				null !== p$3 ? K(a, d, "checked", p$3) : null !== m$2 && K(a, d, "checked", m$2);
 				null !== e ? K(a, d, "value", e) : null !== h && K(a, d, "value", h);
 				a.push(Ha);
 				return null;
@@ -3139,14 +3181,14 @@ var require_react_dom_server_node_production_min = /* @__PURE__ */ __commonJS({ 
 			case "pre":
 				a.push(N(b));
 				g = e = null;
-				for (m$1 in c) if (y.call(c, m$1) && (h = c[m$1], null != h)) switch (m$1) {
+				for (m$2 in c) if (y.call(c, m$2) && (h = c[m$2], null != h)) switch (m$2) {
 					case "children":
 						e = h;
 						break;
 					case "dangerouslySetInnerHTML":
 						g = h;
 						break;
-					default: K(a, d, m$1, h);
+					default: K(a, d, m$2, h);
 				}
 				a.push(L);
 				if (null != g) {
@@ -3187,12 +3229,12 @@ var require_react_dom_server_node_production_min = /* @__PURE__ */ __commonJS({ 
 			case "font-face-format":
 			case "font-face-name":
 			case "missing-glyph": return Ka(a, c, b, d);
-			case "html": return 0 === f$1.insertionMode && a.push(Oa), Ka(a, c, b, d);
+			case "html": return 0 === f$2.insertionMode && a.push(Oa), Ka(a, c, b, d);
 			default:
 				if (-1 === b.indexOf("-") && "string" !== typeof c.is) return Ka(a, c, b, d);
 				a.push(N(b));
 				g = e = null;
-				for (n$3 in c) if (y.call(c, n$3) && (h = c[n$3], null != h)) switch (n$3) {
+				for (n$4 in c) if (y.call(c, n$4) && (h = c[n$4], null != h)) switch (n$4) {
 					case "children":
 						e = h;
 						break;
@@ -3204,7 +3246,7 @@ var require_react_dom_server_node_production_min = /* @__PURE__ */ __commonJS({ 
 						break;
 					case "suppressContentEditableWarning":
 					case "suppressHydrationWarning": break;
-					default: ha(n$3) && "function" !== typeof h && "symbol" !== typeof h && a.push(I, n$3, J, F(h), H$2);
+					default: ha(n$4) && "function" !== typeof h && "symbol" !== typeof h && a.push(I, n$4, J, F(h), H$2);
 				}
 				a.push(L);
 				M(a, g, e);
@@ -3355,10 +3397,10 @@ var require_react_dom_server_node_production_min = /* @__PURE__ */ __commonJS({ 
 		enqueueForceUpdate: function() {}
 	};
 	function pc(a, b, c, d) {
-		var f$1 = void 0 !== a.state ? a.state : null;
+		var f$2 = void 0 !== a.state ? a.state : null;
 		a.updater = oc;
 		a.props = c;
-		a.state = f$1;
+		a.state = f$2;
 		var e = {
 			queue: [],
 			replace: !1
@@ -3367,15 +3409,15 @@ var require_react_dom_server_node_production_min = /* @__PURE__ */ __commonJS({ 
 		var g = b.contextType;
 		a.context = "object" === typeof g && null !== g ? g._currentValue : d;
 		g = b.getDerivedStateFromProps;
-		"function" === typeof g && (g = g(c, f$1), f$1 = null === g || void 0 === g ? f$1 : O({}, f$1, g), a.state = f$1);
+		"function" === typeof g && (g = g(c, f$2), f$2 = null === g || void 0 === g ? f$2 : O({}, f$2, g), a.state = f$2);
 		if ("function" !== typeof b.getDerivedStateFromProps && "function" !== typeof a.getSnapshotBeforeUpdate && ("function" === typeof a.UNSAFE_componentWillMount || "function" === typeof a.componentWillMount)) if (b = a.state, "function" === typeof a.componentWillMount && a.componentWillMount(), "function" === typeof a.UNSAFE_componentWillMount && a.UNSAFE_componentWillMount(), b !== a.state && oc.enqueueReplaceState(a, a.state, null), null !== e.queue && 0 < e.queue.length) if (b = e.queue, g = e.replace, e.queue = null, e.replace = !1, g && 1 === b.length) a.state = b[0];
 		else {
 			e = g ? b[0] : a.state;
-			f$1 = !0;
+			f$2 = !0;
 			for (g = g ? 1 : 0; g < b.length; g++) {
 				var h = b[g];
 				h = "function" === typeof h ? h.call(a, e, c, d) : h;
-				null != h && (f$1 ? (f$1 = !1, e = O({}, e, h)) : O(e, h));
+				null != h && (f$2 ? (f$2 = !1, e = O({}, e, h)) : O(e, h));
 			}
 			a.state = e;
 		}
@@ -3388,22 +3430,22 @@ var require_react_dom_server_node_production_min = /* @__PURE__ */ __commonJS({ 
 	function rc(a, b, c) {
 		var d = a.id;
 		a = a.overflow;
-		var f$1 = 32 - sc(d) - 1;
-		d &= ~(1 << f$1);
+		var f$2 = 32 - sc(d) - 1;
+		d &= ~(1 << f$2);
 		c += 1;
-		var e = 32 - sc(b) + f$1;
+		var e = 32 - sc(b) + f$2;
 		if (30 < e) {
-			var g = f$1 - f$1 % 5;
+			var g = f$2 - f$2 % 5;
 			e = (d & (1 << g) - 1).toString(32);
 			d >>= g;
-			f$1 -= g;
+			f$2 -= g;
 			return {
-				id: 1 << 32 - sc(b) + f$1 | c << f$1 | d,
+				id: 1 << 32 - sc(b) + f$2 | c << f$2 | d,
 				overflow: e + a
 			};
 		}
 		return {
-			id: 1 << e | c << f$1 | d,
+			id: 1 << e | c << f$2 | d,
 			overflow: a
 		};
 	}
@@ -3478,7 +3520,7 @@ var require_react_dom_server_node_production_min = /* @__PURE__ */ __commonJS({ 
 				var d = c[1];
 				a: if (null === d) d = !1;
 				else {
-					for (var f$1 = 0; f$1 < d.length && f$1 < b.length; f$1++) if (!xc(b[f$1], d[f$1])) {
+					for (var f$2 = 0; f$2 < d.length && f$2 < b.length; f$2++) if (!xc(b[f$2], d[f$2])) {
 						d = !1;
 						break a;
 					}
@@ -3576,25 +3618,25 @@ var require_react_dom_server_node_production_min = /* @__PURE__ */ __commonJS({ 
 			return Qc(a);
 		});
 	}
-	function Rc(a, b, c, d, f$1, e, g, h) {
+	function Rc(a, b, c, d, f$2, e, g, h) {
 		a.allPendingTasks++;
 		null === c ? a.pendingRootTasks++ : c.pendingTasks++;
-		var m$1 = {
+		var m$2 = {
 			node: b,
 			ping: function() {
-				return Pc(a, m$1);
+				return Pc(a, m$2);
 			},
 			blockedBoundary: c,
 			blockedSegment: d,
-			abortSet: f$1,
+			abortSet: f$2,
 			legacyContext: e,
 			context: g,
 			treeContext: h
 		};
-		f$1.add(m$1);
-		return m$1;
+		f$2.add(m$2);
+		return m$2;
 	}
-	function Sc(a, b, c, d, f$1, e) {
+	function Sc(a, b, c, d, f$2, e) {
 		return {
 			status: 0,
 			id: -1,
@@ -3604,7 +3646,7 @@ var require_react_dom_server_node_production_min = /* @__PURE__ */ __commonJS({ 
 			children: [],
 			formatContext: d,
 			boundary: c,
-			lastPushedText: f$1,
+			lastPushedText: f$2,
 			textEmbedded: e
 		};
 	}
@@ -3620,16 +3662,16 @@ var require_react_dom_server_node_production_min = /* @__PURE__ */ __commonJS({ 
 		c(b);
 		null !== a.destination ? (a.status = 2, a.destination.destroy(b)) : (a.status = 1, a.fatalError = b);
 	}
-	function Uc(a, b, c, d, f$1) {
+	function Uc(a, b, c, d, f$2) {
 		R = {};
 		yc = b;
 		U = 0;
-		for (a = c(d, f$1); Ac;) Ac = !1, U = 0, Bc += 1, S = null, a = c(d, f$1);
+		for (a = c(d, f$2); Ac;) Ac = !1, U = 0, Bc += 1, S = null, a = c(d, f$2);
 		Ec();
 		return a;
 	}
 	function Vc(a, b, c, d) {
-		var f$1 = c.render(), e = d.childContextTypes;
+		var f$2 = c.render(), e = d.childContextTypes;
 		if (null !== e && void 0 !== e) {
 			var g = b.legacyContext;
 			if ("function" !== typeof c.getChildContext) d = g;
@@ -3639,9 +3681,9 @@ var require_react_dom_server_node_production_min = /* @__PURE__ */ __commonJS({ 
 				d = O({}, g, c);
 			}
 			b.legacyContext = d;
-			Z(a, b, f$1);
+			Z(a, b, f$2);
 			b.legacyContext = g;
-		} else Z(a, b, f$1);
+		} else Z(a, b, f$2);
 	}
 	function Wc(a, b) {
 		if (a && a.defaultProps) {
@@ -3652,36 +3694,36 @@ var require_react_dom_server_node_production_min = /* @__PURE__ */ __commonJS({ 
 		}
 		return b;
 	}
-	function Xc(a, b, c, d, f$1) {
+	function Xc(a, b, c, d, f$2) {
 		if ("function" === typeof c) if (c.prototype && c.prototype.isReactComponent) {
-			f$1 = ic(c, b.legacyContext);
+			f$2 = ic(c, b.legacyContext);
 			var e = c.contextType;
-			e = new c(d, "object" === typeof e && null !== e ? e._currentValue : f$1);
-			pc(e, c, d, f$1);
+			e = new c(d, "object" === typeof e && null !== e ? e._currentValue : f$2);
+			pc(e, c, d, f$2);
 			Vc(a, b, e, c);
 		} else {
 			e = ic(c, b.legacyContext);
-			f$1 = Uc(a, b, c, d, e);
+			f$2 = Uc(a, b, c, d, e);
 			var g = 0 !== U;
-			if ("object" === typeof f$1 && null !== f$1 && "function" === typeof f$1.render && void 0 === f$1.$$typeof) pc(f$1, c, d, e), Vc(a, b, f$1, c);
+			if ("object" === typeof f$2 && null !== f$2 && "function" === typeof f$2.render && void 0 === f$2.$$typeof) pc(f$2, c, d, e), Vc(a, b, f$2, c);
 			else if (g) {
 				d = b.treeContext;
 				b.treeContext = rc(d, 1, 0);
 				try {
-					Z(a, b, f$1);
+					Z(a, b, f$2);
 				} finally {
 					b.treeContext = d;
 				}
-			} else Z(a, b, f$1);
+			} else Z(a, b, f$2);
 		}
 		else if ("string" === typeof c) {
-			f$1 = b.blockedSegment;
-			e = Pa(f$1.chunks, c, d, a.responseState, f$1.formatContext);
-			f$1.lastPushedText = !1;
-			g = f$1.formatContext;
-			f$1.formatContext = ya(g, c, d);
+			f$2 = b.blockedSegment;
+			e = Pa(f$2.chunks, c, d, a.responseState, f$2.formatContext);
+			f$2.lastPushedText = !1;
+			g = f$2.formatContext;
+			f$2.formatContext = ya(g, c, d);
 			Yc(a, b, e);
-			f$1.formatContext = g;
+			f$2.formatContext = g;
 			switch (c) {
 				case "area":
 				case "base":
@@ -3698,9 +3740,9 @@ var require_react_dom_server_node_production_min = /* @__PURE__ */ __commonJS({ 
 				case "source":
 				case "track":
 				case "wbr": break;
-				default: f$1.chunks.push(Qa, c, Ra);
+				default: f$2.chunks.push(Qa, c, Ra);
 			}
-			f$1.lastPushedText = !1;
+			f$2.lastPushedText = !1;
 		} else {
 			switch (c) {
 				case dc:
@@ -3717,7 +3759,7 @@ var require_react_dom_server_node_production_min = /* @__PURE__ */ __commonJS({ 
 				case Yb:
 					a: {
 						c = b.blockedBoundary;
-						f$1 = b.blockedSegment;
+						f$2 = b.blockedSegment;
 						e = d.fallback;
 						d = d.children;
 						g = /* @__PURE__ */ new Set();
@@ -3731,28 +3773,28 @@ var require_react_dom_server_node_production_min = /* @__PURE__ */ __commonJS({ 
 							byteSize: 0,
 							fallbackAbortableTasks: g,
 							errorDigest: null
-						}, m$1 = Sc(a, f$1.chunks.length, h, f$1.formatContext, !1, !1);
-						f$1.children.push(m$1);
-						f$1.lastPushedText = !1;
-						var n$3 = Sc(a, 0, null, f$1.formatContext, !1, !1);
-						n$3.parentFlushed = !0;
+						}, m$2 = Sc(a, f$2.chunks.length, h, f$2.formatContext, !1, !1);
+						f$2.children.push(m$2);
+						f$2.lastPushedText = !1;
+						var n$4 = Sc(a, 0, null, f$2.formatContext, !1, !1);
+						n$4.parentFlushed = !0;
 						b.blockedBoundary = h;
-						b.blockedSegment = n$3;
+						b.blockedSegment = n$4;
 						try {
-							if (Yc(a, b, d), n$3.lastPushedText && n$3.textEmbedded && n$3.chunks.push(za), n$3.status = 1, Zc(h, n$3), 0 === h.pendingTasks) break a;
-						} catch (p$2) {
-							n$3.status = 4, h.forceClientRender = !0, h.errorDigest = Y(a, p$2);
+							if (Yc(a, b, d), n$4.lastPushedText && n$4.textEmbedded && n$4.chunks.push(za), n$4.status = 1, Zc(h, n$4), 0 === h.pendingTasks) break a;
+						} catch (p$3) {
+							n$4.status = 4, h.forceClientRender = !0, h.errorDigest = Y(a, p$3);
 						} finally {
-							b.blockedBoundary = c, b.blockedSegment = f$1;
+							b.blockedBoundary = c, b.blockedSegment = f$2;
 						}
-						b = Rc(a, e, c, m$1, g, b.legacyContext, b.context, b.treeContext);
+						b = Rc(a, e, c, m$2, g, b.legacyContext, b.context, b.treeContext);
 						a.pingedTasks.push(b);
 					}
 					return;
 			}
 			if ("object" === typeof c && null !== c) switch (c.$$typeof) {
 				case Xb:
-					d = Uc(a, b, c.render, d, f$1);
+					d = Uc(a, b, c.render, d, f$2);
 					if (0 !== U) {
 						c = b.treeContext;
 						b.treeContext = rc(c, 1, 0);
@@ -3766,10 +3808,10 @@ var require_react_dom_server_node_production_min = /* @__PURE__ */ __commonJS({ 
 				case $b:
 					c = c.type;
 					d = Wc(c, d);
-					Xc(a, b, c, d, f$1);
+					Xc(a, b, c, d, f$2);
 					return;
 				case Vb:
-					f$1 = d.children;
+					f$2 = d.children;
 					c = c._context;
 					d = d.value;
 					e = c._currentValue;
@@ -3783,7 +3825,7 @@ var require_react_dom_server_node_production_min = /* @__PURE__ */ __commonJS({ 
 						value: d
 					};
 					b.context = d;
-					Z(a, b, f$1);
+					Z(a, b, f$2);
 					a = P;
 					if (null === a) throw Error("Tried to pop a Context at the root of the app. This is a bug in React.");
 					d = a.parentValue;
@@ -3797,8 +3839,8 @@ var require_react_dom_server_node_production_min = /* @__PURE__ */ __commonJS({ 
 					Z(a, b, d);
 					return;
 				case ac:
-					f$1 = c._init;
-					c = f$1(c._payload);
+					f$2 = c._init;
+					c = f$2(c._payload);
 					d = Wc(c, d);
 					Xc(a, b, c, d, void 0);
 					return;
@@ -3828,11 +3870,11 @@ var require_react_dom_server_node_production_min = /* @__PURE__ */ __commonJS({ 
 			if (d && (d = d.call(c))) {
 				c = d.next();
 				if (!c.done) {
-					var f$1 = [];
+					var f$2 = [];
 					do
-						f$1.push(c.value), c = d.next();
+						f$2.push(c.value), c = d.next();
 					while (!c.done);
-					$c(a, b, f$1);
+					$c(a, b, f$2);
 				}
 				return;
 			}
@@ -3842,33 +3884,33 @@ var require_react_dom_server_node_production_min = /* @__PURE__ */ __commonJS({ 
 		"string" === typeof c ? (d = b.blockedSegment, d.lastPushedText = Aa(b.blockedSegment.chunks, c, a.responseState, d.lastPushedText)) : "number" === typeof c && (d = b.blockedSegment, d.lastPushedText = Aa(b.blockedSegment.chunks, "" + c, a.responseState, d.lastPushedText));
 	}
 	function $c(a, b, c) {
-		for (var d = c.length, f$1 = 0; f$1 < d; f$1++) {
+		for (var d = c.length, f$2 = 0; f$2 < d; f$2++) {
 			var e = b.treeContext;
-			b.treeContext = rc(e, d, f$1);
+			b.treeContext = rc(e, d, f$2);
 			try {
-				Yc(a, b, c[f$1]);
+				Yc(a, b, c[f$2]);
 			} finally {
 				b.treeContext = e;
 			}
 		}
 	}
 	function Yc(a, b, c) {
-		var d = b.blockedSegment.formatContext, f$1 = b.legacyContext, e = b.context;
+		var d = b.blockedSegment.formatContext, f$2 = b.legacyContext, e = b.context;
 		try {
 			return Z(a, b, c);
-		} catch (m$1) {
-			if (Ec(), "object" === typeof m$1 && null !== m$1 && "function" === typeof m$1.then) {
-				c = m$1;
+		} catch (m$2) {
+			if (Ec(), "object" === typeof m$2 && null !== m$2 && "function" === typeof m$2.then) {
+				c = m$2;
 				var g = b.blockedSegment, h = Sc(a, g.chunks.length, null, g.formatContext, g.lastPushedText, !0);
 				g.children.push(h);
 				g.lastPushedText = !1;
 				a = Rc(a, b.node, b.blockedBoundary, h, b.abortSet, b.legacyContext, b.context, b.treeContext).ping;
 				c.then(a, a);
 				b.blockedSegment.formatContext = d;
-				b.legacyContext = f$1;
+				b.legacyContext = f$2;
 				b.context = e;
 				nc(e);
-			} else throw b.blockedSegment.formatContext = d, b.legacyContext = f$1, b.context = e, nc(e), m$1;
+			} else throw b.blockedSegment.formatContext = d, b.legacyContext = f$2, b.context = e, nc(e), m$2;
 		}
 	}
 	function ad(a) {
@@ -3911,23 +3953,23 @@ var require_react_dom_server_node_production_min = /* @__PURE__ */ __commonJS({ 
 			var d = Lc;
 			Lc = a.responseState;
 			try {
-				var f$1 = a.pingedTasks, e;
-				for (e = 0; e < f$1.length; e++) {
-					var g = f$1[e];
-					var h = a, m$1 = g.blockedSegment;
-					if (0 === m$1.status) {
+				var f$2 = a.pingedTasks, e;
+				for (e = 0; e < f$2.length; e++) {
+					var g = f$2[e];
+					var h = a, m$2 = g.blockedSegment;
+					if (0 === m$2.status) {
 						nc(g.context);
 						try {
-							Z(h, g, g.node), m$1.lastPushedText && m$1.textEmbedded && m$1.chunks.push(za), g.abortSet.delete(g), m$1.status = 1, bd(h, g.blockedBoundary, m$1);
+							Z(h, g, g.node), m$2.lastPushedText && m$2.textEmbedded && m$2.chunks.push(za), g.abortSet.delete(g), m$2.status = 1, bd(h, g.blockedBoundary, m$2);
 						} catch (E$2) {
 							if (Ec(), "object" === typeof E$2 && null !== E$2 && "function" === typeof E$2.then) {
-								var n$3 = g.ping;
-								E$2.then(n$3, n$3);
+								var n$4 = g.ping;
+								E$2.then(n$4, n$4);
 							} else {
 								g.abortSet.delete(g);
-								m$1.status = 4;
-								var p$2 = g.blockedBoundary, v$2 = E$2, C$1 = Y(h, v$2);
-								null === p$2 ? Tc(h, v$2) : (p$2.pendingTasks--, p$2.forceClientRender || (p$2.forceClientRender = !0, p$2.errorDigest = C$1, p$2.parentFlushed && h.clientRenderedBoundaries.push(p$2)));
+								m$2.status = 4;
+								var p$3 = g.blockedBoundary, v$2 = E$2, C$1 = Y(h, v$2);
+								null === p$3 ? Tc(h, v$2) : (p$3.pendingTasks--, p$3.forceClientRender || (p$3.forceClientRender = !0, p$3.errorDigest = C$1, p$3.parentFlushed && h.clientRenderedBoundaries.push(p$3)));
 								h.allPendingTasks--;
 								if (0 === h.allPendingTasks) {
 									var D$2 = h.onAllReady;
@@ -3937,7 +3979,7 @@ var require_react_dom_server_node_production_min = /* @__PURE__ */ __commonJS({ 
 						}
 					}
 				}
-				f$1.splice(0, e);
+				f$2.splice(0, e);
 				null !== a.destination && dd(a, a.destination);
 			} catch (E$2) {
 				Y(a, E$2), Tc(a, E$2);
@@ -3961,17 +4003,17 @@ var require_react_dom_server_node_production_min = /* @__PURE__ */ __commonJS({ 
 				return w(b, Ta);
 			case 1:
 				c.status = 2;
-				var f$1 = !0;
+				var f$2 = !0;
 				d = c.chunks;
 				var e = 0;
 				c = c.children;
 				for (var g = 0; g < c.length; g++) {
-					for (f$1 = c[g]; e < f$1.index; e++) r(b, d[e]);
-					f$1 = fd(a, b, f$1);
+					for (f$2 = c[g]; e < f$2.index; e++) r(b, d[e]);
+					f$2 = fd(a, b, f$2);
 				}
 				for (; e < d.length - 1; e++) r(b, d[e]);
-				e < d.length && (f$1 = w(b, d[e]));
-				return f$1;
+				e < d.length && (f$2 = w(b, d[e]));
+				return f$2;
 			default: throw Error("Aborted, errored or already flushed boundaries should not be flushed again. This is a bug in React.");
 		}
 	}
@@ -3983,10 +4025,10 @@ var require_react_dom_server_node_production_min = /* @__PURE__ */ __commonJS({ 
 		else if (0 < d.pendingTasks) {
 			d.rootSegmentID = a.nextSegmentId++;
 			0 < d.completedSegments.length && a.partialBoundaries.push(d);
-			var f$1 = a.responseState;
-			var e = f$1.nextSuspenseID++;
-			f$1 = x(f$1.boundaryPrefix + e.toString(16));
-			d = d.id = f$1;
+			var f$2 = a.responseState;
+			var e = f$2.nextSuspenseID++;
+			f$2 = x(f$2.boundaryPrefix + e.toString(16));
+			d = d.id = f$2;
 			cb(b, a.responseState, d);
 			ed(a, b, c);
 		} else if (d.byteSize > a.progressiveChunkSize) d.rootSegmentID = a.nextSegmentId++, a.completedBoundaries.push(d), cb(b, a.responseState, d.id), ed(a, b, c);
@@ -4004,7 +4046,7 @@ var require_react_dom_server_node_production_min = /* @__PURE__ */ __commonJS({ 
 		return zb(b, c.formatContext);
 	}
 	function hd(a, b, c) {
-		for (var d = c.completedSegments, f$1 = 0; f$1 < d.length; f$1++) id(a, b, c, d[f$1]);
+		for (var d = c.completedSegments, f$2 = 0; f$2 < d.length; f$2++) id(a, b, c, d[f$2]);
 		d.length = 0;
 		a = a.responseState;
 		d = c.id;
@@ -4021,8 +4063,8 @@ var require_react_dom_server_node_production_min = /* @__PURE__ */ __commonJS({ 
 	}
 	function id(a, b, c, d) {
 		if (2 === d.status) return !0;
-		var f$1 = d.id;
-		if (-1 === f$1) {
+		var f$2 = d.id;
+		if (-1 === f$2) {
 			if (-1 === (d.id = c.rootSegmentID)) throw Error("A root segment ID must have been assigned by now. This is a bug in React.");
 			return gd(a, b, d);
 		}
@@ -4031,17 +4073,17 @@ var require_react_dom_server_node_production_min = /* @__PURE__ */ __commonJS({ 
 		r(b, a.startInlineScript);
 		a.sentCompleteSegmentFunction ? r(b, Bb) : (a.sentCompleteSegmentFunction = !0, r(b, Ab));
 		r(b, a.segmentPrefix);
-		f$1 = f$1.toString(16);
-		r(b, f$1);
+		f$2 = f$2.toString(16);
+		r(b, f$2);
 		r(b, Cb);
 		r(b, a.placeholderPrefix);
-		r(b, f$1);
+		r(b, f$2);
 		return w(b, Db);
 	}
 	function dd(a, b) {
-		k$1 = new Uint8Array(2048);
-		l$2 = 0;
-		q$1 = !0;
+		k$2 = new Uint8Array(2048);
+		l$3 = 0;
+		q$2 = !0;
 		try {
 			var c = a.completedRootSegment;
 			if (null !== c && 0 === a.pendingRootTasks) {
@@ -4051,27 +4093,27 @@ var require_react_dom_server_node_production_min = /* @__PURE__ */ __commonJS({ 
 				for (c = 0; c < d.length - 1; c++) r(b, d[c]);
 				c < d.length && w(b, d[c]);
 			}
-			var f$1 = a.clientRenderedBoundaries, e;
-			for (e = 0; e < f$1.length; e++) {
-				var g = f$1[e];
+			var f$2 = a.clientRenderedBoundaries, e;
+			for (e = 0; e < f$2.length; e++) {
+				var g = f$2[e];
 				d = b;
-				var h = a.responseState, m$1 = g.id, n$3 = g.errorDigest, p$2 = g.errorMessage, v$2 = g.errorComponentStack;
+				var h = a.responseState, m$2 = g.id, n$4 = g.errorDigest, p$3 = g.errorMessage, v$2 = g.errorComponentStack;
 				r(d, h.startInlineScript);
 				h.sentClientRenderFunction ? r(d, Kb) : (h.sentClientRenderFunction = !0, r(d, Jb));
-				if (null === m$1) throw Error("An ID must have been assigned before we can complete the boundary.");
-				r(d, m$1);
+				if (null === m$2) throw Error("An ID must have been assigned before we can complete the boundary.");
+				r(d, m$2);
 				r(d, Lb);
-				if (n$3 || p$2 || v$2) r(d, Nb), r(d, Pb(n$3 || ""));
-				if (p$2 || v$2) r(d, Nb), r(d, Pb(p$2 || ""));
+				if (n$4 || p$3 || v$2) r(d, Nb), r(d, Pb(n$4 || ""));
+				if (p$3 || v$2) r(d, Nb), r(d, Pb(p$3 || ""));
 				v$2 && (r(d, Nb), r(d, Pb(v$2)));
 				if (!w(d, Mb)) {
 					a.destination = null;
 					e++;
-					f$1.splice(0, e);
+					f$2.splice(0, e);
 					return;
 				}
 			}
-			f$1.splice(0, e);
+			f$2.splice(0, e);
 			var C$1 = a.completedBoundaries;
 			for (e = 0; e < C$1.length; e++) if (!hd(a, b, C$1[e])) {
 				a.destination = null;
@@ -4081,17 +4123,17 @@ var require_react_dom_server_node_production_min = /* @__PURE__ */ __commonJS({ 
 			}
 			C$1.splice(0, e);
 			ca(b);
-			k$1 = new Uint8Array(2048);
-			l$2 = 0;
-			q$1 = !0;
+			k$2 = new Uint8Array(2048);
+			l$3 = 0;
+			q$2 = !0;
 			var D$2 = a.partialBoundaries;
 			for (e = 0; e < D$2.length; e++) {
 				var E$2 = D$2[e];
 				a: {
-					f$1 = a;
+					f$2 = a;
 					g = b;
 					var na$1 = E$2.completedSegments;
-					for (h = 0; h < na$1.length; h++) if (!id(f$1, g, E$2, na$1[h])) {
+					for (h = 0; h < na$1.length; h++) if (!id(f$2, g, E$2, na$1[h])) {
 						h++;
 						na$1.splice(0, h);
 						var Eb$1 = !1;
@@ -4159,13 +4201,13 @@ var require_react_dom_server_node_production_min = /* @__PURE__ */ __commonJS({ 
 		};
 	}
 	function od(a, b) {
-		var c = b ? b.identifierPrefix : void 0, d = b ? b.nonce : void 0, f$1 = b ? b.bootstrapScriptContent : void 0, e = b ? b.bootstrapScripts : void 0;
+		var c = b ? b.identifierPrefix : void 0, d = b ? b.nonce : void 0, f$2 = b ? b.bootstrapScriptContent : void 0, e = b ? b.bootstrapScripts : void 0;
 		var g = b ? b.bootstrapModules : void 0;
 		c = void 0 === c ? "" : c;
 		d = void 0 === d ? ra : x("<script nonce=\"" + F(d) + "\">");
 		var h = [];
-		void 0 !== f$1 && h.push(d, ("" + f$1).replace(wa, xa), sa);
-		if (void 0 !== e) for (f$1 = 0; f$1 < e.length; f$1++) h.push(ta, F(e[f$1]), va);
+		void 0 !== f$2 && h.push(d, ("" + f$2).replace(wa, xa), sa);
+		if (void 0 !== e) for (f$2 = 0; f$2 < e.length; f$2++) h.push(ta, F(e[f$2]), va);
 		if (void 0 !== g) for (e = 0; e < g.length; e++) h.push(ua, F(g[e]), va);
 		g = {
 			bootstrapChunks: h,
@@ -4181,16 +4223,16 @@ var require_react_dom_server_node_production_min = /* @__PURE__ */ __commonJS({ 
 		};
 		e = b ? b.namespaceURI : void 0;
 		e = G("http://www.w3.org/2000/svg" === e ? 2 : "http://www.w3.org/1998/Math/MathML" === e ? 3 : 0, null);
-		f$1 = b ? b.progressiveChunkSize : void 0;
+		f$2 = b ? b.progressiveChunkSize : void 0;
 		d = b ? b.onError : void 0;
 		h = b ? b.onAllReady : void 0;
-		var m$1 = b ? b.onShellReady : void 0, n$3 = b ? b.onShellError : void 0;
+		var m$2 = b ? b.onShellReady : void 0, n$4 = b ? b.onShellError : void 0;
 		b = [];
 		c = /* @__PURE__ */ new Set();
 		g = {
 			destination: null,
 			responseState: g,
-			progressiveChunkSize: void 0 === f$1 ? 12800 : f$1,
+			progressiveChunkSize: void 0 === f$2 ? 12800 : f$2,
 			status: 0,
 			fatalError: null,
 			nextSegmentId: 0,
@@ -4204,8 +4246,8 @@ var require_react_dom_server_node_production_min = /* @__PURE__ */ __commonJS({ 
 			partialBoundaries: [],
 			onError: void 0 === d ? Oc : d,
 			onAllReady: void 0 === h ? X : h,
-			onShellReady: void 0 === m$1 ? X : m$1,
-			onShellError: void 0 === n$3 ? X : n$3,
+			onShellReady: void 0 === m$2 ? X : m$2,
+			onShellError: void 0 === n$4 ? X : n$4,
 			onFatalError: X
 		};
 		e = Sc(g, 0, null, e, !1, !1);
@@ -4236,57 +4278,57 @@ var require_react_dom_server_node_production_min = /* @__PURE__ */ __commonJS({ 
 }) });
 
 //#endregion
-//#region ../../../../DeepSeek_Harness/packages/limix-ui/node_modules/.pnpm/react-dom@18.3.1_react@18.3.1/node_modules/react-dom/server.node.js
-var require_server_node = /* @__PURE__ */ __commonJS({ "../../../../DeepSeek_Harness/packages/limix-ui/node_modules/.pnpm/react-dom@18.3.1_react@18.3.1/node_modules/react-dom/server.node.js": ((exports) => {
-	var l$1 = require_react_dom_server_legacy_node_production_min(), s = require_react_dom_server_node_production_min();
-	exports.version = l$1.version;
-	exports.renderToString = l$1.renderToString;
-	exports.renderToStaticMarkup = l$1.renderToStaticMarkup;
-	exports.renderToNodeStream = l$1.renderToNodeStream;
-	exports.renderToStaticNodeStream = l$1.renderToStaticNodeStream;
+//#region node_modules/react-dom/server.node.js
+var require_server_node = /* @__PURE__ */ __commonJS({ "node_modules/react-dom/server.node.js": ((exports) => {
+	var l$2 = require_react_dom_server_legacy_node_production_min(), s = require_react_dom_server_node_production_min();
+	exports.version = l$2.version;
+	exports.renderToString = l$2.renderToString;
+	exports.renderToStaticMarkup = l$2.renderToStaticMarkup;
+	exports.renderToNodeStream = l$2.renderToNodeStream;
+	exports.renderToStaticNodeStream = l$2.renderToStaticNodeStream;
 	exports.renderToPipeableStream = s.renderToPipeableStream;
 }) });
 
 //#endregion
-//#region ../../../../DeepSeek_Harness/packages/limix-ui/node_modules/.pnpm/react@18.3.1/node_modules/react/cjs/react-jsx-runtime.production.min.js
-var require_react_jsx_runtime_production_min = /* @__PURE__ */ __commonJS({ "../../../../DeepSeek_Harness/packages/limix-ui/node_modules/.pnpm/react@18.3.1/node_modules/react/cjs/react-jsx-runtime.production.min.js": ((exports) => {
-	var f = require_react(), k = Symbol.for("react.element"), l = Symbol.for("react.fragment"), m = Object.prototype.hasOwnProperty, n = f.__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED.ReactCurrentOwner, p = {
+//#region ../agent/node_modules/react/cjs/react-jsx-runtime.production.min.js
+var require_react_jsx_runtime_production_min$1 = /* @__PURE__ */ __commonJS({ "../agent/node_modules/react/cjs/react-jsx-runtime.production.min.js": ((exports) => {
+	var f$1 = require_react(), k$1 = Symbol.for("react.element"), l$1 = Symbol.for("react.fragment"), m$1 = Object.prototype.hasOwnProperty, n$1 = f$1.__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED.ReactCurrentOwner, p$1 = {
 		key: !0,
 		ref: !0,
 		__self: !0,
 		__source: !0
 	};
-	function q(c, a, g) {
+	function q$1(c, a, g) {
 		var b, d = {}, e = null, h = null;
 		void 0 !== g && (e = "" + g);
 		void 0 !== a.key && (e = "" + a.key);
 		void 0 !== a.ref && (h = a.ref);
-		for (b in a) m.call(a, b) && !p.hasOwnProperty(b) && (d[b] = a[b]);
+		for (b in a) m$1.call(a, b) && !p$1.hasOwnProperty(b) && (d[b] = a[b]);
 		if (c && c.defaultProps) for (b in a = c.defaultProps, a) void 0 === d[b] && (d[b] = a[b]);
 		return {
-			$$typeof: k,
+			$$typeof: k$1,
 			type: c,
 			key: e,
 			ref: h,
 			props: d,
-			_owner: n.current
+			_owner: n$1.current
 		};
 	}
-	exports.Fragment = l;
-	exports.jsx = q;
-	exports.jsxs = q;
+	exports.Fragment = l$1;
+	exports.jsx = q$1;
+	exports.jsxs = q$1;
 }) });
 
 //#endregion
-//#region ../../../../DeepSeek_Harness/packages/limix-ui/node_modules/.pnpm/react@18.3.1/node_modules/react/jsx-runtime.js
-var require_jsx_runtime = /* @__PURE__ */ __commonJS({ "../../../../DeepSeek_Harness/packages/limix-ui/node_modules/.pnpm/react@18.3.1/node_modules/react/jsx-runtime.js": ((exports, module) => {
-	module.exports = require_react_jsx_runtime_production_min();
+//#region ../agent/node_modules/react/jsx-runtime.js
+var require_jsx_runtime$1 = /* @__PURE__ */ __commonJS({ "../agent/node_modules/react/jsx-runtime.js": ((exports, module) => {
+	module.exports = require_react_jsx_runtime_production_min$1();
 }) });
 
 //#endregion
 //#region ../agent/src/client/ScatterChart.tsx
 var import_server_node = /* @__PURE__ */ __toESM(require_server_node());
-var import_jsx_runtime = /* @__PURE__ */ __toESM(require_jsx_runtime());
+var import_jsx_runtime$1 = /* @__PURE__ */ __toESM(require_jsx_runtime$1());
 const ACCENT$1 = "#2563eb";
 const W$1 = 400;
 const H$1 = 300;
@@ -4297,7 +4339,7 @@ const PAD$1 = {
 	left: 52
 };
 function ScatterChart({ data }) {
-	const { points, n: n$3, shown, min, max } = data;
+	const { points, n: n$4, shown, min, max } = data;
 	if (!points.length) return null;
 	const span = max - min || 1;
 	const lo = min - span * .05;
@@ -4309,9 +4351,9 @@ function ScatterChart({ data }) {
 	const fmt = (v$2) => Math.abs(v$2) >= 1e3 ? v$2.toFixed(0) : Number(v$2.toPrecision(3)).toString();
 	const r$3 = shown > 800 ? 1.6 : shown > 300 ? 2.1 : 2.8;
 	const op = shown > 800 ? .35 : shown > 300 ? .5 : .62;
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+	return /* @__PURE__ */ (0, import_jsx_runtime$1.jsxs)("div", {
 		style: { marginTop: 8 },
-		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+		children: [/* @__PURE__ */ (0, import_jsx_runtime$1.jsxs)("div", {
 			style: {
 				fontSize: 12,
 				opacity: .7,
@@ -4319,9 +4361,9 @@ function ScatterChart({ data }) {
 			},
 			children: [
 				"预测 vs 真实 · 共 ",
-				n$3,
+				n$4,
 				" 个样本",
-				shown < n$3 && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+				shown < n$4 && /* @__PURE__ */ (0, import_jsx_runtime$1.jsxs)("span", {
 					style: { opacity: .75 },
 					children: [
 						"（等距抽样画出 ",
@@ -4330,7 +4372,7 @@ function ScatterChart({ data }) {
 					]
 				})
 			]
-		}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("svg", {
+		}), /* @__PURE__ */ (0, import_jsx_runtime$1.jsxs)("svg", {
 			viewBox: `0 0 ${W$1} ${H$1}`,
 			style: {
 				width: "100%",
@@ -4340,7 +4382,7 @@ function ScatterChart({ data }) {
 			role: "img",
 			"aria-label": "预测值与真实值散点图",
 			children: [
-				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("rect", {
+				/* @__PURE__ */ (0, import_jsx_runtime$1.jsx)("rect", {
 					x: PAD$1.left,
 					y: PAD$1.top,
 					width: iw,
@@ -4349,7 +4391,7 @@ function ScatterChart({ data }) {
 					stroke: "currentColor",
 					opacity: "0.12"
 				}),
-				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("line", {
+				/* @__PURE__ */ (0, import_jsx_runtime$1.jsx)("line", {
 					x1: sx(lo),
 					y1: sy(lo),
 					x2: sx(hi),
@@ -4359,14 +4401,14 @@ function ScatterChart({ data }) {
 					strokeWidth: "1",
 					strokeDasharray: "4,3"
 				}),
-				points.map((p$2, i) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("circle", {
-					cx: sx(p$2.t),
-					cy: sy(p$2.p),
+				points.map((p$3, i) => /* @__PURE__ */ (0, import_jsx_runtime$1.jsx)("circle", {
+					cx: sx(p$3.t),
+					cy: sy(p$3.p),
 					r: r$3,
 					fill: ACCENT$1,
 					opacity: op
 				}, i)),
-				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("text", {
+				/* @__PURE__ */ (0, import_jsx_runtime$1.jsx)("text", {
 					x: PAD$1.left - 6,
 					y: PAD$1.top + 4,
 					textAnchor: "end",
@@ -4375,7 +4417,7 @@ function ScatterChart({ data }) {
 					opacity: "0.55",
 					children: fmt(hi)
 				}),
-				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("text", {
+				/* @__PURE__ */ (0, import_jsx_runtime$1.jsx)("text", {
 					x: PAD$1.left - 6,
 					y: H$1 - PAD$1.bottom,
 					textAnchor: "end",
@@ -4384,7 +4426,7 @@ function ScatterChart({ data }) {
 					opacity: "0.55",
 					children: fmt(lo)
 				}),
-				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("text", {
+				/* @__PURE__ */ (0, import_jsx_runtime$1.jsx)("text", {
 					x: PAD$1.left,
 					y: H$1 - PAD$1.bottom + 13,
 					fontSize: "10",
@@ -4392,7 +4434,7 @@ function ScatterChart({ data }) {
 					opacity: "0.55",
 					children: fmt(lo)
 				}),
-				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("text", {
+				/* @__PURE__ */ (0, import_jsx_runtime$1.jsx)("text", {
 					x: W$1 - PAD$1.right,
 					y: H$1 - PAD$1.bottom + 13,
 					textAnchor: "end",
@@ -4401,7 +4443,7 @@ function ScatterChart({ data }) {
 					opacity: "0.55",
 					children: fmt(hi)
 				}),
-				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("text", {
+				/* @__PURE__ */ (0, import_jsx_runtime$1.jsx)("text", {
 					x: PAD$1.left + iw / 2,
 					y: H$1 - 6,
 					textAnchor: "middle",
@@ -4410,7 +4452,7 @@ function ScatterChart({ data }) {
 					opacity: "0.6",
 					children: "真实值 →"
 				}),
-				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("text", {
+				/* @__PURE__ */ (0, import_jsx_runtime$1.jsx)("text", {
 					x: 12,
 					y: PAD$1.top + ih / 2,
 					textAnchor: "middle",
@@ -4420,10 +4462,10 @@ function ScatterChart({ data }) {
 					transform: `rotate(-90 12 ${PAD$1.top + ih / 2})`,
 					children: "预测值 →"
 				}),
-				/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("g", {
+				/* @__PURE__ */ (0, import_jsx_runtime$1.jsxs)("g", {
 					fontSize: "10",
 					fill: "currentColor",
-					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("line", {
+					children: [/* @__PURE__ */ (0, import_jsx_runtime$1.jsx)("line", {
 						x1: W$1 - PAD$1.right - 92,
 						y1: PAD$1.top + 8,
 						x2: W$1 - PAD$1.right - 76,
@@ -4431,7 +4473,7 @@ function ScatterChart({ data }) {
 						stroke: "currentColor",
 						opacity: "0.35",
 						strokeDasharray: "4,3"
-					}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("text", {
+					}), /* @__PURE__ */ (0, import_jsx_runtime$1.jsx)("text", {
 						x: W$1 - PAD$1.right - 72,
 						y: PAD$1.top + 11,
 						opacity: "0.6",
@@ -4447,28 +4489,28 @@ function ScatterChart({ data }) {
 //#region ../agent/src/client/ConfusionMatrix.tsx
 const ACCENT = "#2563eb";
 /** 单元格边长按类别数收缩，保证整图宽度稳定在卡片内 */
-function cellSize(k$2) {
-	return k$2 <= 3 ? 62 : k$2 <= 5 ? 52 : k$2 <= 8 ? 42 : 34;
+function cellSize(k$3) {
+	return k$3 <= 3 ? 62 : k$3 <= 5 ? 52 : k$3 <= 8 ? 42 : 34;
 }
 /** 标签过长会撑破行首，统一截断并留 title 兜底 */
 function short$1(s$1, max) {
 	return s$1.length <= max ? s$1 : s$1.slice(0, max - 1) + "…";
 }
 function ConfusionMatrix({ data }) {
-	const { classes, matrix, n: n$3, accuracy, perClass, majorityBaseline } = data;
-	const k$2 = classes.length;
-	if (!k$2) return null;
-	const cs = cellSize(k$2);
+	const { classes, matrix, n: n$4, accuracy, perClass, majorityBaseline } = data;
+	const k$3 = classes.length;
+	if (!k$3) return null;
+	const cs = cellSize(k$3);
 	const LEFT = 78;
 	const TOP = 40;
-	const W$5 = LEFT + k$2 * cs + 14;
-	const H$5 = TOP + k$2 * cs + 8;
+	const W$5 = LEFT + k$3 * cs + 14;
+	const H$5 = TOP + k$3 * cs + 8;
 	const rowMax = matrix.map((row) => Math.max(...row, 1));
 	const pct = (v$2) => `${(v$2 * 100).toFixed(1)}%`;
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+	return /* @__PURE__ */ (0, import_jsx_runtime$1.jsxs)("div", {
 		style: { marginTop: 8 },
 		children: [
-			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+			/* @__PURE__ */ (0, import_jsx_runtime$1.jsxs)("div", {
 				style: {
 					fontSize: 12,
 					opacity: .7,
@@ -4476,13 +4518,13 @@ function ConfusionMatrix({ data }) {
 				},
 				children: [
 					"混淆矩阵 · 共 ",
-					n$3,
+					n$4,
 					" 个样本 · 准确率 ",
-					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("b", { children: pct(accuracy) }),
-					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [" · 多数类基线 ", pct(majorityBaseline)] })
+					/* @__PURE__ */ (0, import_jsx_runtime$1.jsx)("b", { children: pct(accuracy) }),
+					/* @__PURE__ */ (0, import_jsx_runtime$1.jsxs)("span", { children: [" · 多数类基线 ", pct(majorityBaseline)] })
 				]
 			}),
-			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("svg", {
+			/* @__PURE__ */ (0, import_jsx_runtime$1.jsxs)("svg", {
 				viewBox: `0 0 ${W$5} ${H$5}`,
 				style: {
 					width: "100%",
@@ -4492,7 +4534,7 @@ function ConfusionMatrix({ data }) {
 				role: "img",
 				"aria-label": "混淆矩阵",
 				children: [
-					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("text", {
+					/* @__PURE__ */ (0, import_jsx_runtime$1.jsx)("text", {
 						x: LEFT,
 						y: 12,
 						fontSize: "10",
@@ -4500,7 +4542,7 @@ function ConfusionMatrix({ data }) {
 						opacity: "0.55",
 						children: "预测类别 →"
 					}),
-					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("text", {
+					/* @__PURE__ */ (0, import_jsx_runtime$1.jsx)("text", {
 						x: 4,
 						y: TOP - 8,
 						fontSize: "10",
@@ -4508,7 +4550,7 @@ function ConfusionMatrix({ data }) {
 						opacity: "0.55",
 						children: "真实类别 ↓"
 					}),
-					classes.map((c, j) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("text", {
+					classes.map((c, j) => /* @__PURE__ */ (0, import_jsx_runtime$1.jsx)("text", {
 						x: LEFT + j * cs + cs / 2,
 						y: TOP - 8,
 						textAnchor: "middle",
@@ -4517,7 +4559,7 @@ function ConfusionMatrix({ data }) {
 						opacity: "0.7",
 						children: short$1(c, 6)
 					}, `h${c}`)),
-					classes.map((rc$1, i) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("g", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("text", {
+					classes.map((rc$1, i) => /* @__PURE__ */ (0, import_jsx_runtime$1.jsxs)("g", { children: [/* @__PURE__ */ (0, import_jsx_runtime$1.jsx)("text", {
 						x: LEFT - 6,
 						y: TOP + i * cs + cs / 2 + 3,
 						textAnchor: "end",
@@ -4527,19 +4569,19 @@ function ConfusionMatrix({ data }) {
 						children: short$1(rc$1, 10)
 					}), classes.map((cc$1, j) => {
 						const v$2 = matrix[i][j];
-						const f$1 = v$2 / rowMax[i];
+						const f$2 = v$2 / rowMax[i];
 						const diag = i === j;
-						return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("g", { children: [
-							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("rect", {
+						return /* @__PURE__ */ (0, import_jsx_runtime$1.jsxs)("g", { children: [
+							/* @__PURE__ */ (0, import_jsx_runtime$1.jsx)("rect", {
 								x: LEFT + j * cs + 1,
 								y: TOP + i * cs + 1,
 								width: cs - 2,
 								height: cs - 2,
 								rx: 3,
 								fill: ACCENT,
-								opacity: v$2 === 0 ? .04 : .1 + .72 * f$1
+								opacity: v$2 === 0 ? .04 : .1 + .72 * f$2
 							}),
-							diag && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("rect", {
+							diag && /* @__PURE__ */ (0, import_jsx_runtime$1.jsx)("rect", {
 								x: LEFT + j * cs + 1,
 								y: TOP + i * cs + 1,
 								width: cs - 2,
@@ -4550,13 +4592,13 @@ function ConfusionMatrix({ data }) {
 								strokeWidth: "1.5",
 								opacity: "0.85"
 							}),
-							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("text", {
+							/* @__PURE__ */ (0, import_jsx_runtime$1.jsx)("text", {
 								x: LEFT + j * cs + cs / 2,
 								y: TOP + i * cs + cs / 2 + 4,
 								textAnchor: "middle",
-								fontSize: k$2 > 8 ? 10 : 12,
+								fontSize: k$3 > 8 ? 10 : 12,
 								fontWeight: diag ? 700 : 400,
-								fill: f$1 > .55 ? "#ffffff" : "currentColor",
+								fill: f$2 > .55 ? "#ffffff" : "currentColor",
 								opacity: v$2 === 0 ? .35 : 1,
 								children: v$2
 							})
@@ -4564,18 +4606,18 @@ function ConfusionMatrix({ data }) {
 					})] }, `r${rc$1}`))
 				]
 			}),
-			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("details", {
+			/* @__PURE__ */ (0, import_jsx_runtime$1.jsxs)("details", {
 				style: {
 					marginTop: 10,
 					fontSize: 12
 				},
-				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("summary", {
+				children: [/* @__PURE__ */ (0, import_jsx_runtime$1.jsx)("summary", {
 					style: {
 						cursor: "pointer",
 						color: "var(--dsw-alias-label-secondary)"
 					},
 					children: "各类别表现"
-				}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				}), /* @__PURE__ */ (0, import_jsx_runtime$1.jsxs)("div", {
 					style: {
 						display: "grid",
 						gridTemplateColumns: "auto repeat(4, minmax(0,1fr))",
@@ -4584,38 +4626,38 @@ function ConfusionMatrix({ data }) {
 						marginTop: 8
 					},
 					children: [
-						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+						/* @__PURE__ */ (0, import_jsx_runtime$1.jsx)("span", {
 							style: { opacity: .55 },
 							children: "类别"
 						}),
-						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+						/* @__PURE__ */ (0, import_jsx_runtime$1.jsx)("span", {
 							style: { opacity: .55 },
 							children: "样本数"
 						}),
-						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+						/* @__PURE__ */ (0, import_jsx_runtime$1.jsx)("span", {
 							style: { opacity: .55 },
 							children: "精确率"
 						}),
-						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+						/* @__PURE__ */ (0, import_jsx_runtime$1.jsx)("span", {
 							style: { opacity: .55 },
 							children: "召回率"
 						}),
-						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+						/* @__PURE__ */ (0, import_jsx_runtime$1.jsx)("span", {
 							style: { opacity: .55 },
 							children: "F1"
 						}),
-						perClass.map((c) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+						perClass.map((c) => /* @__PURE__ */ (0, import_jsx_runtime$1.jsxs)("span", {
 							style: { display: "contents" },
 							children: [
-								/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+								/* @__PURE__ */ (0, import_jsx_runtime$1.jsx)("span", {
 									style: { wordBreak: "break-all" },
 									title: c.label,
 									children: short$1(c.label, 14)
 								}),
-								/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: c.support }),
-								/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: pct(c.precision) }),
-								/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: pct(c.recall) }),
-								/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: pct(c.f1) })
+								/* @__PURE__ */ (0, import_jsx_runtime$1.jsx)("span", { children: c.support }),
+								/* @__PURE__ */ (0, import_jsx_runtime$1.jsx)("span", { children: pct(c.precision) }),
+								/* @__PURE__ */ (0, import_jsx_runtime$1.jsx)("span", { children: pct(c.recall) }),
+								/* @__PURE__ */ (0, import_jsx_runtime$1.jsx)("span", { children: pct(c.f1) })
 							]
 						}, c.label))
 					]
@@ -4636,19 +4678,19 @@ const PAD = {
 	left: 44
 };
 /** 数值数组 → SVG polyline points 串；x 从 i0 开始编号，全序列共 n 点 */
-function toPoints(ys, i0, n$3, min, max) {
+function toPoints(ys, i0, n$4, min, max) {
 	const iw = W - PAD.left - PAD.right;
 	const ih = H - PAD.top - PAD.bottom;
 	const span = max - min || 1;
 	return ys.map((y$2, i) => {
-		const x$3 = PAD.left + (i0 + i) / Math.max(1, n$3 - 1) * iw;
+		const x$3 = PAD.left + (i0 + i) / Math.max(1, n$4 - 1) * iw;
 		const yy = PAD.top + (1 - (y$2 - min) / span) * ih;
 		return `${x$3.toFixed(1)},${yy.toFixed(1)}`;
 	}).join(" ");
 }
 function ForecastChart({ hist, pred, p10, p90, truth, startLabel, endLabel, target }) {
 	if (!hist.length && !pred.length) return null;
-	const n$3 = hist.length + pred.length;
+	const n$4 = hist.length + pred.length;
 	const all = [
 		...hist,
 		...pred,
@@ -4662,16 +4704,16 @@ function ForecastChart({ hist, pred, p10, p90, truth, startLabel, endLabel, targ
 	const hasBand = !!(p10?.length && p90?.length && p10.length === pred.length && p90.length === pred.length);
 	let bandPath = "";
 	if (hasBand) {
-		const up = toPoints(p90, hist.length, n$3, min, max).split(" ");
-		const dn = toPoints(p10, hist.length, n$3, min, max).split(" ").reverse();
+		const up = toPoints(p90, hist.length, n$4, min, max).split(" ");
+		const dn = toPoints(p10, hist.length, n$4, min, max).split(" ").reverse();
 		bandPath = "M" + [...up, ...dn].join(" L") + " Z";
 	}
 	const predWithBridge = hist.length && pred.length ? [hist[hist.length - 1], ...pred] : pred;
 	const predStart = hist.length ? hist.length - 1 : 0;
 	const fmt = (v$2) => Math.abs(v$2) >= 1e3 ? v$2.toFixed(0) : v$2.toPrecision(3);
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+	return /* @__PURE__ */ (0, import_jsx_runtime$1.jsxs)("div", {
 		style: { marginTop: 12 },
-		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+		children: [/* @__PURE__ */ (0, import_jsx_runtime$1.jsxs)("div", {
 			style: {
 				display: "flex",
 				gap: 16,
@@ -4680,15 +4722,15 @@ function ForecastChart({ hist, pred, p10, p90, truth, startLabel, endLabel, targ
 				color: "var(--dsw-alias-label-secondary)"
 			},
 			children: [
-				hist.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "━ 历史" }),
-				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+				hist.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime$1.jsx)("span", { children: "━ 历史" }),
+				/* @__PURE__ */ (0, import_jsx_runtime$1.jsx)("span", {
 					style: { color: "#2563eb" },
 					children: "┄ 预测"
 				}),
-				!!truth?.length && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "━ 实际" }),
-				hasBand && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "▰ P10–P90 区间" })
+				!!truth?.length && /* @__PURE__ */ (0, import_jsx_runtime$1.jsx)("span", { children: "━ 实际" }),
+				hasBand && /* @__PURE__ */ (0, import_jsx_runtime$1.jsx)("span", { children: "▰ P10–P90 区间" })
 			]
-		}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("svg", {
+		}), /* @__PURE__ */ (0, import_jsx_runtime$1.jsxs)("svg", {
 			viewBox: `0 0 ${W} ${H}`,
 			style: {
 				width: "100%",
@@ -4699,7 +4741,7 @@ function ForecastChart({ hist, pred, p10, p90, truth, startLabel, endLabel, targ
 			role: "img",
 			"aria-label": `${target ?? "目标"} 时序预测图`,
 			children: [
-				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("text", {
+				/* @__PURE__ */ (0, import_jsx_runtime$1.jsx)("text", {
 					x: PAD.left - 6,
 					y: PAD.top + 4,
 					textAnchor: "end",
@@ -4708,7 +4750,7 @@ function ForecastChart({ hist, pred, p10, p90, truth, startLabel, endLabel, targ
 					opacity: "0.55",
 					children: fmt(max)
 				}),
-				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("text", {
+				/* @__PURE__ */ (0, import_jsx_runtime$1.jsx)("text", {
 					x: PAD.left - 6,
 					y: H - PAD.bottom,
 					textAnchor: "end",
@@ -4717,7 +4759,7 @@ function ForecastChart({ hist, pred, p10, p90, truth, startLabel, endLabel, targ
 					opacity: "0.55",
 					children: fmt(min)
 				}),
-				startLabel && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("text", {
+				startLabel && /* @__PURE__ */ (0, import_jsx_runtime$1.jsx)("text", {
 					x: PAD.left,
 					y: H - 6,
 					fontSize: "10",
@@ -4725,7 +4767,7 @@ function ForecastChart({ hist, pred, p10, p90, truth, startLabel, endLabel, targ
 					opacity: "0.55",
 					children: startLabel
 				}),
-				endLabel && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("text", {
+				endLabel && /* @__PURE__ */ (0, import_jsx_runtime$1.jsx)("text", {
 					x: W - PAD.right,
 					y: H - 6,
 					textAnchor: "end",
@@ -4734,36 +4776,36 @@ function ForecastChart({ hist, pred, p10, p90, truth, startLabel, endLabel, targ
 					opacity: "0.55",
 					children: endLabel
 				}),
-				hist.length > 0 && pred.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("line", {
-					x1: PAD.left + (hist.length - 1) / Math.max(1, n$3 - 1) * (W - PAD.left - PAD.right),
+				hist.length > 0 && pred.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime$1.jsx)("line", {
+					x1: PAD.left + (hist.length - 1) / Math.max(1, n$4 - 1) * (W - PAD.left - PAD.right),
 					y1: PAD.top,
-					x2: PAD.left + (hist.length - 1) / Math.max(1, n$3 - 1) * (W - PAD.left - PAD.right),
+					x2: PAD.left + (hist.length - 1) / Math.max(1, n$4 - 1) * (W - PAD.left - PAD.right),
 					y2: H - PAD.bottom,
 					stroke: "currentColor",
 					opacity: "0.15",
 					strokeDasharray: "3,3"
 				}),
-				hasBand && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", {
+				hasBand && /* @__PURE__ */ (0, import_jsx_runtime$1.jsx)("path", {
 					d: bandPath,
 					fill: "#2563eb",
 					opacity: "0.13"
 				}),
-				hist.length > 1 && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("polyline", {
-					points: toPoints(hist, 0, n$3, min, max),
+				hist.length > 1 && /* @__PURE__ */ (0, import_jsx_runtime$1.jsx)("polyline", {
+					points: toPoints(hist, 0, n$4, min, max),
 					fill: "none",
 					stroke: "currentColor",
 					strokeWidth: "1.5",
 					opacity: "0.65"
 				}),
-				!!truth?.length && truth.length === pred.length && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("polyline", {
-					points: toPoints(hist.length ? [hist[hist.length - 1], ...truth] : truth, predStart, n$3, min, max),
+				!!truth?.length && truth.length === pred.length && /* @__PURE__ */ (0, import_jsx_runtime$1.jsx)("polyline", {
+					points: toPoints(hist.length ? [hist[hist.length - 1], ...truth] : truth, predStart, n$4, min, max),
 					fill: "none",
 					stroke: "currentColor",
 					strokeWidth: "1.3",
 					opacity: "0.45"
 				}),
-				predWithBridge.length > 1 && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("polyline", {
-					points: toPoints(predWithBridge, predStart, n$3, min, max),
+				predWithBridge.length > 1 && /* @__PURE__ */ (0, import_jsx_runtime$1.jsx)("polyline", {
+					points: toPoints(predWithBridge, predStart, n$4, min, max),
 					fill: "none",
 					stroke: "#2563eb",
 					strokeWidth: "1.8",
@@ -4836,41 +4878,41 @@ function BenchmarkView({ data, staticView = false }) {
 	const range = Math.max(0, ...values) - min || 1;
 	const x$3 = (value) => 150 + 430 * (value - min) / range;
 	const format = (value, name$1 = key) => finite(value) ? name$1.includes("accuracy") ? `${(value * 100).toFixed(2)}%` : String(Number(value.toFixed(4))) : "—";
-	if (!dataset) return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+	if (!dataset) return /* @__PURE__ */ (0, import_jsx_runtime$1.jsx)("p", {
 		className: "lx-result-note",
 		children: "比较结果未包含数据集。"
 	});
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+	return /* @__PURE__ */ (0, import_jsx_runtime$1.jsxs)("div", {
 		ref: root,
 		"aria-label": "多模型效果比较",
 		children: [
-			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("style", { children: CSS }),
-			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+			/* @__PURE__ */ (0, import_jsx_runtime$1.jsx)("style", { children: CSS }),
+			/* @__PURE__ */ (0, import_jsx_runtime$1.jsxs)("div", {
 				className: "lx-bench-controls",
-				children: [staticView ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: dataset.name }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: labels[key] })] }) : /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { children: ["数据集 ", /* @__PURE__ */ (0, import_jsx_runtime.jsx)("select", {
+				children: [staticView ? /* @__PURE__ */ (0, import_jsx_runtime$1.jsxs)(import_jsx_runtime$1.Fragment, { children: [/* @__PURE__ */ (0, import_jsx_runtime$1.jsx)("strong", { children: dataset.name }), /* @__PURE__ */ (0, import_jsx_runtime$1.jsx)("span", { children: labels[key] })] }) : /* @__PURE__ */ (0, import_jsx_runtime$1.jsxs)(import_jsx_runtime$1.Fragment, { children: [/* @__PURE__ */ (0, import_jsx_runtime$1.jsxs)("label", { children: ["数据集 ", /* @__PURE__ */ (0, import_jsx_runtime$1.jsx)("select", {
 					"data-bench": "dataset",
 					value: dataset.id,
 					onChange: () => {},
 					"aria-label": "比较数据集",
-					children: datasets.map((item) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", {
+					children: datasets.map((item) => /* @__PURE__ */ (0, import_jsx_runtime$1.jsx)("option", {
 						value: item.id,
 						children: item.name
 					}, item.id))
-				})] }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { children: ["指标 ", /* @__PURE__ */ (0, import_jsx_runtime.jsx)("select", {
+				})] }), /* @__PURE__ */ (0, import_jsx_runtime$1.jsxs)("label", { children: ["指标 ", /* @__PURE__ */ (0, import_jsx_runtime$1.jsx)("select", {
 					"data-bench": "metric",
 					value: key,
 					onChange: () => {},
 					"aria-label": "比较指标",
-					children: keys.map((item) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", {
+					children: keys.map((item) => /* @__PURE__ */ (0, import_jsx_runtime$1.jsx)("option", {
 						value: item,
 						children: labels[item]
 					}, item))
-				})] })] }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+				})] })] }), /* @__PURE__ */ (0, import_jsx_runtime$1.jsx)("span", {
 					className: "lx-result-meta",
 					children: key === "rmse" || key === "mae" ? "越低越好" : "越高越好"
 				})]
 			}),
-			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
+			/* @__PURE__ */ (0, import_jsx_runtime$1.jsxs)("p", {
 				className: "lx-result-meta",
 				children: [
 					"训练 ",
@@ -4882,12 +4924,12 @@ function BenchmarkView({ data, staticView = false }) {
 					" 个特征 · 相同拆分"
 				]
 			}),
-			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("svg", {
+			/* @__PURE__ */ (0, import_jsx_runtime$1.jsxs)("svg", {
 				className: "lx-bench-chart",
 				viewBox: `0 0 700 ${runs.length * 46 + 32}`,
 				role: "img",
 				"aria-label": `${dataset.name}：${labels[key]}模型对比`,
-				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("line", {
+				children: [/* @__PURE__ */ (0, import_jsx_runtime$1.jsx)("line", {
 					x1: x$3(0),
 					x2: x$3(0),
 					y1: "12",
@@ -4896,17 +4938,17 @@ function BenchmarkView({ data, staticView = false }) {
 					opacity: ".2"
 				}), runs.map((run, index) => {
 					const value = run.status === "succeeded" ? run.metrics?.[key] : null;
-					return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("g", {
+					return /* @__PURE__ */ (0, import_jsx_runtime$1.jsxs)("g", {
 						transform: `translate(0 ${index * 46 + 20})`,
 						children: [
-							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("text", {
+							/* @__PURE__ */ (0, import_jsx_runtime$1.jsx)("text", {
 								x: "0",
 								y: "13",
 								fill: "currentColor",
 								fontSize: "12",
 								children: run.model.replace("LIMIX_", "LimiX ")
 							}),
-							finite(value) && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("rect", {
+							finite(value) && /* @__PURE__ */ (0, import_jsx_runtime$1.jsx)("rect", {
 								x: Math.min(x$3(0), x$3(value)),
 								y: "0",
 								width: Math.abs(x$3(value) - x$3(0)),
@@ -4914,7 +4956,7 @@ function BenchmarkView({ data, staticView = false }) {
 								rx: "2",
 								fill: colors[index % colors.length]
 							}),
-							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("text", {
+							/* @__PURE__ */ (0, import_jsx_runtime$1.jsx)("text", {
 								x: "600",
 								y: "14",
 								fill: "currentColor",
@@ -4925,24 +4967,24 @@ function BenchmarkView({ data, staticView = false }) {
 					}, run.model);
 				})]
 			}),
-			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+			/* @__PURE__ */ (0, import_jsx_runtime$1.jsx)("div", {
 				className: "lx-bench-scroll",
-				children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("table", {
+				children: /* @__PURE__ */ (0, import_jsx_runtime$1.jsxs)("table", {
 					className: "lx-bench-table",
-					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("thead", { children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("tr", { children: [
-						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("th", { children: "模型" }),
-						keys.map((item) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("th", { children: labels[item] }, item)),
-						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("th", { children: "耗时" }),
-						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("th", { children: "状态" })
-					] }) }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("tbody", { children: runs.map((run) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("tr", { children: [
-						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("td", { children: run.model }),
-						keys.map((item) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("td", { children: run.status === "succeeded" ? format(run.metrics?.[item], item) : "—" }, item)),
-						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("td", { children: finite(run.elapsed_seconds) ? `${run.elapsed_seconds.toFixed(1)} 秒` : "—" }),
-						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("td", { children: statuses[run.status] ?? "状态待确认" })
+					children: [/* @__PURE__ */ (0, import_jsx_runtime$1.jsx)("thead", { children: /* @__PURE__ */ (0, import_jsx_runtime$1.jsxs)("tr", { children: [
+						/* @__PURE__ */ (0, import_jsx_runtime$1.jsx)("th", { children: "模型" }),
+						keys.map((item) => /* @__PURE__ */ (0, import_jsx_runtime$1.jsx)("th", { children: labels[item] }, item)),
+						/* @__PURE__ */ (0, import_jsx_runtime$1.jsx)("th", { children: "耗时" }),
+						/* @__PURE__ */ (0, import_jsx_runtime$1.jsx)("th", { children: "状态" })
+					] }) }), /* @__PURE__ */ (0, import_jsx_runtime$1.jsx)("tbody", { children: runs.map((run) => /* @__PURE__ */ (0, import_jsx_runtime$1.jsxs)("tr", { children: [
+						/* @__PURE__ */ (0, import_jsx_runtime$1.jsx)("td", { children: run.model }),
+						keys.map((item) => /* @__PURE__ */ (0, import_jsx_runtime$1.jsx)("td", { children: run.status === "succeeded" ? format(run.metrics?.[item], item) : "—" }, item)),
+						/* @__PURE__ */ (0, import_jsx_runtime$1.jsx)("td", { children: finite(run.elapsed_seconds) ? `${run.elapsed_seconds.toFixed(1)} 秒` : "—" }),
+						/* @__PURE__ */ (0, import_jsx_runtime$1.jsx)("td", { children: statuses[run.status] ?? "状态待确认" })
 					] }, run.model)) })]
 				})
 			}),
-			runs.filter((run) => run.error).map((run) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
+			runs.filter((run) => run.error).map((run) => /* @__PURE__ */ (0, import_jsx_runtime$1.jsxs)("p", {
 				className: "lx-bench-error",
 				children: [
 					run.model,
@@ -5015,13 +5057,13 @@ function parseForecastCsv(text$1, target, dateColumn) {
 	return series;
 }
 /** 从训练 CSV 取目标列尾部 n 点作图表历史段；列缺失/不可数值化返回 null */
-function parseTrainTail(text$1, colTarget, n$3, dateColumn) {
+function parseTrainTail(text$1, colTarget, n$4, dateColumn) {
 	const lines = text$1.trim().split(/\r?\n/);
 	if (lines.length < 2) return null;
 	const header = splitCsvLine(lines[0].replace(/^\uFEFF/, ""));
 	const idx = header.indexOf(colTarget);
 	if (idx < 0) return null;
-	const rows$1 = lines.slice(Math.max(1, lines.length - n$3)).map(splitCsvLine).filter((r$3) => r$3.length === header.length);
+	const rows$1 = lines.slice(Math.max(1, lines.length - n$4)).map(splitCsvLine).filter((r$3) => r$3.length === header.length);
 	const values = toNums(rows$1, idx);
 	if (!values.length || values.some((v$2) => !Number.isFinite(v$2))) return null;
 	const dateIdx = dateColumn ? header.indexOf(dateColumn) : 0;
@@ -5079,15 +5121,15 @@ function buildConfusion(truthRaw, predRaw) {
 	const pairs = [];
 	for (let i = 0; i < truthRaw.length; i++) {
 		const t$3 = norm(truthRaw[i]);
-		const p$2 = norm(predRaw[i]);
-		if (!t$3 || !p$2) continue;
-		pairs.push([t$3, p$2]);
+		const p$3 = norm(predRaw[i]);
+		if (!t$3 || !p$3) continue;
+		pairs.push([t$3, p$3]);
 	}
 	if (!pairs.length) return null;
 	const set = /* @__PURE__ */ new Set();
-	for (const [t$3, p$2] of pairs) {
+	for (const [t$3, p$3] of pairs) {
 		set.add(t$3);
-		set.add(p$2);
+		set.add(p$3);
 	}
 	if (set.size > MAX_CLASSES) return null;
 	const classes = [...set].sort((a, b) => {
@@ -5096,8 +5138,8 @@ function buildConfusion(truthRaw, predRaw) {
 	});
 	const idx = new Map(classes.map((c, i) => [c, i]));
 	const matrix = classes.map(() => classes.map(() => 0));
-	for (const [t$3, p$2] of pairs) matrix[idx.get(t$3)][idx.get(p$2)]++;
-	const n$3 = pairs.length;
+	for (const [t$3, p$3] of pairs) matrix[idx.get(t$3)][idx.get(p$3)]++;
+	const n$4 = pairs.length;
 	let correct = 0;
 	for (let i = 0; i < classes.length; i++) correct += matrix[i][i];
 	const perClass = classes.map((label, i) => {
@@ -5117,11 +5159,11 @@ function buildConfusion(truthRaw, predRaw) {
 	return {
 		classes,
 		matrix,
-		n: n$3,
+		n: n$4,
 		correct,
-		accuracy: correct / n$3,
+		accuracy: correct / n$4,
 		perClass,
-		majorityBaseline: Math.max(...perClass.map((c) => c.support)) / n$3
+		majorityBaseline: Math.max(...perClass.map((c) => c.support)) / n$4
 	};
 }
 /**
@@ -5135,33 +5177,33 @@ function buildScatter(truthRaw, predRaw) {
 	for (let i = 0; i < truthRaw.length; i++) {
 		if (!norm(truthRaw[i]) || !norm(predRaw[i])) continue;
 		const t$3 = Number(norm(truthRaw[i]));
-		const p$2 = Number(norm(predRaw[i]));
-		if (Number.isFinite(t$3) && Number.isFinite(p$2)) all.push({
+		const p$3 = Number(norm(predRaw[i]));
+		if (Number.isFinite(t$3) && Number.isFinite(p$3)) all.push({
 			t: t$3,
-			p: p$2
+			p: p$3
 		});
 	}
 	if (!all.length) return null;
-	const n$3 = all.length;
+	const n$4 = all.length;
 	let ae = 0, se = 0, sum = 0;
-	for (const { t: t$3, p: p$2 } of all) {
-		ae += Math.abs(p$2 - t$3);
-		se += (p$2 - t$3) ** 2;
+	for (const { t: t$3, p: p$3 } of all) {
+		ae += Math.abs(p$3 - t$3);
+		se += (p$3 - t$3) ** 2;
 		sum += t$3;
 	}
-	const mean = sum / n$3;
+	const mean = sum / n$4;
 	let ssTot = 0;
 	for (const { t: t$3 } of all) ssTot += (t$3 - mean) ** 2;
 	const r2 = ssTot > 0 ? 1 - se / ssTot : null;
-	const step = Math.ceil(n$3 / MAX_POINTS);
+	const step = Math.ceil(n$4 / MAX_POINTS);
 	const points = step > 1 ? all.filter((_, i) => i % step === 0) : all;
-	const vals = all.flatMap(({ t: t$3, p: p$2 }) => [t$3, p$2]);
+	const vals = all.flatMap(({ t: t$3, p: p$3 }) => [t$3, p$3]);
 	return {
 		points,
-		n: n$3,
+		n: n$4,
 		shown: points.length,
-		mae: ae / n$3,
-		rmse: Math.sqrt(se / n$3),
+		mae: ae / n$4,
+		rmse: Math.sqrt(se / n$4),
 		r2,
 		min: Math.min(...vals),
 		max: Math.max(...vals)
@@ -5196,7 +5238,7 @@ function validBatchDetail(value, expected) {
 	const rowLimit = value.task_type === "timeseries" ? value.horizon ?? value.input_rows : value.input_rows;
 	const requestedRows = expected.row_numbers ?? expected.samples?.map((sample) => sample.row_number);
 	const expectedRows = requestedRows ? new Set(requestedRows) : void 0;
-	return value.mode === "local" && value.target === expected.target && value.requested_count === expected.requested_count && value.explained_count === expected.explained_count && Array.isArray(names) && names.length > 0 && names.every((n$3) => typeof n$3 === "string") && new Set(names).size === names.length && Array.isArray(samples) && samples.length === expected.explained_count && new Set(samples.map((s$1) => s$1?.row_number)).size === samples.length && samples.every((s$1) => Number.isInteger(s$1?.row_number) && s$1.row_number > 0 && (rowLimit === void 0 || s$1.row_number <= rowLimit) && (!expectedRows || expectedRows.has(s$1.row_number)) && (typeof s$1.prediction === "string" || Number.isFinite(s$1.prediction) || value.task_type === "timeseries" && s$1.prediction === void 0) && (s$1.step === void 0 || Number.isInteger(s$1.step) && s$1.step > 0) && (value.task_type !== "timeseries" || s$1.step === void 0 || s$1.step === s$1.row_number && (rowLimit === void 0 || s$1.step <= rowLimit)) && (s$1.timestamp === void 0 || typeof s$1.timestamp === "string") && (s$1.feature_values === void 0 || Array.isArray(s$1.feature_values) && s$1.feature_values.length === names.length && s$1.feature_values.every((v$2) => v$2 === null || typeof v$2 === "string" || typeof v$2 === "boolean" || typeof v$2 === "number" && Number.isFinite(v$2))) && Array.isArray(s$1.scores) && s$1.scores.length === names.length && s$1.scores.every(Number.isFinite) && Array.isArray(s$1.directions) && s$1.directions.length === names.length && s$1.directions.every((v$2) => v$2 === null || v$2 === 0 || v$2 === 1 || v$2 === -1));
+	return value.mode === "local" && value.target === expected.target && value.requested_count === expected.requested_count && value.explained_count === expected.explained_count && Array.isArray(names) && names.length > 0 && names.every((n$4) => typeof n$4 === "string") && new Set(names).size === names.length && Array.isArray(samples) && samples.length === expected.explained_count && new Set(samples.map((s$1) => s$1?.row_number)).size === samples.length && samples.every((s$1) => Number.isInteger(s$1?.row_number) && s$1.row_number > 0 && (rowLimit === void 0 || s$1.row_number <= rowLimit) && (!expectedRows || expectedRows.has(s$1.row_number)) && (typeof s$1.prediction === "string" || Number.isFinite(s$1.prediction) || value.task_type === "timeseries" && s$1.prediction === void 0) && (s$1.step === void 0 || Number.isInteger(s$1.step) && s$1.step > 0) && (value.task_type !== "timeseries" || s$1.step === void 0 || s$1.step === s$1.row_number && (rowLimit === void 0 || s$1.step <= rowLimit)) && (s$1.timestamp === void 0 || typeof s$1.timestamp === "string") && (s$1.feature_values === void 0 || Array.isArray(s$1.feature_values) && s$1.feature_values.length === names.length && s$1.feature_values.every((v$2) => v$2 === null || typeof v$2 === "string" || typeof v$2 === "boolean" || typeof v$2 === "number" && Number.isFinite(v$2))) && Array.isArray(s$1.scores) && s$1.scores.length === names.length && s$1.scores.every(Number.isFinite) && Array.isArray(s$1.directions) && s$1.directions.length === names.length && s$1.directions.every((v$2) => v$2 === null || v$2 === 0 || v$2 === 1 || v$2 === -1));
 }
 function sampleLabel(sample, data) {
 	const label = data.task_type === "timeseries" ? `第 ${sample.step ?? sample.row_number} 步` : `第 ${sample.row_number} 行`;
@@ -5234,7 +5276,7 @@ function singleSampleMatrix(data) {
 //#region ../agent/src/client/contribution-matrix.ts
 function contributionMatrix(data) {
 	const samples = data.samples ?? [], names = data.feature_names ?? [];
-	const maximum = samples.reduce((m$1, s$1) => s$1.scores.reduce((n$3, v$2) => Math.max(n$3, Math.abs(v$2)), m$1), 0);
+	const maximum = samples.reduce((m$2, s$1) => s$1.scores.reduce((n$4, v$2) => Math.max(n$4, Math.abs(v$2)), m$2), 0);
 	return {
 		rows: samples.map((sample, sampleIndex) => ({
 			sampleIndex,
@@ -5268,15 +5310,15 @@ function contributionMatrix(data) {
 function contributionScales(...groups) {
 	const matrices = groups.map(contributionMatrix);
 	return {
-		maximum: Math.max(0, ...matrices.map((m$1) => m$1.maximum)),
-		meanMaximum: Math.max(0, ...matrices.flatMap((m$1) => m$1.ranking.map((f$1) => Math.abs(f$1.mean ?? 0))))
+		maximum: Math.max(0, ...matrices.map((m$2) => m$2.maximum)),
+		meanMaximum: Math.max(0, ...matrices.flatMap((m$2) => m$2.ranking.map((f$2) => Math.abs(f$2.mean ?? 0))))
 	};
 }
 
 //#endregion
 //#region ../agent/src/client/graph-layout.ts
 function graphLayout(nodes, edges) {
-	const adjacency = new Map(nodes.map((n$3) => [n$3, edges.filter((e) => e.source === n$3).map((e) => e.target)]));
+	const adjacency = new Map(nodes.map((n$4) => [n$4, edges.filter((e) => e.source === n$4).map((e) => e.target)]));
 	let index = 0;
 	const stack = [], onStack = /* @__PURE__ */ new Set(), indices = /* @__PURE__ */ new Map(), low = /* @__PURE__ */ new Map(), groups = [];
 	const visit = (node) => {
@@ -5299,11 +5341,11 @@ function graphLayout(nodes, edges) {
 			groups.push(group);
 		}
 	};
-	nodes.forEach((n$3) => {
-		if (!indices.has(n$3)) visit(n$3);
+	nodes.forEach((n$4) => {
+		if (!indices.has(n$4)) visit(n$4);
 	});
 	const membership = /* @__PURE__ */ new Map();
-	groups.forEach((g, i) => g.forEach((n$3) => membership.set(n$3, i)));
+	groups.forEach((g, i) => g.forEach((n$4) => membership.set(n$4, i)));
 	const levels = /* @__PURE__ */ new Map();
 	const level = (g) => {
 		if (levels.has(g)) return levels.get(g);
@@ -5312,17 +5354,17 @@ function graphLayout(nodes, edges) {
 		levels.set(g, value);
 		return value;
 	};
-	const isolated = nodes.filter((n$3) => !edges.some((e) => e.source === n$3 || e.target === n$3));
+	const isolated = nodes.filter((n$4) => !edges.some((e) => e.source === n$4 || e.target === n$4));
 	const columns = /* @__PURE__ */ new Map();
-	for (const node of nodes.filter((n$3) => !isolated.includes(n$3))) {
-		const l$4 = Math.min(3, level(membership.get(node)));
-		columns.set(l$4, [...columns.get(l$4) ?? [], node]);
+	for (const node of nodes.filter((n$4) => !isolated.includes(n$4))) {
+		const l$5 = Math.min(3, level(membership.get(node)));
+		columns.set(l$5, [...columns.get(l$5) ?? [], node]);
 	}
 	if (isolated.length) columns.set(Math.max(-1, ...columns.keys()) + 1, isolated);
 	const layers = [...columns.entries()].sort(([a], [b]) => a - b).map(([, group]) => group), width = Math.max(620, layers.length * 190 + 30);
 	const height = Math.max(230, Math.max(0, ...layers.map((c) => c.length)) * 50 + 48);
 	const positions = /* @__PURE__ */ new Map();
-	layers.forEach((col, i) => col.forEach((n$3, j) => positions.set(n$3, [layers.length === 1 ? width / 2 : 85 + i * (width - 170) / (layers.length - 1), 35 + (j + .5) * (height - 55) / col.length])));
+	layers.forEach((col, i) => col.forEach((n$4, j) => positions.set(n$4, [layers.length === 1 ? width / 2 : 85 + i * (width - 170) / (layers.length - 1), 35 + (j + .5) * (height - 55) / col.length])));
 	return {
 		positions,
 		width,
@@ -5364,7 +5406,7 @@ function contributionExportSvg(data, filtered, description = "", theme = default
 		title: `${data.input_rows && (data.samples?.length ?? 0) < data.input_rows ? "本次已解释" : "全样本"} · ${data.samples?.length ?? 0} 个样本${data.input_rows ? ` / 输入 ${data.input_rows} 行` : ""}`
 	}];
 	const plotWidth = Math.max(700, (data.feature_names?.length ?? 1) * 32);
-	const labelWidth = Math.min(250, Math.max(100, ...(data.feature_names ?? []).map((n$3) => (data.labels?.[n$3] ?? n$3).length * 10)));
+	const labelWidth = Math.min(250, Math.max(100, ...(data.feature_names ?? []).map((n$4) => (data.labels?.[n$4] ?? n$4).length * 10)));
 	const width = 80 + plotWidth + 64 + labelWidth + 20 + 290 + 110;
 	const plotHeight = Math.max(330, Math.min(600, (data.samples?.length ?? 1) * 4));
 	const rankHeight = Math.max(plotHeight, (data.feature_names?.length ?? 1) * 28);
@@ -5434,7 +5476,42 @@ function graphExportSvg(data, theme = defaultExportTheme, scope = "完整网络"
 }
 
 //#endregion
+//#region node_modules/react/cjs/react-jsx-runtime.production.min.js
+var require_react_jsx_runtime_production_min = /* @__PURE__ */ __commonJS({ "node_modules/react/cjs/react-jsx-runtime.production.min.js": ((exports) => {
+	var f = require_react(), k = Symbol.for("react.element"), l = Symbol.for("react.fragment"), m = Object.prototype.hasOwnProperty, n = f.__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED.ReactCurrentOwner, p = {
+		key: !0,
+		ref: !0,
+		__self: !0,
+		__source: !0
+	};
+	function q(c, a, g) {
+		var b, d = {}, e = null, h = null;
+		void 0 !== g && (e = "" + g);
+		void 0 !== a.key && (e = "" + a.key);
+		void 0 !== a.ref && (h = a.ref);
+		for (b in a) m.call(a, b) && !p.hasOwnProperty(b) && (d[b] = a[b]);
+		if (c && c.defaultProps) for (b in a = c.defaultProps, a) void 0 === d[b] && (d[b] = a[b]);
+		return {
+			$$typeof: k,
+			type: c,
+			key: e,
+			ref: h,
+			props: d,
+			_owner: n.current
+		};
+	}
+	exports.jsx = q;
+}) });
+
+//#endregion
+//#region node_modules/react/jsx-runtime.js
+var require_jsx_runtime = /* @__PURE__ */ __commonJS({ "node_modules/react/jsx-runtime.js": ((exports, module) => {
+	module.exports = require_react_jsx_runtime_production_min();
+}) });
+
+//#endregion
 //#region src/report/charts.tsx
+var import_jsx_runtime = /* @__PURE__ */ __toESM(require_jsx_runtime());
 /** 无时区的 ISO 日期时间按 UTC 比较；不允许 Date.parse 自动纠正无效日期。 */
 function orderedDates(dates, source) {
 	const times = dates.map((value) => {
@@ -5488,21 +5565,21 @@ async function renderChart(chart, read) {
 						name: "适用范围",
 						value: count === matrix.input_rows ? "全部输入样本" : "仅本次已解释样本，不能代表全部输入"
 					},
-					...contributionMatrix(matrix).ranking.slice(0, 5).map((f$1) => ({
-						name: f$1.label + "（" + f$1.name + "）",
-						value: f$1.mean === null ? "方向未定" : Number(f$1.mean.toFixed(6)),
+					...contributionMatrix(matrix).ranking.slice(0, 5).map((f$2) => ({
+						name: f$2.label + "（" + f$2.name + "）",
+						value: f$2.mean === null ? "方向未定" : Number(f$2.mean.toFixed(6)),
 						meaning: "本次已解释样本的带正负平均贡献；" + [
 							1,
 							-1,
 							0,
 							null
-						].map((direction) => `${direction === 1 ? "正向" : direction === -1 ? "负向" : direction === 0 ? "中性" : "方向未知"} ${matrix.samples.filter((sample) => sample.directions[f$1.featureIndex] === direction).length} 个`).join("，") + "；不表示干预收益"
+						].map((direction) => `${direction === 1 ? "正向" : direction === -1 ? "负向" : direction === 0 ? "中性" : "方向未知"} ${matrix.samples.filter((sample) => sample.directions[f$2.featureIndex] === direction).length} 个`).join("，") + "；不表示干预收益"
 					}))
 				]
 			};
 		}
 		if (!["directed", "undirected"].includes(data.mode) || !Array.isArray(data.nodes) || !data.nodes.length || !Array.isArray(data.edges)) throw new Error("关系图须使用完整的 .view.json");
-		if (data.nodes.some((n$3) => typeof n$3 !== "string") || new Set(data.nodes).size !== data.nodes.length || data.edges.some((e) => !data.nodes.includes(e.source) || !data.nodes.includes(e.target) || !Number.isFinite(e.weight))) throw new Error("关系图节点或连线无效");
+		if (data.nodes.some((n$4) => typeof n$4 !== "string") || new Set(data.nodes).size !== data.nodes.length || data.edges.some((e) => !data.nodes.includes(e.source) || !data.nodes.includes(e.target) || !Number.isFinite(e.weight))) throw new Error("关系图节点或连线无效");
 		return {
 			html: graphExportSvg(data),
 			warnings: [...statusWarnings, "连线表示模型探索的关系，不能据此认定干预收益。"],
@@ -5892,6 +5969,7 @@ function apply(ctx, config = {}) {
 	registerPredictCommand(ctx);
 	registerExplainCommand(ctx);
 	registerBenchmarkCommand(ctx);
+	registerReportWorkflow(ctx);
 	ctx.effect(() => ctx.webServer.register({
 		kind: "exact",
 		path: "/limix-ui/report-status",

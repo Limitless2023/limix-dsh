@@ -55,3 +55,12 @@ npm提交后有数分钟的处理期，期间404如实记录；待全部可下�
 本机desktop五包已升级0.3.11，并正常退出、重开DSH。升级前备份；443个原有配置、凭据、会话、附件及其他文件哈希不变。package.json、pnpm-lock.yaml更新版本；pnpm-workspace.yaml仅将五包的新版本加入安装器生成的minimumReleaseAgeExclude，其他设置未变。桌面profile禁止CLI dump-config，未绕过此限制；没有将安装验证表述为桌面新会话实际预测验证。
 
 本轮没有重新做第二台电脑、Windows、完整业务API流程或截图验收；咨询推断、报告人工审阅与上游光学无向解释问题继续保留。独立升级证据位于Coffee/_recon/npm-0311-validation，构建测试位于Coffee/_recon/release-0.3.11-validation；不上传用户备份或凭据。
+
+
+## 0.3.12 发布与升级
+
+2026-11-02：五包从干净提交868aaf0构建并通过发布预检。公共npm五包固定版本与latest均为0.3.12；真实下载的integrity和SHA256与构建清单一致。GitHub Release v0.3.12已公开，五个tgz、manifest和SHA256SUMS回下载与本地逐字节一致。
+
+独立DSH_HOME使用桌面自带CLI完成公共npm0.3.11→0.3.12升级。五包实际版本、精确依赖和bundle去重检查通过；标准模式选择、数据源文件、profile patch保持一致。假凭据通过安装包内实际读取器校验，用户真实API配置哈希不变。npm处理期间首次升级因版本暂不可用失败；保留失败日志，五包全部可下载后原环境重试通过。
+
+验收证据位于Coffee/_recon/npm-0312-public：registry.json、migration-results.json、首次失败与重试日志、github-assets。不上传测试凭据或用户配置。本轮未更新日常desktop安装；未重新验证Windows、第二台电脑、tgz迁移或全部业务API。提示词推断、报告人工审阅和光学20变量无向解释上游问题继续保留。

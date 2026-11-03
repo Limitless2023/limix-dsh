@@ -4,7 +4,7 @@
 
 ## 插件组成
 
-套件由五个包组成，当前版本为 0.3.14。`data`、`tool`、`agent`、`preset` 共同提供 LimiX Agent；`cover` 负责品牌外观，可选。
+套件由五个包组成，公共稳定版为 0.3.14，仓库中的 0.3.15 为待发布候选版。`data`、`tool`、`agent`、`preset` 共同提供 LimiX Agent；`cover` 负责品牌外观，可选。
 
 | 包 | 职责 |
 | --- | --- |

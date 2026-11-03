@@ -30,6 +30,27 @@ react_jsx_runtime = __toESM(react_jsx_runtime);
 let react_dom = require("react-dom");
 react_dom = __toESM(react_dom);
 
+//#region src/client/prediction-summary.ts
+/**
+* [INPUT]: 结果 CSV 的预测日期、结果行数与实际评估数量。
+* [OUTPUT]: forecastSummary，紧凑预测范围与评估文案；不将未知频率称为天。
+* [POS]: 工具卡时序展示口径；只读已返回的数据，不计算评估指标。
+* [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
+*/
+function forecastSummary(dates, rows$1, evaluated) {
+	const count = (v) => typeof v === "number" && Number.isSafeInteger(v) && v >= 0;
+	const total = dates?.length || (count(rows$1) ? rows$1 : void 0);
+	const unit = !!dates && dates.length > 1 && dates.every((date, i) => {
+		const timestamp = Date.parse(date);
+		return Number.isFinite(timestamp) && (!i || timestamp - Date.parse(dates[i - 1]) === 864e5);
+	}) ? "天" : "步";
+	return {
+		range: dates?.length ? `${dates[0]} — ${dates[dates.length - 1]}` : total !== void 0 ? `预测 ${total} 步` : "",
+		evaluation: count(evaluated) ? total !== void 0 && evaluated < total ? `已评估 ${evaluated}/${total} ${unit}` : `评估 ${evaluated} ${unit}` : ""
+	};
+}
+
+//#endregion
 //#region src/client/ActionMenu.tsx
 function ActionMenu({ label, children, up = false }) {
 	const ref = (0, react.useRef)(null);
@@ -4588,6 +4609,10 @@ const CSS$1 = `
 .lx-result-status[data-state=running]{color:#a56b16}
 .lx-result-status[data-state=warning]{color:#a56b16}
 .lx-result-meta{margin:5px 0 0;color:var(--dsw-alias-label-secondary);font-size:12px}
+.lx-forecast-meta{display:flex;align-items:baseline;justify-content:space-between;gap:8px 20px;flex-wrap:wrap;margin-top:8px;color:var(--dsw-alias-label-secondary);font-size:12px}
+.lx-forecast-footer{margin-left:auto;display:flex;align-items:center;gap:14px;color:var(--dsw-alias-label-secondary);font-size:12px}
+.lx-forecast-baseline{max-width:360px;padding:6px 10px}
+.lx-forecast-baseline p{margin:6px 0}
 .lx-result-metrics{display:flex;flex-wrap:wrap;gap:14px 28px;margin:17px 0 12px;padding:0}
 .lx-result-metrics div{min-width:90px}
 .lx-result-metrics dt{font-size:11px;color:var(--dsw-alias-label-tertiary)}
@@ -4790,6 +4815,7 @@ function LimixToolCard({ callId, block, inspect, cwd, openFile }) {
 					p90: series.p90,
 					truth,
 					target: series.target,
+					forecastDates: series.dates,
 					startLabel: startLabel ?? series.dates[0],
 					endLabel: series.dates[series.dates.length - 1]
 				});
@@ -4803,7 +4829,8 @@ function LimixToolCard({ callId, block, inspect, cwd, openFile }) {
 	const benchmark = command === "benchmark" && parsed?.kind === "benchmark" && Array.isArray(parsed.datasets) && Array.isArray(parsed.runs) ? parsed : null;
 	const report = command === "report" && !cliFailed && parsed?.kind === "report" ? parsed : null;
 	const explanation = command === "explain" && !cliFailed ? parsed?.explanation : null;
-	const target = explanation?.target_label ?? flagValue("--target");
+	const rawTarget = flagValue("--target");
+	const target = explanation?.target_label ?? (typeof parsed?.target_label === "string" ? parsed.target_label : typeof parsed?.labels?.fields?.[rawTarget ?? ""] === "string" ? parsed.labels.fields[rawTarget] : rawTarget);
 	const rows$1 = parsed?.result_content?.rows ?? parsed?.rows;
 	const sampleCount = parsed?.metrics?.n;
 	const help = argList$1.some((arg) => arg === "--help" || arg === "-h");
@@ -4812,6 +4839,8 @@ function LimixToolCard({ callId, block, inspect, cwd, openFile }) {
 		"classify",
 		"forecast"
 	].includes(command);
+	const forecast = prediction && command === "forecast";
+	const forecastMeta = forecastSummary(chart?.forecastDates, rows$1, sampleCount);
 	const title = help ? "参数说明" : parsed?.kind === "report_facts" ? "报告数据核验" : COMMAND_LABELS[command] ?? "工具结果";
 	const originalFile = report && typeof report.report_path === "string" ? report.report_path : typeof parsed?.saved_to === "string" ? parsed.saved_to : null;
 	const [reportAvailability, setReportAvailability] = (0, react.useState)(null);
@@ -4988,9 +5017,13 @@ function LimixToolCard({ callId, block, inspect, cwd, openFile }) {
 						role: "alert",
 						children: fullscreen.error
 					}),
-					!compact && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("p", {
+					!compact && !forecast && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("p", {
 						className: "lx-result-meta",
 						children: [typeof rows$1 === "number" && Number.isFinite(rows$1) ? `${rows$1} 行预测结果` : "", typeof sampleCount === "number" && Number.isFinite(sampleCount) ? `${typeof rows$1 === "number" ? " · " : ""}${sampleCount} 个样本参与评估` : ""]
+					}),
+					forecast && status.kind === "done" && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+						className: "lx-forecast-meta",
+						children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { children: forecastMeta.range }), metrics.length > 0 && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { children: forecastMeta.evaluation })]
 					}),
 					benchmark && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(BenchmarkView, { data: benchmark }),
 					report && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [
@@ -5037,21 +5070,6 @@ function LimixToolCard({ callId, block, inspect, cwd, openFile }) {
 						role: "status",
 						children: "任务已完成；本次评估 R² 小于 0，效果弱于测试真值均值对照，需进一步验证后再用于业务。"
 					}),
-					parsed?.baseline_evaluation && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("details", {
-						className: "lx-result-note",
-						children: [
-							/* @__PURE__ */ (0, react_jsx_runtime.jsx)("summary", { children: "查看预测时可用的时序基线对照" }),
-							/* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", { children: parsed.baseline_evaluation.description }),
-							parsed.baseline_evaluation.metrics && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("p", { children: [
-								"MAE ",
-								parsed.baseline_evaluation.metrics?.mae,
-								" · RMSE ",
-								parsed.baseline_evaluation.metrics?.rmse,
-								" · R² ",
-								parsed.baseline_evaluation.metrics?.r2 ?? "无定义"
-							] })
-						]
-					}),
 					cliFailed ? /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("p", {
 						className: "lx-result-note",
 						role: "alert",
@@ -5080,9 +5098,9 @@ function LimixToolCard({ callId, block, inspect, cwd, openFile }) {
 							className: "lx-result-note",
 							children: "正在提交数据并等待预测结果…"
 						}),
-						prediction && settled && status.kind === "done" && metrics.length === 0 && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
+						prediction && !forecast && settled && status.kind === "done" && metrics.length === 0 && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
 							className: "lx-result-note",
-							children: "预测已完成；本次未返回评估指标。"
+							children: "本次未返回评估指标。"
 						}),
 						chart && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(ForecastChart, { ...chart }),
 						evalView?.kind === "cls" && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(ConfusionMatrix, { data: evalView.data }),
@@ -5194,6 +5212,24 @@ function LimixToolCard({ callId, block, inspect, cwd, openFile }) {
 									}),
 									fileLinks
 								]
+							}),
+							forecast && status.kind === "done" && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+								className: "lx-forecast-footer",
+								children: [metrics.length === 0 && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { children: "本次未返回评估指标" }), parsed?.baseline_evaluation?.metrics && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(ActionMenu, {
+									label: "基线对比",
+									up: true,
+									children: /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+										className: "lx-forecast-baseline",
+										children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", { children: parsed.baseline_evaluation.description }), /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("p", { children: [
+											"MAE ",
+											parsed.baseline_evaluation.metrics.mae,
+											" · RMSE ",
+											parsed.baseline_evaluation.metrics.rmse,
+											" · R² ",
+											parsed.baseline_evaluation.metrics.r2 ?? "无定义"
+										] })]
+									})
+								})]
 							}),
 							!explanation && !prediction && rawToggle,
 							!prediction && metrics.length > 0 && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {

@@ -1,16 +1,16 @@
 # LimiX 五插件 npm 分发
 
-当前套件版本：**0.3.14**。五包统一更新，咨询推断的已知问题见 [提示词验收记录](docs/PROMPT-EVALUATION.md)。GitHub Release tgz 分发继续保留。
+公共稳定版：**0.3.14**；源码候选版：**0.3.15（待手动 Actions 发布）**。五包统一更新，咨询推断的已知问题见 [提示词验收记录](docs/PROMPT-EVALUATION.md)。GitHub Release tgz 分发继续保留。
 
 ## 发布方案
 
 保留五个包名：`dsh-limix-data`、`dsh-limix-tool`、`dsh-limix-agent`、`dsh-limix-preset`、`dsh-limix-cover`。五包统一版本；npm 与 GitHub Release 使用同一批 tgz，SHA256SUMS 校验这些文件。
 
-0.3.10 的 npm 首装与 tgz 迁移验证保留为历史记录；本次使用新版本 0.3.14，避免同一版本存在不同包内容。发布前从干净提交打包，并核对源码提交与包清单。
+0.3.10 的 npm 首装与 tgz 迁移验证保留为历史记录；下一次发布使用新版本 0.3.15，避免同一版本存在不同包内容。发布前从干净提交打包，并核对源码提交与包清单。
 
 五包没有互相声明 npm 依赖，需一次安装全部五包。preset 在 LimiX 模式中加载 tool；tool 的空 bundle patch 是有意设计，不额外挂载全局工具。data 保留 mysql2、pg 运行依赖；其余包随包提供构建产物，使用者无需编译。不会打包另一份 Harness。
 
-五包已由 npm 账号 `limix2026` 发布。自有代码采用 PolyForm Noncommercial 1.0.0；商业授权与第三方权利见 [许可说明](LICENSING.md)。
+稳定版五包已由 npm 账号 `limix2026` 发布；0.3.15 尚未发布，下面的安装指令仍指向已验收的 0.3.14。自有代码采用 PolyForm Noncommercial 1.0.0；商业授权与第三方权利见 [许可说明](LICENSING.md)。
 
 ## 支持条件
 

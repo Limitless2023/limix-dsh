@@ -2,6 +2,12 @@
 
 > L2 | 父级: ../CLAUDE.md
 
+business-acceptance-20261103.md - 业务验收与证据范围的提示词迭代，保留真实模型回答和未通过项。
+
+time-summary-20261103.md - 时序时间证据、逐点误差、三组 DSH CLI 日期专项验证及剩余总结问题。
+
+forecast-copy-20261103/ - 调用前说明与时序卡片精简的真实 DSH 验收记录和截图。
+
 card-files-0314-review.md - 0.3.14 卡片折叠、任务文件、菜单与热力图留白审查及验收边界。
 
 causal-ui-0313-review.md - 0.3.13 因果 UI、场景比较契约、导出与 DSH 实际验收，保留上游错误。

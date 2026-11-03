@@ -1,6 +1,6 @@
 """
 [INPUT]: forecast 参数与本地 CSV；识别常用分隔符及 UTF 编码 BOM。
-[OUTPUT]: 上传前预检与请求参数构建；版本 ID 的远端内容交服务端校验。
+[OUTPUT]: 上传前预检、请求参数构建与结果时间摘要；未知范围不外推。
 [POS]: limix.py 的时序分支；不发网络请求、不修改用户数据。
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 """
@@ -116,3 +116,76 @@ def forecast_payload(args, resolve):
         'distribution_point': args.point, 'reduce_window': args.reduce_window, 'stride': args.stride,
         'model_type': args.model, 'finetuned_result_id': args.finetuned, 'timeout_seconds': args.timeout,
     }
+
+
+def forecast_summary(context, payload, result_path, metrics):
+    """时间证据绑定单次任务；预测日期只读结果，不按历史末日推算。"""
+    from limix_metrics import _read_csv_rows
+
+    column, target = context.get('date'), context.get('target')
+    summary = {'target': target, 'date_column': column,
+               'requested_context': payload.get('context_size'),
+               'requested_horizon': payload.get('horizon'),
+               'training': {'status': 'unavailable'},
+               'prediction': {'status': 'unavailable'},
+               'evaluation': {'status': 'unavailable'},
+               'largest_errors': []}
+
+    def scope(rows, fmt=None):
+        if not rows or not column or any(not row.get(column) for row in rows):
+            raise ValueError('日期缺失')
+        try:
+            dates(rows, column, None, '时间摘要')
+        except ValueError:
+            if not fmt:
+                raise
+            dates(rows, column, fmt, '时间摘要')
+        return {'status': 'verified', 'start': rows[0][column],
+                'end': rows[-1][column], 'rows': len(rows)}
+
+    try:
+        train = local_rows(context.get('train'), '训练集')
+        if train:
+            summary['training'] = dict(scope(train[1], payload.get('col_date_format')),
+                                       source=str(context['train']), scope='uploaded_history')
+    except (OSError, ValueError, KeyError, csv.Error) as exc:
+        summary['training']['reason'] = str(exc)
+    try:
+        predicted = _read_csv_rows(result_path)
+        summary['prediction'] = scope(predicted, payload.get('col_date_format'))
+    except (OSError, UnicodeError, ValueError, KeyError, csv.Error) as exc:
+        summary['prediction']['reason'] = str(exc)
+        return summary
+    if not metrics:
+        summary['evaluation']['reason'] = '没有可用的对齐真值指标；不推断评估范围或逐日误差'
+        return summary
+    try:
+        truth = _read_csv_rows(context['predict_path'])
+        if len(truth) != len(predicted) or [r.get(column) for r in truth] != [r.get(column) for r in predicted]:
+            raise ValueError('真值与预测日期未逐行对齐')
+        columns = {c.lower(): c for c in predicted[0] if c}
+        pred_col = next((columns[c.lower()] for c in (f'pred_{target}', 'pred_label')
+                         if c.lower() != target.lower() and c.lower() in columns), None)
+        if not pred_col:
+            raise ValueError('缺少明确预测列')
+        paired, errors = [], []
+        for actual, prediction in zip(truth, predicted):
+            try:
+                a, b = float(actual[target]), float(prediction[pred_col])
+            except (ValueError, TypeError):
+                continue
+            if not (math.isfinite(a) and math.isfinite(b)):
+                continue
+            paired.append(actual)
+            errors.append({'date': actual[column], 'actual': a, 'prediction': b,
+                           'error': round(b-a, 6), 'absolute_error': round(abs(b-a), 6)})
+        if len(paired) != metrics.get('n'):
+            raise ValueError('有效配对数量与评估指标不一致')
+        summary['evaluation'] = dict(scope(paired, payload.get('col_date_format')),
+                                     source=str(context['predict_path']),
+                                     dates=[r[column] for r in paired],
+                                     coverage='full' if len(paired) == len(predicted) else 'partial')
+        summary['largest_errors'] = sorted(errors, key=lambda e: -e['absolute_error'])[:3]
+    except (OSError, UnicodeError, ValueError, KeyError, TypeError, csv.Error) as exc:
+        summary['evaluation'] = {'status': 'unavailable', 'reason': str(exc)}
+    return summary

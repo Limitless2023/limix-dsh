@@ -261,3 +261,28 @@ test('同一比较续查只显示最新结果，报告核验归辅助调用', ()
   const html=renderToStaticMarkup(React.createElement(LimixTurnStack,{turn:{start:{seq:0},end:{seq:4}},sessionId:'test',useTrajectory:fn=>fn({eventNodes:nodes})}))
   assert.match(html,/1 个任务/);assert.doesNotMatch(html,/分析报告|处理中/);assert.match(html,/查看辅助调用/)
 })
+
+
+test('时序卡片将缺失指标与基线对比放到底栏，不重复完成和结果行数', () => {
+  const forecastCard = data => renderToStaticMarkup(React.createElement(LimixToolCard, {callId:'forecast', block:{
+    kind:'tool-result', call:{name:'limix',argsRaw:JSON.stringify({command:'forecast',args:['--target','cups_sold']})},
+    content:[{type:'text',text:JSON.stringify({status:'finished',rows:7,...data})}],
+  }}))
+  const noMetrics=forecastCard({target_label:'每日销量'})
+  assert.match(noMetrics,/时序预测 · 每日销量/)
+  assert.doesNotMatch(noMetrics,/7 行预测结果|预测已完成/)
+  assert.match(noMetrics,/class="lx-forecast-footer"><span>本次未返回评估指标/)
+  const evaluated=forecastCard({metrics:{n:7,mae:5},baseline_evaluation:{description:'沿用上周同日销量',metrics:{mae:6,rmse:8,r2:0.5}}})
+  assert.match(evaluated,/评估 7 步/)
+  assert.match(evaluated,/基线对比/)
+  assert.doesNotMatch(evaluated,/本次未返回|样本参与评估|查看预测时可用/)
+  assert.match(evaluated,/lx-forecast-footer/)
+})
+
+test('时序范围以返回日期为准，小时级、部分评估与缺少数量不误写成天', () => {
+  const {forecastSummary}=require('../src/client/prediction-summary.ts')
+  assert.deepEqual(forecastSummary(['2026-11-01','2026-11-02','2026-11-03'],3,2),{range:'2026-11-01 — 2026-11-03',evaluation:'已评估 2/3 天'})
+  assert.equal(forecastSummary(['2026-11-01T00:00:00','2026-11-01T01:00:00'],2,2).evaluation,'评估 2 步')
+  assert.deepEqual(forecastSummary(undefined,undefined,undefined),{range:'',evaluation:''})
+  assert.equal(forecastSummary(undefined,7,0).evaluation,'已评估 0/7 步')
+})

@@ -1,6 +1,6 @@
 {
   "name": "dsh-limix-tool",
-  "version": "0.3.14",
+  "version": "0.3.15",
   "description": "在 LimiX Agent 模式中执行数据上传、预测、解释和模型比较，并保存结果文件。",
   "type": "module",
   "main": "lib/index.js",

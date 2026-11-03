@@ -1,5 +1,7 @@
 # 安装 LimiX Agent 0.3.14
 
+仓库源码已准备 0.3.15，尚未发布。请先使用下面已发布的 0.3.14，不要提前安装候选版本。
+
 最低支持 DeepSeek Harness **0.2.1-rc.5**。npm 安装、更新和 tgz 迁移指令见 [npm 分发说明](NPM-DISTRIBUTION.md)。商业用途须事先取得单独书面授权，详见 [许可说明](LICENSING.md)。
 
 从 [GitHub Releases](https://github.com/Limitless2023/limix-dsh/releases) 下载 0.3.14 的插件文件。请保留现有 profile，按顺序安装或更新：

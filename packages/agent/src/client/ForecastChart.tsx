@@ -20,6 +20,8 @@ export interface ForecastChartData {
   /** 首/尾时间标签（可选，只标两端不标满轴） */
   startLabel?: string
   endLabel?: string
+  /** 预测日期序列；供结果卡区分日级与其他频率并展示预测范围。 */
+  forecastDates?: string[]
   /** 目标列名（图例用） */
   target?: string
 }

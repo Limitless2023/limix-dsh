@@ -15,6 +15,8 @@ test_input_preflight.py - 标识列预检、确定性分类选样和七日周期
 runtime.test.mjs - 独立环境准备合并、失败重试、等待取消、复用及外部 CLI 隔离。
 test_runtime.py - 验证 venv/ensurepip/probe 子进程取消、探测超时清理及安装失败不标记 ready。
 
+test_forecast_summary.py - 验证跨年、多窗口、缺失/错位日期、部分评估与无输出路径的时间证据。
+
 test_forecast.py - 时序日期、缺列、无效分位数在上传前拒绝；验证分隔符、UTF BOM 与未知编码委派，不吞掉缺列。
 command-args.test.mjs - 重复命令词容错、位置参数保留与宿主报告分支验证。
 

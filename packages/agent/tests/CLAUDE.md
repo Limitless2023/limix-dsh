@@ -21,3 +21,5 @@ relationship.test.cjs - 场景分差排序、默认矩阵折叠、两组详情�
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 
 pipeline-view.test.cjs 补充登记预览失败与其他失败区分验证。
+
+工具卡测试补充日级/小时级范围、部分评估、底栏缺失指标及基线入口。

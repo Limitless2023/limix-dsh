@@ -35,7 +35,8 @@ pipeline-model.ts - 按轮次组织节点；stages 供流程归并，timeline �
 pipeline-stage.ts - 单次工具调用的业务翻译；解释与比较分类、接口步骤、结果行，只读成功组的有限 metrics。
 flow-navigation.ts - 当前会话页签跳转与一次性阶段定位请求。
 LimixTurnStack.tsx - 默认三项业务任务，辅助调用折叠，按阶段定位本轮流程； 汇总本轮任务，不计参数帮助；只展示 metrics 中的有限数值，不显示 ID。
-ForecastChart.tsx - 时序预测图；显示日期对齐的本地真值。
+ForecastChart.tsx - 时序预测图；显示日期对齐的本地真值；预测日期提供给卡片范围说明。
+prediction-summary.ts - 时序预测范围与评估数量；验证日级频率，部分评估显示分子分母。
 ScatterChart.tsx - 回归散点图；指标由结果卡统一展示。
 ConfusionMatrix.tsx - 分类混淆矩阵；各类别指标默认折叠。
 eval-csv.ts - 分类与回归 CSV 解析。
@@ -49,3 +50,5 @@ ExplanationInsight.tsx - 单条/批量贡献结论、两组均值差异和回归
 
 成功报告的已登记预览检查失败单独提示；不将其他失败降级为预览问题。
 LimixToolCard 支持保留图表状态的折叠；全屏前展开，预测与解释的任务文件收进更多菜单。
+
+时序卡片去除重复完成提示；预测日期与评估数同行，缺失指标和基线入口放底栏右侧；已有中文映射优先展示。

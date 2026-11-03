@@ -7,12 +7,14 @@
  *           任务名称（因果解释沿用官方口径）+ 指标 + 文件下载与打开；指标说明和调用详情默认折叠
  *           + 三类预测图、可全屏的解释/模型比较卡及 JSON/CSV 下载；参数帮助不显示预测完成。
  *           服务连接与参数帮助使用紧凑行，详情按需展开，失败原因保持可见。
+ *           时序范围与评估数量并列；缺失指标和基线对比收进底栏。
  *           卡片折叠保留图表状态；预测和解释的任务文件通过宿主侧栏打开。
  * [POS]: limix-ui 的工具结果渲染器；对位 Next.js 版 tools-ui 的 DSH 形态。
  *        未认领的其他工具不受影响（keyed 插槽按工具名分派，自有工具=纯增量）。
  *        三类结果图共用 /limix-ui/csv 一条只读通道，取数失败一律静默降级为纯文本卡片
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
+import { forecastSummary } from './prediction-summary'
 import { ActionMenu } from './ActionMenu'
 import { TaskFiles } from './TaskFiles'
 import { taskFiles } from './task-files'
@@ -94,6 +96,10 @@ const CSS = `
 .lx-result-status[data-state=running]{color:#a56b16}
 .lx-result-status[data-state=warning]{color:#a56b16}
 .lx-result-meta{margin:5px 0 0;color:var(--dsw-alias-label-secondary);font-size:12px}
+.lx-forecast-meta{display:flex;align-items:baseline;justify-content:space-between;gap:8px 20px;flex-wrap:wrap;margin-top:8px;color:var(--dsw-alias-label-secondary);font-size:12px}
+.lx-forecast-footer{margin-left:auto;display:flex;align-items:center;gap:14px;color:var(--dsw-alias-label-secondary);font-size:12px}
+.lx-forecast-baseline{max-width:360px;padding:6px 10px}
+.lx-forecast-baseline p{margin:6px 0}
 .lx-result-metrics{display:flex;flex-wrap:wrap;gap:14px 28px;margin:17px 0 12px;padding:0}
 .lx-result-metrics div{min-width:90px}
 .lx-result-metrics dt{font-size:11px;color:var(--dsw-alias-label-tertiary)}
@@ -285,7 +291,7 @@ export function LimixToolCard({ callId, block, inspect, cwd, openFile }: Props):
         if (!alive) return
         setChart({
           hist, pred: series.pred, p10: series.p10, p90: series.p90, truth,
-          target: series.target,
+          target: series.target, forecastDates: series.dates,
           startLabel: startLabel ?? series.dates[0],
           endLabel: series.dates[series.dates.length - 1],
         })
@@ -298,11 +304,14 @@ export function LimixToolCard({ callId, block, inspect, cwd, openFile }: Props):
   const benchmark = command === 'benchmark' && parsed?.kind === 'benchmark' && Array.isArray(parsed.datasets) && Array.isArray(parsed.runs) ? parsed : null
   const report = command === 'report' && !cliFailed && parsed?.kind === 'report' ? parsed : null
   const explanation = command === 'explain' && !cliFailed ? parsed?.explanation : null
-  const target = explanation?.target_label ?? flagValue('--target')
+  const rawTarget = flagValue('--target')
+  const target = explanation?.target_label ?? (typeof parsed?.target_label === 'string' ? parsed.target_label : typeof parsed?.labels?.fields?.[rawTarget ?? ''] === 'string' ? parsed.labels.fields[rawTarget!] : rawTarget)
   const rows = parsed?.result_content?.rows ?? parsed?.rows
   const sampleCount = parsed?.metrics?.n
   const help = argList.some(arg => arg === '--help' || arg === '-h')
   const prediction = !help && ['regress', 'classify', 'forecast'].includes(command)
+  const forecast = prediction && command === 'forecast'
+  const forecastMeta = forecastSummary(chart?.forecastDates, rows, sampleCount)
   const title = help ? '参数说明' : parsed?.kind === 'report_facts' ? '报告数据核验' : COMMAND_LABELS[command] ?? '工具结果'
   const originalFile = report && typeof report.report_path === 'string' ? report.report_path : typeof parsed?.saved_to === 'string' ? parsed.saved_to : null
   const [reportAvailability, setReportAvailability] = useState<{status: string; path?: string; source: string} | null>(null)
@@ -369,17 +378,17 @@ export function LimixToolCard({ callId, block, inspect, cwd, openFile }: Props):
         </button>}
       </div>
       {fullscreen.error && <p className="lx-result-note" role="alert">{fullscreen.error}</p>}
-      {!compact && <p className="lx-result-meta">
+      {!compact && !forecast && <p className="lx-result-meta">
         {typeof rows === 'number' && Number.isFinite(rows) ? `${rows} 行预测结果` : ''}
         {typeof sampleCount === 'number' && Number.isFinite(sampleCount) ? `${typeof rows === 'number' ? ' · ' : ''}${sampleCount} 个样本参与评估` : ''}
       </p>}
+      {forecast && status.kind === 'done' && <div className="lx-forecast-meta"><span>{forecastMeta.range}</span>{metrics.length > 0 && <span>{forecastMeta.evaluation}</span>}</div>}
       {benchmark && <BenchmarkView data={benchmark as any} />}
       {report && <><p className="lx-result-meta">Markdown + HTML · {report.chart_count} 张结果图{report.report_path ? ' · 历史版本已保留' : ''}</p>
         {availability?.status === 'missing' && <p role="alert" className="lx-result-note">此版报告文件已被移动或删除，请让 Agent 重新生成；原分析结果不受影响。</p>}
         {availability?.status === 'fallback' && <p className="lx-result-note">历史副本不可用，已切换到本版工作区报告。</p>}
         {Array.isArray(report.preview_paths) && <details className="lx-report-previews"><summary>查看报告图表预览</summary>{report.preview_paths.map((path: string, i: number) => <a key={path} href={'/limix-ui/report-preview?path=' + encodeURIComponent(path)} target="_blank" rel="noreferrer"><img loading="lazy" style={{ width: '100%', maxHeight: 280, objectFit: 'contain', margin: '12px 0' }} src={'/limix-ui/report-preview?path=' + encodeURIComponent(path)} alt={`报告图表 ${i + 1}；如未显示，请打开下方 HTML 报告`} /></a>)}</details>}</>}
       {prediction && status.kind === 'done' && typeof parsed?.metrics?.r2 === 'number' && parsed.metrics.r2 < 0 && <p className="lx-result-note" role="status">任务已完成；本次评估 R² 小于 0，效果弱于测试真值均值对照，需进一步验证后再用于业务。</p>}
-      {parsed?.baseline_evaluation && <details className="lx-result-note"><summary>查看预测时可用的时序基线对照</summary><p>{parsed.baseline_evaluation.description}</p>{parsed.baseline_evaluation.metrics && <p>MAE {parsed.baseline_evaluation.metrics?.mae} · RMSE {parsed.baseline_evaluation.metrics?.rmse} · R² {parsed.baseline_evaluation.metrics?.r2 ?? '无定义'}</p>}</details>}
       {cliFailed ? <p className="lx-result-note" role="alert">{errorMessage}{hint && <><br />{hint}</>}</p> : <>
         {status.kind === 'warning' && !benchmark && <p className="lx-result-note" role="alert">本次解释存在限制，请结合返回说明使用结果。</p>}
         {explanation && <ExplanationView showPredictionCheck={showPredictionCheck} data={explanation} showRelationData={showRelationData} onVisual={() => setShowRelationData(false)} />}
@@ -388,7 +397,7 @@ export function LimixToolCard({ callId, block, inspect, cwd, openFile }: Props):
           {metrics.map(metric => <div key={metric.key}><dt>{metric.label}</dt><dd>{metric.value}</dd></div>)}
         </dl>}
         {prediction && !settled && <p className="lx-result-note">正在提交数据并等待预测结果…</p>}
-        {prediction && settled && status.kind === 'done' && metrics.length === 0 && <p className="lx-result-note">预测已完成；本次未返回评估指标。</p>}
+        {prediction && !forecast && settled && status.kind === 'done' && metrics.length === 0 && <p className="lx-result-note">本次未返回评估指标。</p>}
         {chart && <ForecastChart {...chart} />}
         {evalView?.kind === 'cls' && <ConfusionMatrix data={evalView.data} />}
         {evalView?.kind === 'reg' && <ScatterChart data={evalView.data} />}
@@ -422,6 +431,12 @@ export function LimixToolCard({ callId, block, inspect, cwd, openFile }: Props):
           {inspect && <button type="button" data-lx="inspect">检视调用 ↗</button>}
           {fileLinks}
         </ActionMenu>}
+        {forecast && status.kind === 'done' && <div className="lx-forecast-footer">
+          {metrics.length === 0 && <span>本次未返回评估指标</span>}
+          {parsed?.baseline_evaluation?.metrics && <ActionMenu label="基线对比" up>
+            <div className="lx-forecast-baseline"><p>{parsed.baseline_evaluation.description}</p><p>MAE {parsed.baseline_evaluation.metrics.mae} · RMSE {parsed.baseline_evaluation.metrics.rmse} · R² {parsed.baseline_evaluation.metrics.r2 ?? '无定义'}</p></div>
+          </ActionMenu>}
+        </div>}
         {!explanation && !prediction && rawToggle}
         {!prediction && metrics.length > 0 && <button type="button" data-lx="metrics" aria-expanded={showMetrics} aria-controls={metricsId}>
           {showMetrics ? '收起指标说明 ↑' : '指标说明 ↓'}

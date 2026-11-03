@@ -7,14 +7,14 @@
           config / health / check / upload / classify / regress / forecast /
           task / tasks / cancel / result / download / data / api / docs / doctor / explain / benchmark
 [POS]: dsh-limix-tool 的 CLI；指标计算由同目录 limix_metrics 提供；解释由 limix_explain 编排。
-       本地真值与时序输入校验失败使用统一错误出口；时序上传前由 limix_forecast 预检；无真值不评估基线。
+       本地真值与时序输入校验失败使用统一错误出口；时序上传前由 limix_forecast 预检，下载后提取任务时间证据；无真值不评估基线。
        上传头使用安全 ASCII 文件名，保留原文件路径、扩展名与内容。
        预测与解释零第三方依赖；benchmark 的本地模型依赖独立 Python 环境；docs 子命令读取 Mintlify Markdown，无需凭证。
        文档 https://limix.mintlify.site/api/overview，2026-09-14 核对（54 主线 + 3 按需端点）。
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 """
 
-from limix_forecast import forecast_payload
+from limix_forecast import forecast_payload, forecast_summary
 from limix_metrics import compute_metrics, inference_metrics_context, seasonal_baseline
 from limix_explain import add_parser as add_explain_parser
 from limix_benchmark import add_parser as add_benchmark_parser
@@ -327,16 +327,23 @@ def run_inference(cfg, kind, payload, sync, no_wait, out_path, wait_seconds, met
     result = dict(data)
     ctxm = metrics_ctx or {}
     metrics = None
+
+    def inspect_result(path):
+        measured = compute_metrics(kind, ctxm.get("predict_path"), ctxm.get("target"), path, ctxm.get("date"))
+        if kind == "timeseries":
+            result["time_summary"] = forecast_summary(ctxm, payload, path, measured)
+        return measured
+
     if out_path:
         result["saved_to"] = download_result(cfg, data["result_version_id"], out_path)
-        metrics = compute_metrics(kind, ctxm.get("predict_path"), ctxm.get("target"), result["saved_to"], ctxm.get("date"))
+        metrics = inspect_result(result["saved_to"])
     else:
         log(f"结果版本 {data['result_version_id']}（用 download 子命令可取 CSV）")
         # 没要输出文件时也落一份临时 CSV 算指标，算完即删：指标不能取决于用户是否传 -o
         try:
             with tempfile.TemporaryDirectory() as tmpdir:
                 tmp_csv = download_result(cfg, data["result_version_id"], f"{tmpdir}/result.csv")
-                metrics = compute_metrics(kind, ctxm.get("predict_path"), ctxm.get("target"), tmp_csv, ctxm.get("date"))
+                metrics = inspect_result(tmp_csv)
         except Exception:
             metrics = None
     if metrics:

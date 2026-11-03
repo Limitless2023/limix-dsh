@@ -1,6 +1,6 @@
 /**
  * [INPUT]: release.sh 生成的五包、版本清单与 npm CLI（兼容按包名分组的 JSON 回执）。
- * [OUTPUT]: npm-preflight.json；检查元数据并逐包执行 publish --dry-run。
+ * [OUTPUT]: npm-preflight.json；新版本执行 dry-run，已发布版本核对 registry 完整性。
  * [POS]: npm 发布前检查；无实际发布入口，不修改 registry 或凭据。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
@@ -10,6 +10,7 @@ import { readFile, writeFile } from 'node:fs/promises'
 import { createHash } from 'node:crypto'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { remoteIntegrity } from './npm-publish.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const directories = ['data', 'tool', 'agent', 'preset', 'brand']
@@ -50,15 +51,21 @@ for (const { dir, manifest } of definitions) {
     const packaged = execFileSync('tar', ['-xOf', tarball, `package/${filename}`], { encoding: 'utf8' })
     assert.equal(packaged, await readFile(resolve(root, filename), 'utf8'), `${expected}: ${filename} 须随包分发且与根目录一致`)
   }
-  const result = JSON.parse(execFileSync('npm', ['publish', tarball, '--dry-run', '--ignore-scripts', '--json'], { encoding: 'utf8' }))
-  const published = result[expected] ?? result
-  assert.equal(published.id, `${expected}@${version}`)
-  assert.equal(published.integrity, entry.integrity, `${expected}: dry-run 内容须与候选包一致`)
-  checks.push({ name: expected, version, dry_run: 'passed', license: manifest.license || 'UNDECLARED' })
+  const existing = await remoteIntegrity(entry)
+  if (existing !== null) {
+    assert.equal(existing, entry.integrity, `${expected}: 已发布同版本内容不同`)
+    checks.push({ name: expected, version, dry_run: 'skipped-already-published', registry_integrity: existing, license: manifest.license })
+  } else {
+    const result = JSON.parse(execFileSync('npm', ['publish', tarball, '--dry-run', '--ignore-scripts', '--json'], { encoding: 'utf8' }))
+    const published = result[expected] ?? result
+    assert.equal(published.id, `${expected}@${version}`)
+    assert.equal(published.integrity, entry.integrity, `${expected}: dry-run 内容须与候选包一致`)
+    checks.push({ name: expected, version, dry_run: 'passed', license: manifest.license })
+  }
 }
 await writeFile(resolve(output, 'npm-preflight.json'), JSON.stringify({
   status: 'prepared-not-published', checks,
   publication_performed: false,
   remaining: ['发布身份核验（Actions OIDC 或本地登录及2FA）', '实际发布与公共 registry 安装验收'],
 }, null, 2) + '\n')
-console.log(`五包 dry-run 通过；未发布：${output}`)
+console.log(`五包预检通过；本次未执行发布：${output}`)

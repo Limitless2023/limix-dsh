@@ -2,7 +2,7 @@
 
 > L2 | 父级: ../CLAUDE.md
 
-npm-preflight.mjs - 核验五包元数据与 tarball；兼容 npm 11.15 分组回执并核对 dry-run 完整性。
+npm-preflight.mjs - 核验五包元数据；新版本核对 npm dry-run 回执，已发布版本核对 registry 完整性。
 npm-publish.mjs - 核验五包哈希；仅在指定 Actions 发布现有 tgz，等待 registry 可见后核验。
 package-contract.mjs - 两个入口共用的分发文件检查；每包创建仓库外全新解包目录。
 tests/ - 分发漏入口、敏感文件和旧解包污染的回归检查。

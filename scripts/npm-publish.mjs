@@ -25,7 +25,8 @@ export async function verifyArchives(output, version, commit) {
   const receipt = JSON.parse(await readFile(resolve(output, 'npm-preflight.json'), 'utf8'))
   assert.equal(receipt.status, 'prepared-not-published')
   assert.deepEqual(receipt.checks.map(p => p.name).sort(), [...names].sort())
-  assert.ok(receipt.checks.every(p => p.version === version && p.dry_run === 'passed'))
+  assert.ok(receipt.checks.every(p => p.version === version && (p.dry_run === 'passed' ||
+    (p.dry_run === 'skipped-already-published' && p.registry_integrity === release.packages.find(entry => entry.name === p.name)?.integrity))))
   const sums = []
   for (const entry of release.packages) {
     assert.equal(entry.version, version)

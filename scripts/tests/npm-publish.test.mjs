@@ -75,6 +75,12 @@ test('发布前必须拥有完整五包、预检收据与一致的压缩包字�
     const receipt = { status: 'prepared-not-published', checks: entries.map(p => ({ ...p, dry_run: 'passed' })) }
     await writeFile(join(dir, 'npm-preflight.json'), JSON.stringify(receipt))
     assert.equal((await verifyArchives(dir, '1.2.3', 'commit')).length, 5)
+    receipt.checks[0].dry_run = 'skipped-already-published'
+    await writeFile(join(dir, 'npm-preflight.json'), JSON.stringify(receipt))
+    await assert.rejects(verifyArchives(dir, '1.2.3', 'commit'))
+    receipt.checks[0].registry_integrity = packages[0].integrity
+    await writeFile(join(dir, 'npm-preflight.json'), JSON.stringify(receipt))
+    assert.equal((await verifyArchives(dir, '1.2.3', 'commit')).length, 5)
     await assert.rejects(verifyArchives(dir, '1.2.4', 'commit'))
     await assert.rejects(verifyArchives(dir, '1.2.3', 'other-commit'))
     manifest.source_dirty = true; await save()

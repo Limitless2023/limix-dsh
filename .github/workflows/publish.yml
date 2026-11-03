@@ -1,0 +1,75 @@
+# [INPUT]: master 中统一版本的五包源码、锁文件及 npm 可信发布配置。
+# [OUTPUT]: 已核验的五个 tgz、Actions 产物和 npm 发布结果。
+# [POS]: 仅手动触发的 OIDC 发布入口；不创建 GitHub Release。
+# [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
+name: Publish npm suite
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '五包版本（不带 v，必须与 package.json 一致）'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: limix-npm-publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: github.repository == 'Limitless2023/limix-dsh' && github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      RELEASE_VERSION: ${{ inputs.version }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+          package-manager-cache: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Install publishing CLI and check version
+        run: |
+          npm install --global npm@11.15.0
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import { readFileSync } from 'node:fs';
+          assert.match(process.env.RELEASE_VERSION, /^\d+\.\d+\.\d+$/);
+          for (const dir of ['data', 'tool', 'agent', 'preset', 'brand']) {
+            const pkg = JSON.parse(readFileSync(`packages/${dir}/package.json`));
+            assert.equal(pkg.version, process.env.RELEASE_VERSION, `${dir}: 版本不一致`);
+          }
+          NODE
+      - name: Install locked build dependencies
+        run: |
+          for package in data tool agent; do
+            npm ci --prefix "packages/$package" --ignore-scripts --no-audit --no-fund
+          done
+      - name: Build and verify the five release archives
+        run: ./release.sh
+      - name: Run offline regression tests
+        run: |
+          node --test scripts/tests/*.test.mjs packages/data/tests/*.test.* packages/tool/tests/*.test.* packages/agent/tests/*.test.* benchmarks/tests/cancellation.test.mjs
+          python3 -m unittest discover -s packages/tool/tests -v
+      - name: Verify npm publication metadata
+        run: node scripts/npm-preflight.mjs
+      - name: Preserve exact release archives
+        uses: actions/upload-artifact@v4
+        with:
+          name: limix-v${{ inputs.version }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: dist/v${{ inputs.version }}/
+          if-no-files-found: error
+          retention-days: 30
+      - name: Publish verified archives through OIDC
+        run: node scripts/npm-publish.mjs --publish

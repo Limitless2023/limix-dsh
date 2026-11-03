@@ -27,7 +27,7 @@ async function run(name,command,args,cwd=root){
 const packages=['data','tool','agent','preset','brand'],packed=[]
 try {
  for(const name of packages){const cwd=join(root,'packages',name);const manifest=JSON.parse(await readFile(join(cwd,'package.json'),'utf8'));if(manifest.scripts?.build)await run('build-'+name,'npm',['run','build'],cwd)}
- await run('node-release-contract','node',['--test','scripts/tests/package-contract.test.mjs'])
+ await run('node-release-contract','node',['--test',...(await readdir(join(root,'scripts/tests'))).filter(f=>f.endsWith('.test.mjs')).map(f=>join(root,'scripts/tests',f))])
  for(const name of ['data','tool','agent']){const folder=join(root,'packages',name,'tests');const files=(await readdir(folder)).filter(f=>/\.test\.(mjs|cjs)$/.test(f));await run('node-'+name,'node',['--test',...files.map(f=>join(folder,f))])}
  await run('node-benchmark-cancel','node',['--test','benchmarks/tests/cancellation.test.mjs'])
  await run('python-tool','python3',['-m','unittest','discover','-s','packages/tool/tests','-v'])

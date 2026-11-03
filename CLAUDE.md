@@ -3,6 +3,7 @@
 TypeScript + React 18 + tsdown + Node.js + Python 3
 
 <directory>
+.github/workflows/ - 仅手动触发的 npm OIDC 发布，保留相同 tgz 供 GitHub Release 使用。
 packages/agent/ - 预测、全量贡献热力图与完整关系网络，任务流程与 LimiX 专属首屏。
 packages/tool/ - preset 专用 API 工具与命令；复用 Agent 图表生成离线报告，受控下载结果。
 packages/preset/ - 定义业务到 LimiX 任务落地的角色和工具组合；保留用户默认选择。

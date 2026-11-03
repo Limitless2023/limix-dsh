@@ -57,6 +57,6 @@ for (const { dir, manifest } of definitions) {
 await writeFile(resolve(output, 'npm-preflight.json'), JSON.stringify({
   status: 'prepared-not-published', checks,
   publication_performed: false,
-  remaining: ['发布账号登录及2FA', '实际发布与公共 registry 安装验收'],
+  remaining: ['发布身份核验（Actions OIDC 或本地登录及2FA）', '实际发布与公共 registry 安装验收'],
 }, null, 2) + '\n')
 console.log(`五包 dry-run 通过；未发布：${output}`)

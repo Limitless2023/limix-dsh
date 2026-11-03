@@ -10,6 +10,7 @@ locale/en.json - 英文插件名称与说明。
 locale/zh.json - 中文插件名称与说明。
 LICENSE / LICENSING.md / THIRD-PARTY-NOTICES.md - 非商业许可、商业授权入口及历史/第三方权利。
 package.json - npm 公开分发元数据、最低 Harness rc.5 声明；插件入口、依赖与 build/test 命令。
+package-lock.json - 锁定构建依赖及数据库驱动解析；不随插件分发。
 cordis.patch.yml - 挂载全局设置页与路由；不注册会话工具。
 tsdown.config.ts - 构建宿主 ESM 与浏览器工厂；数据库驱动保持 external。
 tsconfig.json - TypeScript 编译约束。

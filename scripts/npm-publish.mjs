@@ -1,6 +1,6 @@
 /**
  * [INPUT]: release.sh 的五包与清单、npm-preflight 收据、公共 registry。
- * [OUTPUT]: 默认只读检查；--publish 在指定 Actions 中发布同一份 tgz。
+ * [OUTPUT]: 默认只读检查；--publish 在指定 Actions 中发布同一份 tgz，并等待 registry 可见。
  * [POS]: 可信发布执行器；不构建、不打包、不登录、不修改信任配置。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
@@ -73,6 +73,28 @@ export function assertPublisherContext(env) {
   assert.ok(env.ACTIONS_ID_TOKEN_REQUEST_URL && env.ACTIONS_ID_TOKEN_REQUEST_TOKEN, '缺少 OIDC 授权')
 }
 
+export async function waitForPublished(entries, {
+  lookup = remoteIntegrity,
+  pause = ms => new Promise(resolve => setTimeout(resolve, ms)),
+  attempts = 60, interval = 10000,
+  onPending = () => {},
+} = {}) {
+  let pending = [...entries]
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    const missing = []
+    for (const entry of pending) {
+      const integrity = await lookup(entry)
+      if (integrity === null) missing.push(entry)
+      else assert.equal(integrity, entry.integrity, `${entry.name}: 发布后内容不一致`)
+    }
+    if (!missing.length) return
+    pending = missing
+    onPending(pending)
+    if (attempt + 1 < attempts) await pause(interval)
+  }
+  throw new Error(`npm 尚未公开以下版本：${pending.map(p => `${p.name}@${p.version}`).join(', ')}；请先核查 registry，不要直接重复发布`)
+}
+
 async function main() {
   const args = process.argv.slice(2)
   assert.ok(args.length === 0 || (args.length === 1 && args[0] === '--publish'), '仅支持 --publish；默认只读检查')
@@ -90,7 +112,7 @@ async function main() {
     }
   }
   if (publishing) {
-    for (const entry of entries) assert.equal(await remoteIntegrity(entry), entry.integrity, `${entry.name}: 发布后核验失败`)
+    await waitForPublished(entries, { onPending: pending => console.log(`等待 npm 公开 ${pending.length} 个包，10 秒后重新核验…`) })
     console.log(`五包 ${version} 的 registry integrity 已核验；GitHub Release 须复用本次 Actions 产物。`)
   }
 }

@@ -100,13 +100,13 @@ npx --yes npm@11.15.0 trust github dsh-limix-cover --repo Limitless2023/limix-ds
 ### 每次发版
 
 1. 将已批准的版本和工作流推送到 `master`。仅推送工作流不会自动发布；首次正式运行前须准备尚未发布的新套件版本。
-2. 在 GitHub 的 Actions → **Publish npm suite** → **Run workflow**，选择 `master`，输入五包共同版本（不带 `v`）。其他分支不会执行发布 job。
+2. 用户批准后，维护者或 Agent 执行 `gh workflow run publish.yml --ref master -f version=版本号`，也可在 Actions 页面点击 **Run workflow**。手动触发表示按需发版，不要求用户亲自点击。其他分支不会执行发布 job。
 3. 工作流按锁文件安装依赖，运行 `./release.sh`，执行离线回归测试及 npm 发布预检。构建导致跟踪文件变化时停止，修正并提交后重试，不能跳过干净工作树检查。
 4. 工作流保存完整 `dist/v版本/` 为 Actions artifact，再发布 manifest 列出的五个 tgz。发布前重验 SHA256、SHA512、大小、五包集合与预检收据。
 5. 同版本已存在且 integrity 相同则跳过；内容不同或 registry 请求异常则停止。五包先全部检查，再开始发布。五包发布并非原子操作；部分成功后，从同一提交重跑并确认产物一致，不能覆盖已发布版本。
 6. 发布后核对公共 registry 的五包 integrity。Actions artifact 保留 30 天；下载后用于 GitHub Release，并完成公共 npm 安装验收。该工作流没有仓库写权限，不自动创建 GitHub Release，也不升级本机 DSH。
 
-若发布后 registry 暂时未返回新版本，运行可能显示核验失败。先查看 npm 实际状态，待 registry 可读后重跑相同提交；不要立即修改同版本内容。
+发布后 registry 暂时未返回新版本时，每 10 秒重查未公开的包，最多 60 轮。超时仍会明确报错；内容不一致或请求异常立即停止。先查看 npm 实际状态，待 registry 可读后重跑相同提交；不要立即修改同版本内容。
 
 新建信任、改仓库或改工作流名称时仍需维护者确认。后续普通版本发布无需重复配置；维护者可在 npm 撤销信任。
 

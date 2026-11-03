@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 临时发布清单、模拟 registry 与 Actions 身份。
- * [OUTPUT]: 哈希、五包集合、版本冲突、失败重试与发布身份边界测试。
+ * [OUTPUT]: 哈希、五包集合、版本冲突、公开延迟与发布身份边界测试。
  * [POS]: 可信发布回归测试；不请求 registry、不执行 npm publish。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
@@ -10,9 +10,27 @@ import { mkdtemp, writeFile, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createHash } from 'node:crypto'
-import { verifyArchives, publicationPlan, assertPublisherContext } from '../npm-publish.mjs'
+import { verifyArchives, publicationPlan, assertPublisherContext, waitForPublished } from '../npm-publish.mjs'
 
 const entries = ['data', 'tool', 'agent', 'preset', 'cover'].map(name => ({ name: `dsh-limix-${name}`, version: '1.2.3', integrity: `sha512-${name}` }))
+
+test('发布后等待 registry 公开，仅重查尚不可见的包', async () => {
+  const calls = new Map(); let pauses = 0
+  await waitForPublished(entries, { attempts: 3, pause: async () => { pauses++ }, lookup: async entry => {
+    const count = (calls.get(entry.name) || 0) + 1; calls.set(entry.name, count)
+    return entry === entries[0] && count < 3 ? null : entry.integrity
+  } })
+  assert.equal(pauses, 2)
+  assert.equal(calls.get(entries[0].name), 3)
+  assert.equal(calls.get(entries[1].name), 1)
+})
+
+test('公开等待有上限，内容不匹配和网络错误立即停止', async () => {
+  const options = { attempts: 2, pause: async () => {} }
+  await assert.rejects(waitForPublished(entries, { ...options, lookup: async () => null }), /不要直接重复发布/)
+  await assert.rejects(waitForPublished(entries, { ...options, lookup: async () => 'wrong' }), /内容不一致/)
+  await assert.rejects(waitForPublished(entries, { ...options, lookup: async () => { throw new Error('HTTP 503') } }), /503/)
+})
 
 test('首次五包发布与部分成功后的重试计划', async () => {
   const fresh = await publicationPlan(entries, async () => null)

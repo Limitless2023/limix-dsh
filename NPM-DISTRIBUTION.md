@@ -1,16 +1,16 @@
 # LimiX 五插件 npm 分发
 
-公共稳定版：**0.3.14**；源码候选版：**0.3.15（待手动 Actions 发布）**。五包统一更新，咨询推断的已知问题见 [提示词验收记录](docs/PROMPT-EVALUATION.md)。GitHub Release tgz 分发继续保留。
+公共版本：**0.3.15**。五包统一更新，咨询推断的已知问题见 [提示词验收记录](docs/PROMPT-EVALUATION.md)。GitHub Release tgz 分发继续保留。
 
 ## 发布方案
 
 保留五个包名：`dsh-limix-data`、`dsh-limix-tool`、`dsh-limix-agent`、`dsh-limix-preset`、`dsh-limix-cover`。五包统一版本；npm 与 GitHub Release 使用同一批 tgz，SHA256SUMS 校验这些文件。
 
-0.3.10 的 npm 首装与 tgz 迁移验证保留为历史记录；下一次发布使用新版本 0.3.15，避免同一版本存在不同包内容。发布前从干净提交打包，并核对源码提交与包清单。
+0.3.10 的 npm 首装与 tgz 迁移验证保留为历史记录；后续发布须使用高于 0.3.15 的新版本，避免同一版本存在不同包内容。发布前从干净提交打包，并核对源码提交与包清单。
 
 五包没有互相声明 npm 依赖，需一次安装全部五包。preset 在 LimiX 模式中加载 tool；tool 的空 bundle patch 是有意设计，不额外挂载全局工具。data 保留 mysql2、pg 运行依赖；其余包随包提供构建产物，使用者无需编译。不会打包另一份 Harness。
 
-稳定版五包已由 npm 账号 `limix2026` 发布；0.3.15 尚未发布，下面的安装指令仍指向已验收的 0.3.14。自有代码采用 PolyForm Noncommercial 1.0.0；商业授权与第三方权利见 [许可说明](LICENSING.md)。
+0.3.15 五包通过 GitHub Actions 的 OIDC 身份发布，下面的安装指令均使用该版本。自有代码采用 PolyForm Noncommercial 1.0.0；商业授权与第三方权利见 [许可说明](LICENSING.md)。
 
 ## 支持条件
 
@@ -34,7 +34,7 @@ DSH='/Applications/DeepSeek Harness.app/Contents/Resources/runtime/cli/bin/dsh'
 先完全退出 DeepSeek Harness。在终端执行以下**一条命令**，安装五个同版本插件：
 
 ```sh
-dsh plugin --profile desktop add --save-exact --registry=https://registry.npmjs.org/ dsh-limix-data@0.3.14 dsh-limix-tool@0.3.14 dsh-limix-agent@0.3.14 dsh-limix-preset@0.3.14 dsh-limix-cover@0.3.14
+dsh plugin --profile desktop add --save-exact --registry=https://registry.npmjs.org/ dsh-limix-data@0.3.15 dsh-limix-tool@0.3.15 dsh-limix-agent@0.3.15 dsh-limix-preset@0.3.15 dsh-limix-cover@0.3.15
 ```
 
 macOS 若使用上方 `DSH` 变量，把命令开头 `dsh` 换成 `"$DSH"`。Web 用户将 `desktop` 换成实际使用的 profile，例如 `web`。不要新建 profile 代替原 profile，否则会看不到原来的插件与配置选择。
@@ -43,7 +43,7 @@ macOS 若使用上方 `DSH` 变量，把命令开头 `dsh` 换成 `"$DSH"`。Web
 
 升级前备份自己的 DSH_HOME 和 `~/.limix/config.json`，备份仅留本机。默认 DSH_HOME 为 `~/.dsh`；自定义环境应使用原路径。数据源存于 `DSH_HOME/limix-datasource.json`；API Key 使用 `LIMIX_API_KEY` 或 `~/.limix/config.json`。环境变量必须对实际启动 DSH 的进程可见。
 
-重启后，在“插件”确认五包均为 0.3.14；进入“设置 → 数据源”检查已有连接；新建会话选择 LimiX Agent，执行服务连接检查。标准模式默认选择会保留。历史会话仍沿用自己的预设。
+重启后，在“插件”确认五包均为 0.3.15；进入“设置 → 数据源”检查已有连接；新建会话选择 LimiX Agent，执行服务连接检查。标准模式默认选择会保留。历史会话仍沿用自己的预设。
 
 命令行核对：
 
@@ -61,11 +61,11 @@ GitHub tgz 安装继续支持：从对应 Release 下载五个文件，在“插
 
 详细历史结果、peer 提示和未验收项见 [分发审查](reviews/npm-distribution-review.md)。Windows、第二台电脑及隔离环境的真实预测和数据库查询尚未验收。报告仍需人工审阅；光学 20 变量无向解释上游错误未修复。
 
-本次 0.3.14 五包已发布到公共 npm，下载 SHA256 与发布包一致。独立环境完成 0.3.13→0.3.14 升级，五包版本、标准模式选择、数据源文件和凭据解析验证通过。本机日常 desktop 从 0.3.12 升至 0.3.14，API Key、数据源和服务凭据文件摘要未变，升级前 325 个会话文件保留，重启后原有工作区与会话可见。首次发布遇到 npm CDN 短暂 404 缓存，缓存过期后正常安装通过。
+上一版 0.3.14 五包已发布到公共 npm，下载 SHA256 与发布包一致。独立环境完成 0.3.13→0.3.14 升级，五包版本、标准模式选择、数据源文件和凭据解析验证通过。本机日常 desktop 从 0.3.12 升至 0.3.14，API Key、数据源和服务凭据文件摘要未变，升级前 325 个会话文件保留，重启后原有工作区与会话可见。首次发布遇到 npm CDN 短暂 404 缓存，缓存过期后正常安装通过。
 
 ## 维护者发布步骤
 
-1. 核对 LICENSING.md 与五包许可文件，完成代码和界面验收，五包统一使用新的版本号。已有 0.3.14 不可覆盖。
+1. 核对 LICENSING.md 与五包许可文件，完成代码和界面验收，五包统一使用新的版本号。已有 0.3.15 不可覆盖。
 2. 用 Node 24、npm 11.15.0，在 data/tool/agent 目录分别运行 `npm ci --ignore-scripts`，重建 lib。提交锁文件、源码与构建产物，使再次构建后的工作树保持干净。
 3. 用户批准后，按下方可信发布流程在 Actions 手动发版。若选择本机发布，仍须先在干净提交执行 `./release.sh` 和 `node scripts/npm-preflight.mjs`，并完成 npm 登录及二次验证。
 4. 从公共 npm 按固定版本安装到新 profile，核对五包版本与 tarball integrity，再创建对应 GitHub Release。Actions 发版须上传该次运行归档中的五个 tgz、manifest 和 SHA256SUMS，不在本机重新打包。
@@ -73,7 +73,7 @@ GitHub tgz 安装继续支持：从对应 Release 下载五个文件，在“插
 
 公共 npm 验收记录在 reviews/npm-distribution-review.md 更新。对外安装页面应引用本文的同版本安装指令。
 
-## npm 可信发布（五包信任已配置，尚未实发验证）
+## npm 可信发布（五包实发已验证）
 
 目的：一次配置包与 GitHub 工作流之间的信任，后续由 Actions 使用短期 OIDC 身份发布，不再逐次索要维护者的 Passkey。仍保留手动发版入口，不因 push、tag 或 PR 自动发布。
 
@@ -116,7 +116,10 @@ npx --yes npm@11.15.0 trust github dsh-limix-cover --repo Limitless2023/limix-ds
 - 独立临时副本使用 Node 24.22.2 / npm 11.15.0，从三份锁文件重新安装依赖；`./release.sh` 成功构建并核验五包，构建后工作树干净。
 - 133 个 Node 测试、78 个 Python 测试通过。包含五包缺失、内容篡改、同版本冲突、部分发布恢复和 Actions 身份边界测试。
 - 2026-11-03，维护者完成五包信任配置；通过 `npm trust list` 逐包核对仓库 `Limitless2023/limix-dsh`、工作流 `publish.yml` 和直接发布权限，均一致。
-- 尚未触发 GitHub Ubuntu runner 或执行真实 OIDC 发布；npm 发布预演也未在本轮执行。现有界面与模型回复的人工验收结论不因此改变。
+- 2026-11-03，GitHub Ubuntu runner 已完成五包构建、预演及 OIDC 真实发布，全程无需额外 Passkey。首次运行在发布后的即时核验遇到 npm 延迟公开；脚本已增加有上限的等待，并新增两项测试通过。
+- 公共下载的五包 SHA256/SHA512 与 Actions 归档一致；独立 DSH 环境 0.3.14→0.3.15 升级通过，标准模式选择、数据源与预设文件保持一致，安装包凭据读取正常。用户真实 API 配置未改变。
+- 最终 [Actions 回验](https://github.com/Limitless2023/limix-dsh/actions/runs/41654863665) 成功，135 项 Node、78 项 Python 测试通过，重建五包字节与已发布版本一致。
+- 本轮没有升级日常 desktop，没有重做首次安装、tgz 迁移或浏览器全流程。现有界面与模型回复的人工验收结论不因此改变。
 
 依据：[npm 可信发布文档](https://docs.npmjs.com/trusted-publishers/)、[npm trust 命令](https://docs.npmjs.com/cli/v11/commands/npm-trust/)、[未验证配置 48 小时到期公告](https://github.blog/changelog/2026-10-02-unvalidated-npm-trusted-publishing-configurations-now-expire/)。核对日期：2026-11-03。
 

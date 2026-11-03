@@ -14,7 +14,7 @@ causal-ui-0313-review.md - 0.3.13 因果 UI、场景比较契约、导出与 DSH
 
 report-delivery-0312-review.md - 0.3.12 工程修复、真实测试与发布回验；保留提示词未通过项。
 
-npm-distribution-review.md - npm候选分发交叉审查、隔离安装/升级/迁移与待确认边界。
+npm-distribution-review.md - npm 分发审查、0.3.15 可信发布与隔离升级；保留失败运行及未验收边界。
 ui-release-review.md - v0.3.9 UI独立审查、修复与验证边界。
 coffee-release-review.md - v0.3.8 数据库咖啡演示后的调用、日期与报告修复审查；保留人工审阅和未验收边界。
 scenarios-release-review.md - v0.3.7 报告、环境、输入与分发交叉审查；记录修复、最终检查和未验收项。

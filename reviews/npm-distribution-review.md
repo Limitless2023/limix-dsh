@@ -72,3 +72,16 @@ npm提交后有数分钟的处理期，期间404如实记录；待全部可下�
 独立DSH_HOME完成公共npm0.3.12→0.3.13升级。五包实际版本与精确依赖一致，bundle无重复；标准模式选择、数据源文件和profile patch保留。安装包实际凭据读取器通过测试，用户真实API配置哈希不变。npm处理期间版本暂不可用，重试通过；一次下载TLS连接中断后重新核对五包通过。
 
 证据位于Coffee/_recon/npm-0313-public。实际DSH因果界面验收和保留问题见[本轮审查](causal-ui-0313-review.md)。本轮未升级日常desktop，未重做首次安装、tgz迁移、Windows或第二台电脑验收。
+
+
+## 0.3.15 可信发布与公共升级（2026-11-03）
+
+首次 Actions 运行 41653477941 在提交 29d4bd87ec374569b82f66890aa2a509dc954b4c 上完成五包 OIDC 发布，全程未要求维护者额外 Passkey。npm 返回接受发布与 provenance 回执；即时公共查询仍为 404，导致该次运行的最后核验失败。随后五包均公开，下载 SHA256/SHA512 与首次 Actions 归档一致。
+
+重跑 41654419578 暴露 npm 11.15 对已发布版本的 dry-run 拒绝。脚本现对新版本执行 dry-run，对已发布版本核对完整性；发布后最多等待 60 轮公开状态，内容不一致和网络错误立即停止。新增两项延迟测试，发布测试共 9 项通过。失败运行保留，不删记录。
+
+独立 DSH_HOME 从 0.3.14 配置副本升级到公共 npm 0.3.15。五包精确版本一致、bundle 无重复；标准模式选择、数据源文件和 profile patch 保留；安装包凭据解析器可读测试环境凭据。用户真实 API 配置摘要不变。没有修改日常 desktop。
+
+本机证据在 Coffee/_recon/npm-0315-public：registry.json、migration-results.json、升级日志与 actions-artifacts。此目录不上传用户配置。此次未重做首装、tgz 迁移、Windows、第二台电脑或预测业务全流程；自然语言总结仍须人工审阅。
+
+最终运行 [41654863665](https://github.com/Limitless2023/limix-dsh/actions/runs/41654863665) 成功：135 项 Node、78 项 Python 测试通过；五包重建字节与已发布包一致，全部安全跳过重复发布并再次核验通过。

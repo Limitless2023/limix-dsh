@@ -18,6 +18,8 @@ test_runtime.py - 验证 venv/ensurepip/probe 子进程取消、探测超时清�
 test_forecast.py - 时序日期、缺列、无效分位数在上传前拒绝；验证分隔符、UTF BOM 与未知编码委派，不吞掉缺列。
 command-args.test.mjs - 重复命令词容错、位置参数保留与宿主报告分支验证。
 
+test_explain_graph.py - 模型身份与写入失败清理； 矩阵尺寸、抽样上限、比较详情保留原值但回执省略、两组列重排、失败拒绝与输出保护。
+
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 
 report.test.mjs 补充双格式一致性与 Markdown 冲突回滚验证。

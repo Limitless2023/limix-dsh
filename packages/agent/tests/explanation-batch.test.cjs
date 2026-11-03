@@ -16,11 +16,11 @@ const { contributionFill, number } = require('../src/client/explanation-data.ts'
 const { graphLayout } = require('../src/client/graph-layout.ts')
 const batch = require('./fixtures/explanation-batch.json'), graph = require('./fixtures/explanation-network.json')
 
-test('真实63条解释默认展示819个贡献色块并可切逐样本', () => {
+test('真实63条解释默认展示819个贡献色块并可切单条解释', () => {
   const html = renderToStaticMarkup(React.createElement(ExplanationView, { data: batch }))
-  assert.match(html, /贡献热力图/); assert.match(html, /逐样本/)
+  assert.match(html, /贡献热力图/); assert.match(html, /单条解释/); assert.match(html, /平均贡献说明/)
   assert.equal((html.match(/class="lx-matrix-cell"/g) ?? []).length, 63 * 13)
-  assert.match(html, /共 819 个色块/); assert.match(html, /aria-label="数据说明" aria-expanded="false"/)
+  assert.match(html, /共 819 个色块/); assert.match(html, /aria-label="快捷分组说明" aria-expanded="false"/)
   assert.equal(batch.samples.length, 63)
   assert.ok(validBatchDetail(batch, batch))
   const selected = sampleView(batch, batch.samples[62])
@@ -39,10 +39,12 @@ test('完整网络不截掉20个变量、28条边和6个孤立变量', () => {
   const html = renderToStaticMarkup(React.createElement(ExplanationView, { data: graph }))
   assert.equal((html.match(/class="lx-causal-edge"/g) ?? []).length, 28)
   assert.equal((html.match(/class="lx-causal-node"/g) ?? []).length, 20)
-  assert.match(html, /6 个变量未检出连线/)
+  assert.doesNotMatch(html, /6 个变量未检出连线/)
+  assert.match(html, /关系图说明/)
   assert.match(html, /aria-label="关系图说明" aria-expanded="false"/)
   assert.doesNotMatch(html, /保留显示|实验依据需另行核对|循环关系/)
-  assert.match(html, /聚焦目标关系/)
+  assert.doesNotMatch(html, /聚焦此变量/)
+  assert.match(html, /因果关系网络/)
   const layout = graphLayout(graph.nodes, graph.edges)
   assert.equal(layout.positions.size, 20)
   assert.equal(layout.isolated.length, 6)
@@ -99,7 +101,7 @@ test('统一色阶反映全量最大值，未知方向保留灰色且不伪造�
   assert.equal(contributionFill(-.15, 1, .3), contributionFill(.15, 1, .3))
   const html = renderToStaticMarkup(React.createElement(ExplanationView, { data:batch }))
   assert.match(html, /贡献色阶：蓝色负向，绿色正向，深色贡献大/)
-  assert.ok(html.includes(`负向 −${number(contributionMatrix(batch).maximum)}`))
+  assert.ok(html.includes(`−${number(contributionMatrix(batch).maximum)}`))
 })
 
 test('零值、重复值、负分数和分类预测均保留，不产生无效尺寸', () => {
@@ -110,7 +112,9 @@ test('零值、重复值、负分数和分类预测均保留，不产生无效�
     assert.equal(matrix.ranking[0].mean, score === 0 ? 0 : null)
     const html = renderToStaticMarkup(React.createElement(ExplanationView, { data:{...value,requested_count:63,explained_count:63} }))
     assert.match(html,/方向未定/); assert.doesNotMatch(html,/NaN|Infinity/)
-    assert.match(html,/类别A/)
+    assert.doesNotMatch(html,/类别A/)
+    const checked=renderToStaticMarkup(React.createElement(ExplanationView,{data:{...value,requested_count:63,explained_count:63},showPredictionCheck:true}))
+    assert.match(checked,/类别A/)
     if(score === 0) assert.match(html,/贡献均为 0/)
   }
   assert.equal(contributionMatrix({ feature_names:[], samples:[] }).cellCount,0)

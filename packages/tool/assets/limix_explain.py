@@ -1,5 +1,5 @@
 """
-[INPUT]: CLI HTTP/上传函数；本地 CSV 或时序预测结果版本、字段字典与原预测文件。
+[INPUT]: CLI HTTP/上传函数、limix_explain_graph 图契约；本地 CSV 或时序预测结果版本、字段字典与原预测文件。
 [OUTPUT]: explain 子命令；所有模式保存 JSON/CSV/.view.json，供结果卡和报告复用。
 [POS]: 扩展任务编排；与预测状态分离，提交回执支持超时续查。stderr 进度行由 agent 的 pipeline-stage 解析，改格式须同步。
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
@@ -14,6 +14,7 @@ from pathlib import Path
 from limix_explain_batch import select_rows, normalize_local, contribution_rows
 from limix_explain_timeseries import normalize_timeseries
 from limix_explain_input import prepare_features, stratified_rows, numeric
+from limix_explain_graph import graph_fields, graph_input, compare
 
 TERMINAL = {'succeeded', 'degraded_succeeded', 'partially_succeeded', 'failed', 'timeout', 'cancelled'}
 SUCCESS = {'succeeded', 'degraded_succeeded', 'partially_succeeded'}
@@ -40,6 +41,11 @@ def add_parser(sub, cli):
     p.add_argument('--task-id', help='续查已提交的解释任务，绝不重新提交')
     p.add_argument('--timeout', type=int, default=480, help='本地等待秒数；超时保留任务回执')
     p.add_argument('-o', '--output', required=True, help='原始解释 JSON 保存路径；旁边另存 CSV 和回执')
+    p.add_argument('--compare-left', help='本地比较：左组成功的 .view.json')
+    p.add_argument('--compare-right', help='本地比较：右组成功的 .view.json')
+    p.add_argument('--left-label', default='场景 A')
+    p.add_argument('--right-label', default='场景 B')
+    p.add_argument('--group-description', help='两组分组规则；比较必填')
     p.set_defaults(fn=lambda cfg, args: run(cfg, args, cli))
 
 
@@ -181,7 +187,7 @@ def normalize(data, context):
             raise ValueError('关系图边与变量集合不一致')
         if context.get('feature_names') and set(names) != set(context['feature_names']+[context['target']]):
             raise ValueError('关系图变量与请求不一致')
-        view.update({'nodes': names, 'edges': edges})
+        view.update({'nodes': names, 'edges': edges, **graph_fields(result,names)})
     else:raise ValueError('未识别的解释模式')
     return view
 
@@ -215,6 +221,8 @@ def verify_recovered_task(data, request, task_id):
 
 
 def run(cfg, args, cli):
+    if getattr(args,'compare_left',None) or getattr(args,'compare_right',None):
+        return compare(args,cli)
     output = Path(args.output).resolve()
     if output.suffix.lower() != '.json' or not output.parent.is_dir():
         cli.die('输出须为已有目录中的 .json 文件', exit_code=2)
@@ -287,9 +295,15 @@ def run(cfg, args, cli):
             cli.die(data.get('error_message') or f'解释未完成：{status}',exit_code=3,payload={'task_id':task_id,'task_status':status,'saved_to':str(output)})
         view=normalize(data,context)
         view['task_status']=status
+        view['source_task_id']=task_id
+        if view['mode']!='local':
+            view.update(graph_input(rows,view['nodes']))
+            view['source_sha256']=context['signature']['files']['data']
         csv_path=output.with_suffix('.csv');export_csv(csv_path,view)
         cli.log(f'已保存解释 → {output}')
         detail_path=output.with_suffix('.view.json');save_json(detail_path,view)
+        if view['mode']!='local':
+            view={k:v for k,v in view.items() if k not in ['graph_samples']}
         if view.get('requested_count',1)>1:
             view={k:v for k,v in view.items() if k not in ['samples','prior_predictions','row_numbers']}
         view['detail_path']=str(detail_path)

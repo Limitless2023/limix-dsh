@@ -10,7 +10,7 @@ const { renderToStaticMarkup } = require('react-dom/server')
 for (const ext of ['.ts','.tsx']) require.extensions[ext] = (module,file) => module._compile(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText,file)
 const { emptyFilter, filterSamples, filterFields, filterError, filterDescription } = require('../src/client/explanation-filter.ts')
 const { contributionMatrix, contributionScales } = require('../src/client/contribution-matrix.ts')
-const { contributionExportSvg, graphExportSvg } = require('../src/client/explanation-export.ts')
+const { contributionExportSvg, singleContributionExportSvg, graphExportSvg } = require('../src/client/explanation-export.ts')
 const { explanationRecords } = require('../src/client/ExplanationDataTable.tsx')
 const { batchDetailKey, validBatchDetail, sampleView, sampleLabel } = require('../src/client/explanation-data.ts')
 const { ContributionHeatmap } = require('../src/client/ContributionHeatmap.tsx')
@@ -184,16 +184,22 @@ test('旧时序文件也按未核实尺度展示，不套业务单位或比较�
     const data={...sampleView(timeseries,timeseries.samples[0]),unit:'元/MWh',prediction_scale:scale,
       prior_prediction:300,prediction_delta:-294}
     const html=renderToStaticMarkup(React.createElement(LocalExplanation,{data}))
-    assert.match(html,/解释模型输出/); assert.doesNotMatch(html,/元\/MWh|原预测|重算差异|解释时预测/)
+    assert.doesNotMatch(html,/解释模型输出/); assert.doesNotMatch(html,/元\/MWh|原预测|重算差异|解释时预测/)
     const batchData={...data,samples:[timeseries.samples[0]]}
     const matrixHtml=renderToStaticMarkup(React.createElement(ContributionHeatmap,{data:batchData}))
-    assert.match(matrixHtml,/解释模型输出/); assert.doesNotMatch(matrixHtml,/元\/MWh|解释时预测/)
+    assert.doesNotMatch(matrixHtml,/解释模型输出/); assert.doesNotMatch(matrixHtml,/元\/MWh|解释时预测/)
+    const { PredictionCheck } = require('../src/client/PredictionCheck.tsx')
+    const checked=renderToStaticMarkup(React.createElement(PredictionCheck,{data:batchData}))
+    assert.match(checked,/解释模型输出/); assert.doesNotMatch(checked,/元\/MWh|原预测|与原预测相差/)
     assert.equal(filterFields(batchData)[0].label,'解释模型输出')
     assert.match(renderToStaticMarkup(React.createElement(ExplanationDataTable,{data:batchData})),/<th>解释模型输出<\/th>/)
   }
   const regression={mode:'local',task_type:'regression',target:'strength',unit:'MPa',prediction:200,prior_prediction:190,prediction_delta:10}
   const html=renderToStaticMarkup(React.createElement(LocalExplanation,{data:regression}))
-  assert.match(html,/解释时预测/); assert.match(html,/MPa/); assert.match(html,/重算差异/)
+  assert.doesNotMatch(html,/解释时预测|MPa|重算差异/)
+  const { PredictionCheck } = require('../src/client/PredictionCheck.tsx')
+  const checked=renderToStaticMarkup(React.createElement(PredictionCheck,{data:regression}))
+  assert.match(checked,/解释时预测/); assert.match(checked,/MPa/); assert.match(checked,/与原预测相差/)
 })
 
 test('无向 SVG 的可读关系说明也不暗示方向', () => {
@@ -203,3 +209,14 @@ test('无向 SVG 的可读关系说明也不暗示方向', () => {
   assert.doesNotMatch(svg,/marker-end=|x → y/)
   assert.match(graphExportSvg({...data,mode:'directed'}),/<title>x → y：0.5<\/title>/)
 })
+
+ test('单条导出只包含选中行的双向贡献，分组导出不冒充筛选覆盖率', () => {
+  const sample=sampleView(batch,batch.samples[8]),svg=singleContributionExportSvg(sample)
+  assert.match(svg,/第 9 行/);assert.doesNotMatch(svg,/全样本|当前筛选|解释时预测|fill-opacity=/)
+  assert.equal((svg.match(/<rect x=/g)??[]).length,13)
+  assert.match(svg,/#4168a9/);assert.match(svg,/#248575/)
+  const low={...batch,samples:batch.samples.slice(0,25)},high={...batch,samples:batch.samples.slice(25)}
+  const pair=contributionExportSvg(high,low,'高低组对比',undefined,['低预测组','高预测组'])
+  assert.match(pair,/低预测组 · 25 个样本/);assert.match(pair,/高预测组 · 38 个样本/)
+  assert.doesNotMatch(pair,/当前筛选|覆盖率|全样本/)
+ })

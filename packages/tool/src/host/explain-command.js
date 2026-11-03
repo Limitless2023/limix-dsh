@@ -16,7 +16,9 @@ const WORKFLOW = `以下是执行指引，仅在用户已要求实际执行对�
 6. 贡献分数无目标单位，不写成增减多少MPa；方向是模型归因，不是实际调节收益。分类接口未声明 sign_scores 对应哪一类别，只称“服务返回的贡献方向”，不解释为提升某一类别概率，也不把不同预测标签的平均方向当成同一类别效果。中性或零贡献不等于变量没有实际作用，也不能据此断定共线性。
 7. 批量核对 requested_count、explained_count、missing_rows。各影响因子影响分数对比采用带正负的平均贡献：每条 abs(score)×direction 求平均，再按平均值绝对大小排序；未知方向不补零。samples 完整矩阵由界面按 detail_path 加载。missing_rows 非空不得称全部完成；mapping=input_order 只是按输入顺序对应，不是服务索引核验。报告区分 input_rows 输入总量、requested_count 请求量和 explained_count 返回量；局部范围不称全样本结论。样本不足且无索引时拒绝错配；时间与特征名称只使用返回值，整体排名不是有向因果图。
 8. 解释终态用 task_status；仅 succeeded 是完整成功，degraded_succeeded 或 partially_succeeded 必须说明限制。续查用 task_id 和原参数/output；缺回执但有请求文件时先通过 api GET /v1/extensions/tasks 排查。参数或权限错误先核对帮助、公开文档与原始错误，不猜测 API 端点，不追加用户未请求的探测任务。
-9. 用户问预测误差原因时，先区分模型归因与误差诊断。可描述真实值对照中的日期和偏差；缺少天气、日历信息不足或分布变化等只能列为待验证假设。没有补充数据或对照实验，不断言某因素是主要误差原因，也不声称仅凭某些特征就无法提前预测。`
+9. 用户问预测误差原因时，先区分模型归因与误差诊断。可描述真实值对照中的日期和偏差；缺少天气、日历信息不足或分布变化等只能列为待验证假设。没有补充数据或对照实验，不断言某因素是主要误差原因，也不声称仅凭某些特征就无法提前预测。
+10. 结论先行：解释完成先用1–3句回答本次业务问题，指出数据范围、真实发现和需要核查的因素，再引导查看卡片图表。只使用返回关系与贡献作为证据；不把分数写成因果概率、收益或变量作用大小。交互卡片中的关系网络和变量×变量矩阵共享同一结果；当前离线报告的 explanation 图仅导出关系网络，不自动包含交互矩阵，不为未知图表类型试探调用。样本×特征热力图解释预测，不与关系分数混算。
+11. 用户要求场景关系对比时，先说明并固定两组业务条件、字段与处理口径，分别执行有向解释；两组均 succeeded 后用 explain --mode directed --compare-left 左组.view.json --compare-right 右组.view.json --left-label 左组名称 --right-label 右组名称 --group-description 分组规则 --threshold 共同阈值 --output 新路径.json 生成本地对比卡，不手工拼接返回。共同阈值用于显示筛选；记录样本数，提示取值范围和条件筛选也会改变关系。不主动增加稳定性重复调用或无向解释探测。批量回归贡献卡支持按原预测（缺失则解释时预测）中位数分组：低组严格小于中位数，高组大于或等于中位数，相等值归高组。结论与表格必须使用同一分组边界、样本范围及带符号均值；不把平均绝对值写成平均贡献。用户指定分组优先使用原值筛选。`
 
 export function registerExplainCommand(ctx) {
   ctx.systemPrompt.section({ name: 'limix:explain-workflow', order: 510, text: WORKFLOW, interpolate: false })

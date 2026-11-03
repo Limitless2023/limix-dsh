@@ -925,6 +925,7 @@ function explanationPrediction(data) {
 function batchDetailKey(data) {
 	return JSON.stringify([
 		data.detail_path,
+		data.detail_sha256,
 		data.mode,
 		data.target,
 		data.task_type,
@@ -936,7 +937,14 @@ function batchDetailKey(data) {
 		data.requested_count,
 		data.explained_count,
 		data.feature_names,
-		data.row_numbers ?? data.samples?.map((sample) => sample.row_number)
+		data.row_numbers ?? data.samples?.map((sample) => sample.row_number),
+		data.comparison && [
+			data.comparison.left.source_task_id,
+			data.comparison.left.source_sha256,
+			data.comparison.right.source_task_id,
+			data.comparison.right.source_sha256,
+			data.comparison.threshold
+		]
 	]);
 }
 function validBatchDetail(value, expected) {
@@ -999,6 +1007,834 @@ function singleSampleMatrix(data) {
 			feature_values: values
 		}]
 	};
+}
+/** 图详情只补原值，不接受其他任务或变量顺序。 */
+function validGraphDetail(value, expected) {
+	const names = value?.nodes;
+	return value?.mode === expected.mode && value.target === expected.target && value.source_task_id === expected.source_task_id && JSON.stringify(names) === JSON.stringify(expected.nodes) && value.input_rows === expected.input_rows && value.source_sha256 === expected.source_sha256 && value.model_type === expected.model_type && value.graph_backend === expected.graph_backend && value.graph_standardize === expected.graph_standardize && Array.isArray(value.graph_sample_names) && JSON.stringify(value.graph_sample_names) === JSON.stringify(names) && Array.isArray(value.graph_samples) && value.graph_samples.length === expected.graph_sample_count && value.graph_samples.length <= 2e3 && value.graph_samples.every((r) => Array.isArray(r) && r.length === names.length && r.every(Number.isFinite)) && JSON.stringify(value.graph_weights) === JSON.stringify(expected.graph_weights);
+}
+/** 对比详情须同时匹配两组身份和全部分数；只允许补入原值样本。 */
+function validComparisonDetail(value, expected) {
+	const c = expected.comparison, v = value?.comparison;
+	if (!c || !v || value.mode !== expected.mode || value.target !== expected.target || JSON.stringify(value.nodes) !== JSON.stringify(expected.nodes)) return false;
+	if (v.threshold !== c.threshold || v.description !== c.description || JSON.stringify(v.records) !== JSON.stringify(c.records)) return false;
+	return ["left", "right"].every((side) => v[side]?.label === c[side].label && validGraphDetail(v[side], c[side]));
+}
+/** 场景对比回执只传 SHA256；完整内容验证通过后再进入图表。 */
+async function parseComparisonDetail(text$1, expected) {
+	if (Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text$1))), (b) => b.toString(16).padStart(2, "0")).join("") !== expected.detail_sha256) throw new Error("场景对比文件已变化，请重新生成比较结果");
+	const value = JSON.parse(text$1);
+	if (value.mode !== expected.mode || value.target !== expected.target || !validComparisonDetail(value, value)) throw new Error("场景对比文件格式不匹配");
+	return value;
+}
+
+//#endregion
+//#region src/client/ExplanationDataTable.tsx
+function explanationRecords(data) {
+	if (data.comparison) return data.comparison.records.map((r, i) => ({
+		key: `${i}:${r.source}:${r.target}`,
+		row: void 0,
+		values: [
+			data.labels?.[r.source] ?? r.source,
+			r.source,
+			data.labels?.[r.target] ?? r.target,
+			r.target,
+			String(r.left_weight),
+			String(r.right_weight),
+			r.left_present && r.right_present ? "两组均达到显示阈值" : `仅${r.left_present ? data.comparison.left.label : data.comparison.right.label}达到显示阈值`
+		]
+	}));
+	if (data.mode !== "local") return (data.edges ?? []).map((e, i) => ({
+		key: `${i}:${e.source}:${e.target}`,
+		row: void 0,
+		values: [
+			data.labels?.[e.source] ?? e.source,
+			e.source,
+			data.labels?.[e.target] ?? e.target,
+			e.target,
+			String(e.weight)
+		]
+	}));
+	return (data.samples ?? []).flatMap((s) => (data.feature_names ?? []).map((name, index) => ({
+		key: `${s.row_number}:${name}`,
+		row: s.row_number,
+		values: [
+			sampleLabel(s, data),
+			s.prediction === void 0 ? "—" : String(s.prediction),
+			data.labels?.[name] ?? name,
+			name,
+			s.feature_values?.[index] === void 0 || s.feature_values[index] === null ? "—" : String(s.feature_values[index]),
+			String(s.scores[index]),
+			directionLabel(s.directions[index])
+		]
+	})));
+}
+function ExplanationDataTable({ data }) {
+	const root = (0, react.useRef)(null), [query, setQuery] = (0, react.useState)(""), [page, setPage] = (0, react.useState)(0);
+	const records = (0, react.useMemo)(() => explanationRecords(data), [data]);
+	const filtered = (0, react.useMemo)(() => {
+		const term = query.trim().toLocaleLowerCase();
+		return term ? records.filter((r) => r.values.some((v) => v.toLocaleLowerCase().includes(term))) : records;
+	}, [records, query]);
+	const size = 25, pages = Math.max(1, Math.ceil(filtered.length / size)), current = Math.min(page, pages - 1);
+	(0, react.useEffect)(() => {
+		const element = root.current;
+		const input = (event) => {
+			if (event.target.matches("[data-lx-raw-search]")) {
+				setQuery(event.target.value);
+				setPage(0);
+			}
+		};
+		const click = (event) => {
+			const action = event.target.closest("[data-lx-raw-page]")?.dataset.lxRawPage;
+			if (action) setPage((p) => Math.min(pages - 1, Math.max(0, p + (action === "next" ? 1 : -1))));
+		};
+		element?.addEventListener("input", input);
+		element?.addEventListener("click", click);
+		return () => {
+			element?.removeEventListener("input", input);
+			element?.removeEventListener("click", click);
+		};
+	}, [pages]);
+	const headings = data.comparison ? [
+		"起点",
+		"起点字段",
+		"终点",
+		"终点字段",
+		data.comparison.left.label,
+		data.comparison.right.label,
+		"显示情况"
+	] : data.mode === "local" ? [
+		data.task_type === "timeseries" ? "预测步 / 时间" : "原始行",
+		explanationPrediction(data).label,
+		"影响因子",
+		"字段名",
+		"特征原值",
+		"贡献分数",
+		"方向"
+	] : [
+		"起点",
+		"起点字段",
+		"终点",
+		"终点字段",
+		"关系分数"
+	];
+	return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+		ref: root,
+		className: "lx-raw",
+		children: [
+			/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+				className: "lx-raw-toolbar",
+				children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("input", {
+					"data-lx-raw-search": true,
+					value: query,
+					onChange: () => {},
+					"aria-label": "检索解释数据",
+					placeholder: "检索行号、字段或数值"
+				}), /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", { children: [
+					filtered.length,
+					" / ",
+					records.length,
+					" 条记录"
+				] })]
+			}),
+			/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+				className: "lx-raw-scroll",
+				children: /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("table", {
+					className: "lx-raw-table",
+					children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("thead", { children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)("tr", { children: headings.map((h) => /* @__PURE__ */ (0, react_jsx_runtime.jsx)("th", { children: h }, h)) }) }), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("tbody", { children: filtered.slice(current * size, (current + 1) * size).map((record) => /* @__PURE__ */ (0, react_jsx_runtime.jsx)("tr", { children: record.values.map((v, i) => /* @__PURE__ */ (0, react_jsx_runtime.jsx)("td", { children: i === 0 && record.row !== void 0 ? /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("button", {
+						type: "button",
+						"data-lx-batch": "row",
+						"data-row": record.row,
+						children: [v, " ↗"]
+					}) : v }, i)) }, record.key)) })]
+				})
+			}),
+			!filtered.length && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
+				className: "lx-explain-foot",
+				children: "没有符合条件的数据。"
+			}),
+			/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+				className: "lx-heatmap-footer",
+				children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", { children: [
+					"展示 ",
+					filtered.length ? current * size + 1 : 0,
+					"–",
+					Math.min((current + 1) * size, filtered.length),
+					" 条"
+				] }), /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", { children: [
+					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+						type: "button",
+						"data-lx-raw-page": "previous",
+						"aria-label": "上一页原始数据",
+						disabled: current === 0,
+						children: "←"
+					}),
+					/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", { children: [
+						current + 1,
+						" / ",
+						pages
+					] }),
+					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+						type: "button",
+						"data-lx-raw-page": "next",
+						"aria-label": "下一页原始数据",
+						disabled: current === pages - 1,
+						children: "→"
+					})
+				] })]
+			})
+		]
+	});
+}
+
+//#endregion
+//#region src/client/PredictionCheck.tsx
+function PredictionCheck({ data }) {
+	const prediction = explanationPrediction(data);
+	const samples = data.samples ?? [{
+		row_number: data.row_number ?? 1,
+		step: data.step,
+		timestamp: data.timestamp,
+		prediction: data.prediction,
+		prior_prediction: data.prior_prediction,
+		prediction_delta: data.prediction_delta
+	}];
+	const format = (v) => typeof v === "number" ? number(v) : v === void 0 || v === null ? "未返回" : String(v);
+	return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("section", {
+		"aria-label": "预测值核对",
+		style: { marginTop: 16 },
+		children: [
+			/* @__PURE__ */ (0, react_jsx_runtime.jsx)("strong", {
+				style: { fontSize: 12 },
+				children: "预测值核对"
+			}),
+			/* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
+				className: "lx-explain-foot",
+				style: { margin: "6px 0" },
+				children: prediction.comparable ? "贡献图对应解释接口本次计算的结果；原预测用于核对。" : "解释模型输出的尺度尚未核实，不与业务预测值比较。"
+			}),
+			/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+				className: "lx-raw-scroll",
+				style: { maxHeight: 240 },
+				children: /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("table", {
+					className: "lx-raw-table",
+					children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("thead", { children: /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("tr", { children: [
+						/* @__PURE__ */ (0, react_jsx_runtime.jsx)("th", { children: "样本" }),
+						prediction.comparable && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("th", { children: ["原预测", prediction.unit && `（${prediction.unit}）`] }),
+						/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("th", { children: [prediction.label, prediction.unit && `（${prediction.unit}）`] }),
+						prediction.comparable && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("th", { children: data.task_type === "classification" ? "类别核对" : "与原预测相差" })
+					] }) }), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("tbody", { children: samples.map((s) => /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("tr", { children: [
+						/* @__PURE__ */ (0, react_jsx_runtime.jsx)("td", { children: sampleLabel(s, data) }),
+						prediction.comparable && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("td", { children: format(s.prior_prediction) }),
+						/* @__PURE__ */ (0, react_jsx_runtime.jsx)("td", { children: format(s.prediction) }),
+						prediction.comparable && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("td", { children: data.task_type === "classification" ? s.prior_prediction === void 0 || s.prediction === void 0 ? "无法核对" : String(s.prior_prediction) === String(s.prediction) ? "一致" : `重算类别 ${s.prior_prediction} → ${s.prediction}` : typeof s.prediction_delta === "number" ? `${s.prediction_delta > 0 ? "+" : ""}${number(s.prediction_delta)} ${prediction.unit}` : "未返回" })
+					] }, s.row_number)) })]
+				})
+			})
+		]
+	});
+}
+
+//#endregion
+//#region src/client/contribution-matrix.ts
+function contributionMatrix(data) {
+	const samples = data.samples ?? [], names = data.feature_names ?? [];
+	const maximum = samples.reduce((m, s) => s.scores.reduce((n, v) => Math.max(n, Math.abs(v)), m), 0);
+	return {
+		rows: samples.map((sample, sampleIndex) => ({
+			sampleIndex,
+			rowNumber: sample.row_number,
+			cells: names.map((name, featureIndex) => ({
+				name,
+				featureIndex,
+				score: sample.scores[featureIndex],
+				direction: sample.directions[featureIndex]
+			}))
+		})),
+		ranking: [...names.map((name, featureIndex) => {
+			let signed$1 = 0, unknownCount = 0;
+			for (const sample of samples) {
+				const magnitude = Math.abs(sample.scores[featureIndex]), direction = sample.directions[featureIndex];
+				if (knownDirection(direction)) signed$1 += magnitude * direction;
+				else if (magnitude !== 0) unknownCount++;
+			}
+			return {
+				name,
+				featureIndex,
+				label: data.labels?.[name] ?? name,
+				unknownCount,
+				mean: samples.length && !unknownCount ? signed$1 / samples.length : null
+			};
+		})].sort((a, b) => Number(a.mean === null) - Number(b.mean === null) || Math.abs(b.mean ?? 0) - Math.abs(a.mean ?? 0) || a.featureIndex - b.featureIndex),
+		maximum,
+		cellCount: samples.length * names.length
+	};
+}
+function contributionScales(...groups) {
+	const matrices = groups.map(contributionMatrix);
+	return {
+		maximum: Math.max(0, ...matrices.map((m) => m.maximum)),
+		meanMaximum: Math.max(0, ...matrices.flatMap((m) => m.ranking.map((f) => Math.abs(f.mean ?? 0))))
+	};
+}
+
+//#endregion
+//#region src/client/ExplanationInsight.tsx
+function ExplanationInsight({ data }) {
+	const value = data.samples ? data : singleSampleMatrix(data), count = value.samples?.length ?? 0;
+	const top = contributionMatrix(value).ranking.filter((f) => f.mean !== null && f.mean !== 0).slice(0, 3);
+	return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("p", {
+		className: "lx-insight",
+		children: [!count ? "当前筛选没有样本，请调整条件。" : top.length ? `在当前 ${count} 个样本中，${count === 1 ? "贡献" : "平均贡献"}较突出的因素是${top.map((f) => f.label).join("、")}。${count > 1 ? "先看整体分布，再点击样本查看差异。" : "下方展示各因素在本次预测中的贡献。"}` : "当前贡献没有可汇总的非零已知方向，请查看原始数据与方向说明。", data.task_type === "classification" ? " 分类方向未绑定具体类别，不代表某一类别概率变化。" : ""]
+	});
+}
+function predictionGroups(data) {
+	if (data.task_type === "classification" || data.task_type === "timeseries") return null;
+	const samples = data.samples ?? [], prior = samples.length > 0 && samples.every((s) => typeof s.prior_prediction === "number" && Number.isFinite(s.prior_prediction));
+	const values = samples.map((s) => prior ? s.prior_prediction : s.prediction);
+	if (values.length < 2 || !values.every((v) => typeof v === "number" && Number.isFinite(v))) return null;
+	const sorted = values.slice().sort((a, b) => a - b), mid = Math.floor(sorted.length / 2), median = sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+	return {
+		median,
+		label: prior ? "原预测" : "解释时预测",
+		low: {
+			...data,
+			samples: samples.filter((_, i) => values[i] < median)
+		},
+		high: {
+			...data,
+			samples: samples.filter((_, i) => values[i] >= median)
+		}
+	};
+}
+function GroupInsight({ low, high }) {
+	const left = contributionMatrix(low).ranking, right = contributionMatrix(high).ranking;
+	const changes = left.flatMap((a) => {
+		const b = right.find((b$1) => b$1.name === a.name);
+		return a.mean !== null && b?.mean != null ? [{
+			label: a.label,
+			delta: b.mean - a.mean
+		}] : [];
+	}).sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta)).filter((x) => x.delta !== 0).slice(0, 3);
+	return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("p", {
+		className: "lx-insight",
+		children: [
+			"低预测组 ",
+			low.samples?.length ?? 0,
+			" 条，高预测组 ",
+			high.samples?.length ?? 0,
+			" 条。",
+			changes.length ? `高组减低组的平均贡献差异较大的是${changes.map((x) => `${x.label}（${x.delta > 0 ? "+" : ""}${number(x.delta)}）`).join("、")}。` : "当前两组没有可比较的非零平均贡献差异。",
+			"下方共用色阶和数值轴。"
+		]
+	});
+}
+
+//#endregion
+//#region src/client/LocalExplanation.tsx
+function LocalExplanation({ data, controls }) {
+	const root = (0, react.useRef)(null), [expanded, setExpanded] = (0, react.useState)(false);
+	(0, react.useEffect)(() => {
+		const element = root.current;
+		const click = (event) => {
+			if (event.target.closest("[data-lx-local-toggle]")) setExpanded((v) => !v);
+		};
+		element?.addEventListener("click", click);
+		return () => element?.removeEventListener("click", click);
+	}, []);
+	const factors = (data.features ?? []).filter((f) => Number.isFinite(f.score)).sort((a, b) => Math.abs(b.score) - Math.abs(a.score));
+	const maximum = Math.max(...factors.map((f) => Math.abs(f.score)), 1e-5);
+	return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+		ref: root,
+		children: [
+			/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+				className: "lx-explain-head lx-local-head",
+				children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+					className: "lx-local-heading",
+					children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { children: "主要影响因素" })
+				}), controls ?? /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+					className: "lx-explain-label",
+					children: sampleLabel({
+						row_number: data.row_number ?? 1,
+						step: data.step,
+						timestamp: data.timestamp
+					}, data)
+				})]
+			}),
+			/* @__PURE__ */ (0, react_jsx_runtime.jsx)("style", { children: `
+.lx-local-head{align-items:center;margin-top:16px;margin-bottom:12px}.lx-local-heading{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--dsw-alias-label-secondary)}.lx-local-summary-right{display:flex;flex-direction:column;align-items:flex-end;gap:10px}.lx-local-summary-right .lx-explain-diff{max-width:none}.lx-local-summary-right:empty{display:none}@container(max-width:420px){.lx-local-summary-right{align-items:flex-start;margin-top:12px}}
+.lx-tornado{width:100%;max-width:1050px;margin:0 auto}.lx-tornado-row,.lx-tornado-axis-row{display:grid;grid-template-columns:minmax(95px,150px) minmax(100px,1fr) 85px;gap:18px;align-items:center;min-height:34px}.lx-tornado-name{font-size:12px;overflow-wrap:anywhere}.lx-tornado-name small{color:var(--dsw-alias-label-secondary);margin-left:6px;font-size:10px}.lx-tornado-track{height:34px;position:relative}.lx-tornado-track:before{content:'';position:absolute;left:50%;height:100%;border-left:1px solid var(--dsw-alias-border-primary,#ddd)}.lx-tornado-bar{position:absolute;top:12px;height:10px;border-radius:2px}.lx-tornado-score{text-align:right;font-size:12px;font-variant-numeric:tabular-nums}.lx-tornado-axis{display:flex;justify-content:space-between;color:var(--dsw-alias-label-secondary);font-size:11px}.lx-tornado:not([data-expanded=true]) .lx-tornado-row:nth-child(n+7){display:none}.lx-fullscreen-dialog[open] .lx-tornado .lx-tornado-row:nth-child(n){display:grid}.lx-fullscreen-dialog[open] .lx-local-expand{display:none}.lx-tornado-toggle{max-width:1050px;margin:8px auto}.lx-tornado-row:last-child{margin-bottom:0}@container(max-width:520px){.lx-tornado-row{grid-template-columns:85px minmax(80px,1fr) 65px;gap:8px}}
+` }),
+			/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+				className: "lx-tornado",
+				"data-expanded": expanded,
+				"aria-label": "单条样本正负贡献图",
+				children: [factors.map((f) => {
+					const known = f.direction === 1 || f.direction === -1 || f.direction === 0;
+					const value = f.direction === 0 ? 0 : Math.abs(f.score) * (f.direction === -1 ? -1 : 1);
+					const width = known ? Math.abs(value) / maximum * 50 : 0;
+					return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+						className: "lx-tornado-row",
+						title: `${f.label} · ${f.name}：${number(f.score)} · ${directionLabel(f.direction)}`,
+						children: [
+							/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
+								className: "lx-tornado-name",
+								children: [f.label, f.label !== f.name && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("small", { children: f.name })]
+							}),
+							/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+								className: "lx-tornado-track",
+								children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+									className: "lx-tornado-bar",
+									"data-direction": f.direction,
+									style: {
+										left: `${value < 0 ? 50 - width : 50}%`,
+										width: `${width}%`,
+										background: value < 0 ? "#4168a9" : "#248575"
+									}
+								})
+							}),
+							/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+								className: "lx-tornado-score",
+								children: known ? `${value > 0 ? "+" : ""}${number(value)}` : `${number(f.score)} · 方向未定`
+							})
+						]
+					}, f.name);
+				}), /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+					className: "lx-tornado-axis-row",
+					children: [
+						/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {}),
+						/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+							className: "lx-tornado-axis",
+							children: [
+								/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { children: "负向" }),
+								/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { children: "0" }),
+								/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { children: "正向" })
+							]
+						}),
+						/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {})
+					]
+				})]
+			}),
+			factors.length > 6 && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+				type: "button",
+				className: "lx-explain-toggle lx-local-expand",
+				"data-lx-local-toggle": true,
+				"aria-expanded": expanded,
+				children: expanded ? "收起因素 ↑" : `查看全部 ${factors.length} 个因素 ↓`
+			})
+		]
+	});
+}
+
+//#endregion
+//#region src/client/graph-layout.ts
+function graphLayout(nodes, edges, aspect = 2) {
+	const adjacency = new Map(nodes.map((n) => [n, edges.filter((e) => e.source === n).map((e) => e.target)]));
+	let index = 0;
+	const stack = [], onStack = /* @__PURE__ */ new Set(), indices = /* @__PURE__ */ new Map(), low = /* @__PURE__ */ new Map(), groups = [];
+	const visit = (node) => {
+		indices.set(node, index);
+		low.set(node, index++);
+		stack.push(node);
+		onStack.add(node);
+		for (const next of adjacency.get(node) ?? []) if (!indices.has(next)) {
+			visit(next);
+			low.set(node, Math.min(low.get(node), low.get(next)));
+		} else if (onStack.has(next)) low.set(node, Math.min(low.get(node), indices.get(next)));
+		if (low.get(node) === indices.get(node)) {
+			const group = [];
+			let member;
+			do {
+				member = stack.pop();
+				onStack.delete(member);
+				group.push(member);
+			} while (member !== node);
+			groups.push(group);
+		}
+	};
+	nodes.forEach((n) => {
+		if (!indices.has(n)) visit(n);
+	});
+	const membership = /* @__PURE__ */ new Map();
+	groups.forEach((g, i) => g.forEach((n) => membership.set(n, i)));
+	const levels = /* @__PURE__ */ new Map();
+	const level = (g) => {
+		if (levels.has(g)) return levels.get(g);
+		const parents = edges.filter((e) => membership.get(e.target) === g && membership.get(e.source) !== g).map((e) => membership.get(e.source));
+		const value = parents.length ? 1 + Math.max(...parents.map(level)) : 0;
+		levels.set(g, value);
+		return value;
+	};
+	const isolated = nodes.filter((n) => !edges.some((e) => e.source === n || e.target === n));
+	const columns = /* @__PURE__ */ new Map();
+	for (const node of nodes.filter((n) => !isolated.includes(n))) {
+		const l = Math.min(3, level(membership.get(node)));
+		columns.set(l, [...columns.get(l) ?? [], node]);
+	}
+	const layers = [...columns.entries()].sort(([a], [b]) => a - b).map(([, group]) => group);
+	for (let pass = 0; pass < 4; pass++) {
+		const forward = pass % 2 === 0;
+		const order = forward ? layers.map((_, i) => i) : layers.map((_, i) => layers.length - 1 - i);
+		for (const i of order) {
+			const neighbor = layers[i + (forward ? -1 : 1)];
+			if (!neighbor) continue;
+			const score = (n) => {
+				const linked = neighbor.map((m, j) => edges.some((e) => e.source === n && e.target === m || e.source === m && e.target === n) ? j : -1).filter((j) => j >= 0);
+				return linked.length ? linked.reduce((a, b) => a + b, 0) / linked.length : layers[i].indexOf(n);
+			};
+			const scores = new Map(layers[i].map((n) => [n, score(n)]));
+			layers[i].sort((a, b) => scores.get(a) - scores.get(b));
+		}
+	}
+	const isolateColumns = isolated.length > 4 ? 2 : isolated.length ? 1 : 0;
+	const height = Math.max(230, Math.max(0, ...layers.map((c) => c.length), Math.ceil(isolated.length / Math.max(1, isolateColumns))) * 62 + 40);
+	const isolateWidth = isolateColumns ? isolateColumns * 154 + 36 : 0;
+	const width = Math.max(620, layers.length * 260 + isolateWidth, height * Math.max(1.2, Math.min(1.9, aspect)));
+	const mainWidth = width - isolateWidth;
+	const positions = /* @__PURE__ */ new Map();
+	layers.forEach((col, i) => col.forEach((n, j) => positions.set(n, [layers.length === 1 ? mainWidth / 2 : 85 + i * (mainWidth - 170) / (layers.length - 1), 20 + (j + .5) * (height - 40) / col.length])));
+	isolated.forEach((n, i) => positions.set(n, [mainWidth + 100 + i % isolateColumns * 154, 55 + Math.floor(i / isolateColumns) * 70]));
+	return {
+		positions,
+		width,
+		height,
+		isolated,
+		cycles: groups.filter((g) => g.length > 1 || edges.some((e) => e.source === g[0] && e.target === g[0]))
+	};
+}
+
+//#endregion
+//#region src/client/explanation-export.ts
+const defaultExportTheme = {
+	background: "#ffffff",
+	foreground: "#202734",
+	border: "#dce2eb"
+};
+const escape = (value) => String(value).replace(/[&<>"']/g, (c) => ({
+	"&": "&amp;",
+	"<": "&lt;",
+	">": "&gt;",
+	"\"": "&quot;",
+	"'": "&apos;"
+})[c]);
+const text = (x, y, value, size = 13, attrs = "") => `<text x="${x}" y="${y}" font-size="${size}" ${attrs}>${escape(value)}</text>`;
+const start = (width, height, theme, title) => `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img"><title>${escape(title)}</title><rect width="100%" height="100%" fill="${theme.background}"/><g fill="${theme.foreground}" font-family="system-ui, -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif">`;
+const end = "</g></svg>";
+const short = (s) => Array.from(s).length > 24 ? Array.from(s).slice(0, 12).join("") + "…" + Array.from(s).slice(-10).join("") : s;
+const signed = (v) => v === null ? "方向未定" : `${v > 0 ? "+" : ""}${number(v)}`;
+function contributionExportSvg(data, filtered, description = "", theme = defaultExportTheme, groupTitles) {
+	const coverage = data.samples?.length ? (filtered?.samples?.length ?? 0) / data.samples.length * 100 : 0;
+	const groups = filtered ? [{
+		data: filtered,
+		title: `当前筛选 · ${filtered.samples?.length ?? 0} 个样本 · 覆盖率 ${number(coverage)}%`
+	}, {
+		data,
+		title: `${data.input_rows && (data.samples?.length ?? 0) < data.input_rows ? "本次已解释" : "全样本"} · ${data.samples?.length ?? 0} 个样本${data.input_rows ? ` / 输入 ${data.input_rows} 行` : ""}`
+	}] : [{
+		data,
+		title: `${data.input_rows && (data.samples?.length ?? 0) < data.input_rows ? "本次已解释" : "全样本"} · ${data.samples?.length ?? 0} 个样本${data.input_rows ? ` / 输入 ${data.input_rows} 行` : ""}`
+	}];
+	if (groupTitles && filtered) groups.forEach((group, i) => {
+		group.title = `${groupTitles[i]} · ${group.data.samples?.length ?? 0} 个样本`;
+	});
+	const plotWidth = Math.max(700, (data.feature_names?.length ?? 1) * 32);
+	const labelWidth = Math.min(250, Math.max(100, ...(data.feature_names ?? []).map((n) => (data.labels?.[n] ?? n).length * 10)));
+	const width = 80 + plotWidth + 64 + labelWidth + 20 + 290 + 110;
+	const plotHeight = Math.max(330, Math.min(600, (data.samples?.length ?? 1) * 4));
+	const rankHeight = Math.max(plotHeight, (data.feature_names?.length ?? 1) * 28);
+	const sectionHeight = Math.max(plotHeight + 180, rankHeight + 40) + 100, height = 110 + groups.length * sectionHeight + 50;
+	const scales = contributionScales(data, ...filtered ? [filtered] : []), title = `预测解释 · ${data.target_label ?? data.target}`;
+	let svg = start(width, height, theme, title) + text(36, 38, title, 23, "font-weight=\"600\"") + text(36, 67, description || "全部已解释样本", 13);
+	const timed = data.samples?.filter((s) => s.timestamp);
+	if (timed?.length) svg += text(36, 88, `预测时间 ${timed[0].timestamp} — ${timed[timed.length - 1].timestamp}`, 11);
+	svg += `<defs><linearGradient id="contribution-scale"><stop stop-color="${contributionColors.negative}"/><stop offset=".5" stop-color="${theme.background}"/><stop offset="1" stop-color="${contributionColors.positive}"/></linearGradient></defs>`;
+	groups.forEach((group, groupIndex) => {
+		const matrix = contributionMatrix(group.data), samples = group.data.samples ?? [], names = group.data.feature_names ?? [];
+		const top = 110 + groupIndex * sectionHeight, x = 80, y = top + 58, rowHeight = plotHeight / Math.max(samples.length, 1), columnWidth = plotWidth / Math.max(names.length, 1);
+		const barLabel = x + plotWidth + 64, barZero = barLabel + labelWidth + 20 + 145, barHalf = 145;
+		svg += text(36, top + 16, group.title, 17, "font-weight=\"600\"") + text(x, top + 43, "影响因子热力图", 13) + text(barLabel, top + 43, "各影响因子影响分数对比", 13);
+		svg += `<rect x="${x + plotWidth - 220}" y="${top + 7}" width="220" height="8" fill="url(#contribution-scale)"/>` + text(x + plotWidth - 220, top + 32, `−${number(scales.maximum)}`, 11) + text(x + plotWidth - 110, top + 32, "0", 11, "text-anchor=\"middle\"") + text(x + plotWidth, top + 32, `+${number(scales.maximum)}`, 11, "text-anchor=\"end\"");
+		if (!samples.length) svg += text(x, y + 40, "没有符合条件的样本");
+		matrix.rows.forEach((row) => row.cells.forEach((cell) => {
+			const color = contributionColor(cell.direction);
+			const alpha = scales.maximum ? Math.min(1, Math.abs(cell.score) / scales.maximum) : 0;
+			svg += `<rect x="${x + cell.featureIndex * columnWidth}" y="${y + row.sampleIndex * rowHeight}" width="${columnWidth}" height="${rowHeight}" fill="${color}" fill-opacity="${alpha}"><title>${escape(`${sampleLabel(samples[row.sampleIndex], data)} · ${data.labels?.[cell.name] ?? cell.name} · ${cell.score} · ${directionLabel(cell.direction)}`)}</title></rect>`;
+		}));
+		[...new Set([
+			0,
+			.25,
+			.5,
+			.75,
+			1
+		].map((t) => Math.round(t * (samples.length - 1))))].filter((i) => i >= 0 && i < samples.length).forEach((i) => {
+			svg += text(x - 12, y + (i + .5) * rowHeight + 4, samples[i].step ?? samples[i].row_number, 11, "text-anchor=\"end\"");
+		});
+		svg += text(36, y - 8, data.task_type === "timeseries" ? "预测步" : "原始行", 11);
+		names.forEach((name, i) => {
+			const label = data.labels?.[name] ?? name;
+			svg += `<g transform="translate(${x + (i + .5) * columnWidth} ${y + plotHeight + 16}) rotate(55)"><title>${escape(label + " · " + name)}</title>` + text(0, 0, short(label), 12) + "</g>";
+		});
+		svg += `<line x1="${barZero}" x2="${barZero}" y1="${y}" y2="${y + rankHeight}" stroke="${theme.border}"/>`;
+		matrix.ranking.forEach((feature, i) => {
+			const cy = y + (i + .5) * rankHeight / Math.max(names.length, 1), v = feature.mean;
+			const barWidth = v === null || !scales.meanMaximum ? 0 : Math.abs(v) / scales.meanMaximum * barHalf;
+			svg += `<g><title>${escape(feature.label + " · " + feature.name)}</title>` + text(barLabel + labelWidth, cy - 1, short(feature.label), 12, "text-anchor=\"end\"") + (feature.label !== feature.name ? text(barLabel + labelWidth, cy + 13, short(feature.name), 10, "text-anchor=\"end\" opacity=\".6\"") : "");
+			if (v !== null) svg += `<rect x="${v < 0 ? barZero - barWidth : barZero}" y="${cy - 5}" width="${barWidth}" height="10" fill="${v < 0 ? contributionColors.negative : contributionColors.positive}"/>`;
+			svg += text(width - 30, cy + 4, signed(v), 12, "text-anchor=\"end\"") + "</g>";
+		});
+		svg += text(barZero - barHalf, y + rankHeight + 20, `−${number(scales.meanMaximum)}`, 11, "text-anchor=\"middle\"") + text(barZero, y + rankHeight + 20, "0", 11, "text-anchor=\"middle\"") + text(barZero + barHalf, y + rankHeight + 20, `+${number(scales.meanMaximum)}`, 11, "text-anchor=\"middle\"");
+	});
+	svg += text(36, height - 36, "蓝色负向 · 绿色正向 · 灰蓝中性 · 灰色方向未定；中性按 0 计入均值，正负会抵消。", 12);
+	return svg + end;
+}
+function singleContributionExportSvg(data, theme = defaultExportTheme) {
+	const factors = (data.features ?? []).filter((f) => Number.isFinite(f.score)).sort((a, b) => Math.abs(b.score) - Math.abs(a.score));
+	const maximum = Math.max(...factors.map((f) => Math.abs(f.score)), 1e-5);
+	const width = 1e3, height = 160 + factors.length * 34, zero = 570, half = 270;
+	const title = `单条解释 · ${data.target_label ?? data.target}`;
+	let svg = start(width, height, theme, title) + text(36, 38, title, 22, "font-weight=\"600\"");
+	svg += text(36, 68, sampleLabel({
+		row_number: data.row_number ?? 1,
+		step: data.step,
+		timestamp: data.timestamp
+	}, data));
+	svg += `<line x1="${zero}" x2="${zero}" y1="90" y2="${90 + factors.length * 34}" stroke="${theme.border}"/>`;
+	factors.forEach((factor, i) => {
+		const y = 110 + i * 34, known = [
+			-1,
+			0,
+			1
+		].includes(factor.direction);
+		const value = factor.direction === 0 ? 0 : Math.abs(factor.score) * (factor.direction === -1 ? -1 : 1);
+		const w = known ? Math.abs(value) / maximum * half : 0;
+		svg += `<g><title>${escape(`${factor.label} · ${factor.name}`)}</title>` + text(36, y, short(factor.label || factor.name));
+		svg += `<rect x="${value < 0 ? zero - w : zero}" y="${y - 9}" width="${w}" height="10" fill="${value < 0 ? contributionColors.negative : contributionColors.positive}"/>`;
+		svg += text(964, y, known ? signed(value) : `${number(factor.score)} · 方向未定`, 12, "text-anchor=\"end\"") + "</g>";
+	});
+	return svg + text(zero - half, height - 32, "负向", 12) + text(zero, height - 32, "0", 12, "text-anchor=\"middle\"") + text(zero + half, height - 32, "正向", 12, "text-anchor=\"end\"") + end;
+}
+function graphExportSvg(data, theme = defaultExportTheme, scope = "完整网络") {
+	const nodes = data.nodes ?? [], edges = data.edges ?? [], layout = graphLayout(nodes, edges), width = Math.max(800, layout.width + 72), height = layout.height + 160;
+	const label = (name) => data.labels?.[name] ?? name;
+	let svg = start(width, height, theme, `关系探索 · ${data.target_label ?? data.target}`) + text(36, 38, `关系探索 · ${data.target_label ?? data.target}`, 22, "font-weight=\"600\"") + text(36, 66, `${scope} · ${nodes.length} 个变量 · ${edges.length} 条关系`, 13);
+	svg += `<defs><marker id="arrow" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0 1 L6 3.5 L0 6" fill="none" stroke="#7793c3"/></marker></defs><g transform="translate(36 90)">`;
+	edges.forEach((e) => {
+		const a = layout.positions.get(e.source), b = layout.positions.get(e.target);
+		if (!a || !b) return;
+		const right = b[0] > a[0], same = b[0] === a[0], ax = a[0] + (right || same ? 68 : -68), bx = b[0] + (right ? -68 : 68);
+		const d = same ? `M${ax} ${a[1]} C${ax + 30} ${a[1]},${bx + 30} ${b[1]},${bx} ${b[1]}` : `M${ax} ${a[1]} C${(ax + bx) / 2} ${a[1]},${(ax + bx) / 2} ${b[1]},${bx} ${b[1]}`;
+		svg += `<path d="${d}" fill="none" stroke="#7793c3" stroke-width="1.5"${data.mode === "directed" ? " marker-end=\"url(#arrow)\"" : ""}><title>${escape(`${label(e.source)} ${data.mode === "directed" ? "→" : "—"} ${label(e.target)}：${e.weight}`)}</title></path>`;
+		if (edges.length <= 5) svg += text((ax + bx) / 2, (a[1] + b[1]) / 2 - 7, number(e.weight), 11, "text-anchor=\"middle\"");
+	});
+	nodes.forEach((name) => {
+		const [x, y] = layout.positions.get(name);
+		svg += `<rect x="${x - 68}" y="${y - 22}" width="136" height="44" rx="5" fill="${theme.background}" stroke="${name === data.target ? "#7793c3" : theme.border}"/>` + text(x, y - 2, label(name), 12, "text-anchor=\"middle\"") + text(x, y + 14, name, 10, "text-anchor=\"middle\" opacity=\".65\"");
+	});
+	return svg + "</g>" + text(36, height - 22, "连线表示模型发现的关系，数值为关系分数。", 12) + end;
+}
+
+//#endregion
+//#region src/client/ExplanationExport.tsx
+function themeAt(element) {
+	const probe = document.createElement("span");
+	probe.style.cssText = "position:absolute;visibility:hidden;color:var(--dsw-alias-label-primary,#202734);background:var(--dsw-alias-background-primary,#fff);border-color:var(--dsw-alias-border-l3,#dce2eb)";
+	element.append(probe);
+	const style = getComputedStyle(probe), colors$1 = [
+		style.backgroundColor,
+		style.color,
+		style.borderTopColor
+	];
+	const canvas = document.createElement("canvas");
+	canvas.width = canvas.height = 1;
+	const context = canvas.getContext("2d");
+	const resolve = (color, fallback) => {
+		if (!context) return fallback;
+		context.clearRect(0, 0, 1, 1);
+		context.fillStyle = color;
+		context.fillRect(0, 0, 1, 1);
+		const rgba = context.getImageData(0, 0, 1, 1).data;
+		return rgba[3] ? `#${[...rgba].slice(0, 3).map((v) => v.toString(16).padStart(2, "0")).join("")}` : fallback;
+	};
+	const theme = {
+		background: resolve(colors$1[0], defaultExportTheme.background),
+		foreground: resolve(colors$1[1], defaultExportTheme.foreground),
+		border: resolve(colors$1[2], defaultExportTheme.border)
+	};
+	probe.remove();
+	return theme;
+}
+async function png(svg) {
+	const url = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml" }));
+	try {
+		const image = new Image();
+		await new Promise((resolve, reject) => {
+			image.onload = () => resolve();
+			image.onerror = () => reject(/* @__PURE__ */ new Error("图片转换失败，可下载 SVG"));
+			image.src = url;
+		});
+		const scale = Math.min(2, Math.sqrt(16e6 / (image.width * image.height))), canvas = document.createElement("canvas");
+		canvas.width = Math.ceil(image.width * scale);
+		canvas.height = Math.ceil(image.height * scale);
+		const context = canvas.getContext("2d");
+		if (!context) throw new Error("浏览器无法导出 PNG，可下载 SVG");
+		context.drawImage(image, 0, 0, canvas.width, canvas.height);
+		return await new Promise((resolve, reject) => canvas.toBlob((blob) => blob ? resolve(blob) : reject(/* @__PURE__ */ new Error("PNG 导出失败")), "image/png"));
+	} finally {
+		URL.revokeObjectURL(url);
+	}
+}
+function ExplanationExport({ build, filename, menuLabel = "导出图表", children }) {
+	const root = (0, react.useRef)(null), busyRef = (0, react.useRef)(false), [status, setStatus] = (0, react.useState)("");
+	(0, react.useEffect)(() => {
+		const element = root.current;
+		const click = async (event) => {
+			const format = event.target.closest("[data-lx-export]")?.dataset.lxExport;
+			if (!format || !element || busyRef.current) return;
+			busyRef.current = true;
+			setStatus("正在导出…");
+			try {
+				const svg = build(themeAt(element)), blob = format === "png" ? await png(svg) : new Blob([svg], { type: "image/svg+xml;charset=utf-8" });
+				const url = URL.createObjectURL(blob), anchor = document.createElement("a");
+				anchor.href = url;
+				anchor.download = `${filename.replace(/[^\p{L}\p{N}_-]/gu, "-").slice(0, 100)}.${format}`;
+				document.body.append(anchor);
+				anchor.click();
+				anchor.remove();
+				setTimeout(() => URL.revokeObjectURL(url), 1e4);
+				setStatus("已导出");
+			} catch (error) {
+				setStatus(error instanceof Error ? error.message : "导出失败，请重试");
+			} finally {
+				busyRef.current = false;
+			}
+		};
+		element?.addEventListener("click", click);
+		return () => element?.removeEventListener("click", click);
+	}, [build, filename]);
+	return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+		className: "lx-export",
+		ref: root,
+		children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)(ActionMenu, {
+			label: menuLabel,
+			children: [
+				children,
+				/* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+					type: "button",
+					"data-lx-export": "svg",
+					"aria-label": "导出 SVG 图表",
+					children: "SVG"
+				}),
+				/* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+					type: "button",
+					"data-lx-export": "png",
+					"aria-label": "导出 PNG 图表",
+					children: "PNG"
+				})
+			]
+		}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+			role: "status",
+			className: "lx-export-status",
+			children: status
+		})]
+	});
+}
+
+//#endregion
+//#region src/client/ExplanationSingle.tsx
+function ExplanationSingle({ data, showPredictionCheck = false }) {
+	const root = (0, react.useRef)(null), [view, setView] = (0, react.useState)("visual");
+	const matrix = (0, react.useMemo)(() => singleSampleMatrix(data), [data]);
+	(0, react.useEffect)(() => {
+		const element = root.current;
+		const click = (event) => {
+			const target = event.target, tab = target.closest("[data-lx-single-view]")?.dataset.lxSingleView;
+			if (tab) setView(tab);
+			if (target.closest("[data-lx-batch=\"row\"]")) setView("visual");
+		};
+		element?.addEventListener("click", click);
+		return () => element?.removeEventListener("click", click);
+	}, []);
+	return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+		ref: root,
+		children: [
+			/* @__PURE__ */ (0, react_jsx_runtime.jsx)(ExplanationInsight, { data: matrix }),
+			/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+				className: "lx-analysis-toolbar",
+				children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+					className: "lx-plot-tabs",
+					"aria-label": "解释数据视图",
+					children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+						type: "button",
+						"data-lx-single-view": "visual",
+						"aria-pressed": view === "visual",
+						children: "可视化"
+					}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+						type: "button",
+						"data-lx-single-view": "raw",
+						"aria-pressed": view === "raw",
+						children: "原始数据"
+					})]
+				}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)(ExplanationExport, {
+					filename: `${data.target}-单样本解释`,
+					build: (theme) => singleContributionExportSvg(data, theme)
+				})]
+			}),
+			showPredictionCheck && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(PredictionCheck, { data }),
+			view === "visual" ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)(LocalExplanation, { data }) : /* @__PURE__ */ (0, react_jsx_runtime.jsx)(ExplanationDataTable, { data: matrix })
+		]
+	});
+}
+
+//#endregion
+//#region src/client/ContributionLegend.tsx
+function ContributionLegend({ maximum, unknown, neutral = false, vertical = false }) {
+	return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+		className: "lx-contribution-legend",
+		"aria-label": "贡献色阶：蓝色负向，绿色正向，深色贡献大",
+		children: [
+			/* @__PURE__ */ (0, react_jsx_runtime.jsx)("style", { children: `
+      .lx-contribution-legend{width:218px;max-width:100%;flex-shrink:0;font-size:10px;color:var(--dsw-alias-label-secondary)}
+      .lx-contribution-scale-labels{display:flex;justify-content:space-between;gap:8px;font-variant-numeric:tabular-nums;margin-bottom:5px}
+      .lx-contribution-scale{height:7px;border-radius:2px}
+      .lx-contribution-unknown{display:flex;align-items:center;justify-content:flex-end;gap:5px;margin-top:5px}.lx-contribution-unknown i{width:7px;height:7px;border-radius:50%}
+    ` }),
+			maximum > 0 ? /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+				className: "lx-contribution-scale-labels",
+				children: [
+					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+						"aria-label": `负向 −${number(maximum)}`,
+						children: vertical ? /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [
+							"负向",
+							/* @__PURE__ */ (0, react_jsx_runtime.jsx)("br", {}),
+							"−",
+							number(maximum)
+						] }) : `负向 −${number(maximum)}`
+					}),
+					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { children: "0" }),
+					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { children: vertical ? /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [
+						"正向",
+						/* @__PURE__ */ (0, react_jsx_runtime.jsx)("br", {}),
+						"+",
+						number(maximum)
+					] }) : `+${number(maximum)} 正向` })
+				]
+			}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+				className: "lx-contribution-scale",
+				role: "img",
+				"aria-label": `负向 ${number(maximum)} 到正向 ${number(maximum)}；深浅表示贡献绝对值`,
+				style: { background: `linear-gradient(to right, ${contributionFill(maximum, -1, maximum)}, ${contributionBase} 50%, ${contributionFill(maximum, 1, maximum)})` }
+			})] }) : /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { children: "贡献均为 0" }),
+			neutral && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
+				className: "lx-contribution-unknown",
+				children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("i", { style: { background: contributionColors.neutral } }), "灰蓝：中性"]
+			}),
+			unknown && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
+				className: "lx-contribution-unknown",
+				children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("i", { style: { background: contributionColors.unknown } }), "灰色：方向未定"]
+			})
+		]
+	});
 }
 
 //#endregion
@@ -1119,642 +1955,9 @@ function ExplanationHelp({ label, children }) {
 }
 
 //#endregion
-//#region src/client/LocalExplanation.tsx
-function LocalExplanation({ data }) {
-	const root = (0, react.useRef)(null), [expanded, setExpanded] = (0, react.useState)(false);
-	(0, react.useEffect)(() => {
-		const element = root.current;
-		const click = (event) => {
-			if (event.target.closest("[data-lx-local-toggle]")) setExpanded((v) => !v);
-		};
-		element?.addEventListener("click", click);
-		return () => element?.removeEventListener("click", click);
-	}, []);
-	const factors = (data.features ?? []).filter((f) => Number.isFinite(f.score));
-	const maximum = Math.max(...factors.map((f) => Math.abs(f.score)), 1e-5);
-	const prediction = explanationPrediction(data);
-	return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-		ref: root,
-		children: [
-			/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-				className: "lx-explain-head",
-				children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-					className: "lx-explain-label",
-					children: [
-						sampleLabel({
-							row_number: data.row_number ?? 1,
-							step: data.step,
-							timestamp: data.timestamp
-						}, data),
-						" · ",
-						prediction.label
-					]
-				}), /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-					className: "lx-explain-value",
-					children: [typeof data.prediction === "number" ? number(data.prediction) : data.prediction ?? "未返回", /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
-						className: "lx-explain-unit",
-						children: prediction.unit
-					})]
-				})] }), prediction.comparable && data.prior_prediction !== void 0 && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-					className: "lx-explain-diff",
-					children: [
-						"原预测 ",
-						typeof data.prior_prediction === "number" ? number(data.prior_prediction) : data.prior_prediction,
-						" ",
-						prediction.unit,
-						data.task_type === "classification" && data.prediction !== void 0 ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", { children: String(data.prior_prediction) === String(data.prediction) ? "分类结果一致" : `重算类别 ${data.prior_prediction} → ${data.prediction}` }) : typeof data.prediction_delta === "number" && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", { children: [
-							"重算差异 ",
-							data.prediction_delta > 0 ? "+" : "",
-							number(data.prediction_delta),
-							" ",
-							prediction.unit
-						] })
-					]
-				})]
-			}),
-			/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-				className: "lx-explain-subtitle",
-				children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { children: "主要影响因素" }), /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-					style: {
-						display: "flex",
-						alignItems: "center",
-						gap: 4
-					},
-					children: ["贡献分数 · 模型方向", /* @__PURE__ */ (0, react_jsx_runtime.jsx)(ExplanationHelp, {
-						label: "贡献分数说明",
-						children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", { children: "表示各因素对本次模型预测的影响。" })
-					})]
-				})]
-			}),
-			(expanded ? factors : factors.slice(0, 6)).map((f) => /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-				className: "lx-factor",
-				children: [
-					/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
-						className: "lx-factor-name",
-						children: [f.label, f.label !== f.name && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
-							className: "lx-factor-key",
-							children: f.name
-						})]
-					}),
-					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
-						className: "lx-factor-track",
-						children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
-							className: "lx-factor-bar",
-							"data-direction": f.direction,
-							style: { width: `${Math.abs(f.score) / maximum * 100}%` }
-						})
-					}),
-					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
-						className: "lx-factor-score",
-						children: number(f.score)
-					}),
-					/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
-						className: "lx-factor-direction",
-						children: [directionLabel(f.direction), f.direction === 1 ? " ↑" : f.direction === -1 ? " ↓" : ""]
-					})
-				]
-			}, f.name)),
-			factors.length > 6 && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
-				type: "button",
-				className: "lx-explain-toggle",
-				"data-lx-local-toggle": true,
-				"aria-expanded": expanded,
-				children: expanded ? "收起因素 ↑" : `查看全部 ${factors.length} 个因素 ↓`
-			})
-		]
-	});
-}
-
-//#endregion
-//#region src/client/ExplanationDataTable.tsx
-function explanationRecords(data) {
-	if (data.mode !== "local") return (data.edges ?? []).map((e, i) => ({
-		key: `${i}:${e.source}:${e.target}`,
-		row: void 0,
-		values: [
-			data.labels?.[e.source] ?? e.source,
-			e.source,
-			data.labels?.[e.target] ?? e.target,
-			e.target,
-			String(e.weight)
-		]
-	}));
-	return (data.samples ?? []).flatMap((s) => (data.feature_names ?? []).map((name, index) => ({
-		key: `${s.row_number}:${name}`,
-		row: s.row_number,
-		values: [
-			sampleLabel(s, data),
-			s.prediction === void 0 ? "—" : String(s.prediction),
-			data.labels?.[name] ?? name,
-			name,
-			s.feature_values?.[index] === void 0 || s.feature_values[index] === null ? "—" : String(s.feature_values[index]),
-			String(s.scores[index]),
-			directionLabel(s.directions[index])
-		]
-	})));
-}
-function ExplanationDataTable({ data }) {
-	const root = (0, react.useRef)(null), [query, setQuery] = (0, react.useState)(""), [page, setPage] = (0, react.useState)(0);
-	const records = (0, react.useMemo)(() => explanationRecords(data), [data]);
-	const filtered = (0, react.useMemo)(() => {
-		const term = query.trim().toLocaleLowerCase();
-		return term ? records.filter((r) => r.values.some((v) => v.toLocaleLowerCase().includes(term))) : records;
-	}, [records, query]);
-	const size = 25, pages = Math.max(1, Math.ceil(filtered.length / size)), current = Math.min(page, pages - 1);
-	(0, react.useEffect)(() => {
-		const element = root.current;
-		const input = (event) => {
-			if (event.target.matches("[data-lx-raw-search]")) {
-				setQuery(event.target.value);
-				setPage(0);
-			}
-		};
-		const click = (event) => {
-			const action = event.target.closest("[data-lx-raw-page]")?.dataset.lxRawPage;
-			if (action) setPage((p) => Math.min(pages - 1, Math.max(0, p + (action === "next" ? 1 : -1))));
-		};
-		element?.addEventListener("input", input);
-		element?.addEventListener("click", click);
-		return () => {
-			element?.removeEventListener("input", input);
-			element?.removeEventListener("click", click);
-		};
-	}, [pages]);
-	const headings = data.mode === "local" ? [
-		data.task_type === "timeseries" ? "预测步 / 时间" : "原始行",
-		explanationPrediction(data).label,
-		"影响因子",
-		"字段名",
-		"特征原值",
-		"贡献分数",
-		"方向"
-	] : [
-		"起点",
-		"起点字段",
-		"终点",
-		"终点字段",
-		"关系分数"
-	];
-	return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-		ref: root,
-		className: "lx-raw",
-		children: [
-			/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-				className: "lx-raw-toolbar",
-				children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("input", {
-					"data-lx-raw-search": true,
-					value: query,
-					onChange: () => {},
-					"aria-label": "检索解释数据",
-					placeholder: "检索行号、字段或数值"
-				}), /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", { children: [
-					filtered.length,
-					" / ",
-					records.length,
-					" 条记录"
-				] })]
-			}),
-			/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
-				className: "lx-raw-scroll",
-				children: /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("table", {
-					className: "lx-raw-table",
-					children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("thead", { children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)("tr", { children: headings.map((h) => /* @__PURE__ */ (0, react_jsx_runtime.jsx)("th", { children: h }, h)) }) }), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("tbody", { children: filtered.slice(current * size, (current + 1) * size).map((record) => /* @__PURE__ */ (0, react_jsx_runtime.jsx)("tr", { children: record.values.map((v, i) => /* @__PURE__ */ (0, react_jsx_runtime.jsx)("td", { children: i === 0 && record.row !== void 0 ? /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("button", {
-						type: "button",
-						"data-lx-batch": "row",
-						"data-row": record.row,
-						children: [v, " ↗"]
-					}) : v }, i)) }, record.key)) })]
-				})
-			}),
-			!filtered.length && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
-				className: "lx-explain-foot",
-				children: "没有符合条件的数据。"
-			}),
-			/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-				className: "lx-heatmap-footer",
-				children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", { children: [
-					"展示 ",
-					filtered.length ? current * size + 1 : 0,
-					"–",
-					Math.min((current + 1) * size, filtered.length),
-					" 条"
-				] }), /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", { children: [
-					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
-						type: "button",
-						"data-lx-raw-page": "previous",
-						"aria-label": "上一页原始数据",
-						disabled: current === 0,
-						children: "←"
-					}),
-					/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", { children: [
-						current + 1,
-						" / ",
-						pages
-					] }),
-					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
-						type: "button",
-						"data-lx-raw-page": "next",
-						"aria-label": "下一页原始数据",
-						disabled: current === pages - 1,
-						children: "→"
-					})
-				] })]
-			})
-		]
-	});
-}
-
-//#endregion
-//#region src/client/contribution-matrix.ts
-function contributionMatrix(data) {
-	const samples = data.samples ?? [], names = data.feature_names ?? [];
-	const maximum = samples.reduce((m, s) => s.scores.reduce((n, v) => Math.max(n, Math.abs(v)), m), 0);
-	return {
-		rows: samples.map((sample, sampleIndex) => ({
-			sampleIndex,
-			rowNumber: sample.row_number,
-			cells: names.map((name, featureIndex) => ({
-				name,
-				featureIndex,
-				score: sample.scores[featureIndex],
-				direction: sample.directions[featureIndex]
-			}))
-		})),
-		ranking: [...names.map((name, featureIndex) => {
-			let signed$1 = 0, unknownCount = 0;
-			for (const sample of samples) {
-				const magnitude = Math.abs(sample.scores[featureIndex]), direction = sample.directions[featureIndex];
-				if (knownDirection(direction)) signed$1 += magnitude * direction;
-				else if (magnitude !== 0) unknownCount++;
-			}
-			return {
-				name,
-				featureIndex,
-				label: data.labels?.[name] ?? name,
-				unknownCount,
-				mean: samples.length && !unknownCount ? signed$1 / samples.length : null
-			};
-		})].sort((a, b) => Number(a.mean === null) - Number(b.mean === null) || Math.abs(b.mean ?? 0) - Math.abs(a.mean ?? 0) || a.featureIndex - b.featureIndex),
-		maximum,
-		cellCount: samples.length * names.length
-	};
-}
-function contributionScales(...groups) {
-	const matrices = groups.map(contributionMatrix);
-	return {
-		maximum: Math.max(0, ...matrices.map((m) => m.maximum)),
-		meanMaximum: Math.max(0, ...matrices.flatMap((m) => m.ranking.map((f) => Math.abs(f.mean ?? 0))))
-	};
-}
-
-//#endregion
-//#region src/client/graph-layout.ts
-function graphLayout(nodes, edges) {
-	const adjacency = new Map(nodes.map((n) => [n, edges.filter((e) => e.source === n).map((e) => e.target)]));
-	let index = 0;
-	const stack = [], onStack = /* @__PURE__ */ new Set(), indices = /* @__PURE__ */ new Map(), low = /* @__PURE__ */ new Map(), groups = [];
-	const visit = (node) => {
-		indices.set(node, index);
-		low.set(node, index++);
-		stack.push(node);
-		onStack.add(node);
-		for (const next of adjacency.get(node) ?? []) if (!indices.has(next)) {
-			visit(next);
-			low.set(node, Math.min(low.get(node), low.get(next)));
-		} else if (onStack.has(next)) low.set(node, Math.min(low.get(node), indices.get(next)));
-		if (low.get(node) === indices.get(node)) {
-			const group = [];
-			let member;
-			do {
-				member = stack.pop();
-				onStack.delete(member);
-				group.push(member);
-			} while (member !== node);
-			groups.push(group);
-		}
-	};
-	nodes.forEach((n) => {
-		if (!indices.has(n)) visit(n);
-	});
-	const membership = /* @__PURE__ */ new Map();
-	groups.forEach((g, i) => g.forEach((n) => membership.set(n, i)));
-	const levels = /* @__PURE__ */ new Map();
-	const level = (g) => {
-		if (levels.has(g)) return levels.get(g);
-		const parents = edges.filter((e) => membership.get(e.target) === g && membership.get(e.source) !== g).map((e) => membership.get(e.source));
-		const value = parents.length ? 1 + Math.max(...parents.map(level)) : 0;
-		levels.set(g, value);
-		return value;
-	};
-	const isolated = nodes.filter((n) => !edges.some((e) => e.source === n || e.target === n));
-	const columns = /* @__PURE__ */ new Map();
-	for (const node of nodes.filter((n) => !isolated.includes(n))) {
-		const l = Math.min(3, level(membership.get(node)));
-		columns.set(l, [...columns.get(l) ?? [], node]);
-	}
-	if (isolated.length) columns.set(Math.max(-1, ...columns.keys()) + 1, isolated);
-	const layers = [...columns.entries()].sort(([a], [b]) => a - b).map(([, group]) => group), width = Math.max(620, layers.length * 190 + 30);
-	const height = Math.max(230, Math.max(0, ...layers.map((c) => c.length)) * 50 + 48);
-	const positions = /* @__PURE__ */ new Map();
-	layers.forEach((col, i) => col.forEach((n, j) => positions.set(n, [layers.length === 1 ? width / 2 : 85 + i * (width - 170) / (layers.length - 1), 35 + (j + .5) * (height - 55) / col.length])));
-	return {
-		positions,
-		width,
-		height,
-		isolated,
-		cycles: groups.filter((g) => g.length > 1 || edges.some((e) => e.source === g[0] && e.target === g[0]))
-	};
-}
-
-//#endregion
-//#region src/client/explanation-export.ts
-const defaultExportTheme = {
-	background: "#ffffff",
-	foreground: "#202734",
-	border: "#dce2eb"
-};
-const escape = (value) => String(value).replace(/[&<>"']/g, (c) => ({
-	"&": "&amp;",
-	"<": "&lt;",
-	">": "&gt;",
-	"\"": "&quot;",
-	"'": "&apos;"
-})[c]);
-const text = (x, y, value, size = 13, attrs = "") => `<text x="${x}" y="${y}" font-size="${size}" ${attrs}>${escape(value)}</text>`;
-const start = (width, height, theme, title) => `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img"><title>${escape(title)}</title><rect width="100%" height="100%" fill="${theme.background}"/><g fill="${theme.foreground}" font-family="system-ui, -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif">`;
-const end = "</g></svg>";
-const short = (s) => Array.from(s).length > 24 ? Array.from(s).slice(0, 12).join("") + "…" + Array.from(s).slice(-10).join("") : s;
-const signed = (v) => v === null ? "方向未定" : `${v > 0 ? "+" : ""}${number(v)}`;
-function contributionExportSvg(data, filtered, description = "", theme = defaultExportTheme) {
-	const coverage = data.samples?.length ? (filtered?.samples?.length ?? 0) / data.samples.length * 100 : 0;
-	const groups = filtered ? [{
-		data: filtered,
-		title: `当前筛选 · ${filtered.samples?.length ?? 0} 个样本 · 覆盖率 ${number(coverage)}%`
-	}, {
-		data,
-		title: `${data.input_rows && (data.samples?.length ?? 0) < data.input_rows ? "本次已解释" : "全样本"} · ${data.samples?.length ?? 0} 个样本${data.input_rows ? ` / 输入 ${data.input_rows} 行` : ""}`
-	}] : [{
-		data,
-		title: `${data.input_rows && (data.samples?.length ?? 0) < data.input_rows ? "本次已解释" : "全样本"} · ${data.samples?.length ?? 0} 个样本${data.input_rows ? ` / 输入 ${data.input_rows} 行` : ""}`
-	}];
-	const plotWidth = Math.max(700, (data.feature_names?.length ?? 1) * 32);
-	const labelWidth = Math.min(250, Math.max(100, ...(data.feature_names ?? []).map((n) => (data.labels?.[n] ?? n).length * 10)));
-	const width = 80 + plotWidth + 64 + labelWidth + 20 + 290 + 110;
-	const plotHeight = Math.max(330, Math.min(600, (data.samples?.length ?? 1) * 4));
-	const rankHeight = Math.max(plotHeight, (data.feature_names?.length ?? 1) * 28);
-	const sectionHeight = Math.max(plotHeight + 180, rankHeight + 40) + 100, height = 110 + groups.length * sectionHeight + 50;
-	const scales = contributionScales(data, ...filtered ? [filtered] : []), title = `预测解释 · ${data.target_label ?? data.target}`;
-	let svg = start(width, height, theme, title) + text(36, 38, title, 23, "font-weight=\"600\"") + text(36, 67, description || "全部已解释样本", 13);
-	const timed = data.samples?.filter((s) => s.timestamp);
-	if (timed?.length) svg += text(36, 88, `预测时间 ${timed[0].timestamp} — ${timed[timed.length - 1].timestamp}`, 11);
-	svg += `<defs><linearGradient id="contribution-scale"><stop stop-color="${contributionColors.negative}"/><stop offset=".5" stop-color="${theme.background}"/><stop offset="1" stop-color="${contributionColors.positive}"/></linearGradient></defs>`;
-	groups.forEach((group, groupIndex) => {
-		const matrix = contributionMatrix(group.data), samples = group.data.samples ?? [], names = group.data.feature_names ?? [];
-		const top = 110 + groupIndex * sectionHeight, x = 80, y = top + 58, rowHeight = plotHeight / Math.max(samples.length, 1), columnWidth = plotWidth / Math.max(names.length, 1);
-		const barLabel = x + plotWidth + 64, barZero = barLabel + labelWidth + 20 + 145, barHalf = 145;
-		svg += text(36, top + 16, group.title, 17, "font-weight=\"600\"") + text(x, top + 43, "影响因子热力图", 13) + text(barLabel, top + 43, "各影响因子影响分数对比", 13);
-		svg += `<rect x="${x + plotWidth - 220}" y="${top + 7}" width="220" height="8" fill="url(#contribution-scale)"/>` + text(x + plotWidth - 220, top + 32, `−${number(scales.maximum)}`, 11) + text(x + plotWidth - 110, top + 32, "0", 11, "text-anchor=\"middle\"") + text(x + plotWidth, top + 32, `+${number(scales.maximum)}`, 11, "text-anchor=\"end\"");
-		if (!samples.length) svg += text(x, y + 40, "没有符合条件的样本");
-		matrix.rows.forEach((row) => row.cells.forEach((cell) => {
-			const color = contributionColor(cell.direction);
-			const alpha = scales.maximum ? Math.min(1, Math.abs(cell.score) / scales.maximum) : 0;
-			svg += `<rect x="${x + cell.featureIndex * columnWidth}" y="${y + row.sampleIndex * rowHeight}" width="${columnWidth}" height="${rowHeight}" fill="${color}" fill-opacity="${alpha}"><title>${escape(`${sampleLabel(samples[row.sampleIndex], data)} · ${data.labels?.[cell.name] ?? cell.name} · ${cell.score} · ${directionLabel(cell.direction)}`)}</title></rect>`;
-		}));
-		[...new Set([
-			0,
-			.25,
-			.5,
-			.75,
-			1
-		].map((t) => Math.round(t * (samples.length - 1))))].filter((i) => i >= 0 && i < samples.length).forEach((i) => {
-			svg += text(x - 12, y + (i + .5) * rowHeight + 4, samples[i].step ?? samples[i].row_number, 11, "text-anchor=\"end\"");
-		});
-		svg += text(36, y - 8, data.task_type === "timeseries" ? "预测步" : "原始行", 11);
-		names.forEach((name, i) => {
-			const label = data.labels?.[name] ?? name;
-			svg += `<g transform="translate(${x + (i + .5) * columnWidth} ${y + plotHeight + 16}) rotate(55)"><title>${escape(label + " · " + name)}</title>` + text(0, 0, short(label), 12) + "</g>";
-		});
-		svg += `<line x1="${barZero}" x2="${barZero}" y1="${y}" y2="${y + rankHeight}" stroke="${theme.border}"/>`;
-		matrix.ranking.forEach((feature, i) => {
-			const cy = y + (i + .5) * rankHeight / Math.max(names.length, 1), v = feature.mean;
-			const barWidth = v === null || !scales.meanMaximum ? 0 : Math.abs(v) / scales.meanMaximum * barHalf;
-			svg += `<g><title>${escape(feature.label + " · " + feature.name)}</title>` + text(barLabel + labelWidth, cy - 1, short(feature.label), 12, "text-anchor=\"end\"") + (feature.label !== feature.name ? text(barLabel + labelWidth, cy + 13, short(feature.name), 10, "text-anchor=\"end\" opacity=\".6\"") : "");
-			if (v !== null) svg += `<rect x="${v < 0 ? barZero - barWidth : barZero}" y="${cy - 5}" width="${barWidth}" height="10" fill="${v < 0 ? contributionColors.negative : contributionColors.positive}"/>`;
-			svg += text(width - 30, cy + 4, signed(v), 12, "text-anchor=\"end\"") + "</g>";
-		});
-		svg += text(barZero - barHalf, y + rankHeight + 20, `−${number(scales.meanMaximum)}`, 11, "text-anchor=\"middle\"") + text(barZero, y + rankHeight + 20, "0", 11, "text-anchor=\"middle\"") + text(barZero + barHalf, y + rankHeight + 20, `+${number(scales.meanMaximum)}`, 11, "text-anchor=\"middle\"");
-	});
-	svg += text(36, height - 36, "蓝色负向 · 绿色正向 · 灰蓝中性 · 灰色方向未定；中性按 0 计入均值，正负会抵消。", 12);
-	return svg + end;
-}
-function graphExportSvg(data, theme = defaultExportTheme, scope = "完整网络") {
-	const nodes = data.nodes ?? [], edges = data.edges ?? [], layout = graphLayout(nodes, edges), width = Math.max(800, layout.width + 72), height = layout.height + 160;
-	const label = (name) => data.labels?.[name] ?? name;
-	let svg = start(width, height, theme, `关系探索 · ${data.target_label ?? data.target}`) + text(36, 38, `关系探索 · ${data.target_label ?? data.target}`, 22, "font-weight=\"600\"") + text(36, 66, `${scope} · ${nodes.length} 个变量 · ${edges.length} 条关系`, 13);
-	svg += `<defs><marker id="arrow" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0 1 L6 3.5 L0 6" fill="none" stroke="#7793c3"/></marker></defs><g transform="translate(36 90)">`;
-	edges.forEach((e) => {
-		const a = layout.positions.get(e.source), b = layout.positions.get(e.target);
-		if (!a || !b) return;
-		const right = b[0] > a[0], same = b[0] === a[0], ax = a[0] + (right || same ? 68 : -68), bx = b[0] + (right ? -68 : 68);
-		const d = same ? `M${ax} ${a[1]} C${ax + 30} ${a[1]},${bx + 30} ${b[1]},${bx} ${b[1]}` : `M${ax} ${a[1]} C${(ax + bx) / 2} ${a[1]},${(ax + bx) / 2} ${b[1]},${bx} ${b[1]}`;
-		svg += `<path d="${d}" fill="none" stroke="#7793c3" stroke-width="1.5"${data.mode === "directed" ? " marker-end=\"url(#arrow)\"" : ""}><title>${escape(`${label(e.source)} ${data.mode === "directed" ? "→" : "—"} ${label(e.target)}：${e.weight}`)}</title></path>`;
-		if (edges.length <= 5) svg += text((ax + bx) / 2, (a[1] + b[1]) / 2 - 7, number(e.weight), 11, "text-anchor=\"middle\"");
-	});
-	nodes.forEach((name) => {
-		const [x, y] = layout.positions.get(name);
-		svg += `<rect x="${x - 68}" y="${y - 22}" width="136" height="44" rx="5" fill="${theme.background}" stroke="${name === data.target ? "#7793c3" : theme.border}"/>` + text(x, y - 2, label(name), 12, "text-anchor=\"middle\"") + text(x, y + 14, name, 10, "text-anchor=\"middle\" opacity=\".65\"");
-	});
-	return svg + "</g>" + text(36, height - 22, "连线表示模型发现的关系，数值为关系分数。", 12) + end;
-}
-
-//#endregion
-//#region src/client/ExplanationExport.tsx
-function themeAt(element) {
-	const probe = document.createElement("span");
-	probe.style.cssText = "position:absolute;visibility:hidden;color:var(--dsw-alias-label-primary,#202734);background:var(--dsw-alias-background-primary,#fff);border-color:var(--dsw-alias-border-l3,#dce2eb)";
-	element.append(probe);
-	const style = getComputedStyle(probe), colors$1 = [
-		style.backgroundColor,
-		style.color,
-		style.borderTopColor
-	];
-	const canvas = document.createElement("canvas");
-	canvas.width = canvas.height = 1;
-	const context = canvas.getContext("2d");
-	const resolve = (color, fallback) => {
-		if (!context) return fallback;
-		context.clearRect(0, 0, 1, 1);
-		context.fillStyle = color;
-		context.fillRect(0, 0, 1, 1);
-		const rgba = context.getImageData(0, 0, 1, 1).data;
-		return rgba[3] ? `#${[...rgba].slice(0, 3).map((v) => v.toString(16).padStart(2, "0")).join("")}` : fallback;
-	};
-	const theme = {
-		background: resolve(colors$1[0], defaultExportTheme.background),
-		foreground: resolve(colors$1[1], defaultExportTheme.foreground),
-		border: resolve(colors$1[2], defaultExportTheme.border)
-	};
-	probe.remove();
-	return theme;
-}
-async function png(svg) {
-	const url = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml" }));
-	try {
-		const image = new Image();
-		await new Promise((resolve, reject) => {
-			image.onload = () => resolve();
-			image.onerror = () => reject(/* @__PURE__ */ new Error("图片转换失败，可下载 SVG"));
-			image.src = url;
-		});
-		const scale = Math.min(2, Math.sqrt(16e6 / (image.width * image.height))), canvas = document.createElement("canvas");
-		canvas.width = Math.ceil(image.width * scale);
-		canvas.height = Math.ceil(image.height * scale);
-		const context = canvas.getContext("2d");
-		if (!context) throw new Error("浏览器无法导出 PNG，可下载 SVG");
-		context.drawImage(image, 0, 0, canvas.width, canvas.height);
-		return await new Promise((resolve, reject) => canvas.toBlob((blob) => blob ? resolve(blob) : reject(/* @__PURE__ */ new Error("PNG 导出失败")), "image/png"));
-	} finally {
-		URL.revokeObjectURL(url);
-	}
-}
-function ExplanationExport({ build, filename }) {
-	const root = (0, react.useRef)(null), busyRef = (0, react.useRef)(false), [status, setStatus] = (0, react.useState)("");
-	(0, react.useEffect)(() => {
-		const element = root.current;
-		const click = async (event) => {
-			const format = event.target.closest("[data-lx-export]")?.dataset.lxExport;
-			if (!format || !element || busyRef.current) return;
-			busyRef.current = true;
-			setStatus("正在导出…");
-			try {
-				const svg = build(themeAt(element)), blob = format === "png" ? await png(svg) : new Blob([svg], { type: "image/svg+xml;charset=utf-8" });
-				const url = URL.createObjectURL(blob), anchor = document.createElement("a");
-				anchor.href = url;
-				anchor.download = `${filename.replace(/[^\p{L}\p{N}_-]/gu, "-").slice(0, 100)}.${format}`;
-				document.body.append(anchor);
-				anchor.click();
-				anchor.remove();
-				setTimeout(() => URL.revokeObjectURL(url), 1e4);
-				setStatus("已导出");
-			} catch (error) {
-				setStatus(error instanceof Error ? error.message : "导出失败，请重试");
-			} finally {
-				busyRef.current = false;
-			}
-		};
-		element?.addEventListener("click", click);
-		return () => element?.removeEventListener("click", click);
-	}, [build, filename]);
-	return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-		className: "lx-export",
-		ref: root,
-		children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)(ActionMenu, {
-			label: "导出图表",
-			children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
-				type: "button",
-				"data-lx-export": "svg",
-				"aria-label": "导出 SVG 图表",
-				children: "SVG"
-			}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
-				type: "button",
-				"data-lx-export": "png",
-				"aria-label": "导出 PNG 图表",
-				children: "PNG"
-			})]
-		}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
-			role: "status",
-			className: "lx-export-status",
-			children: status
-		})]
-	});
-}
-
-//#endregion
-//#region src/client/ExplanationSingle.tsx
-function ExplanationSingle({ data }) {
-	const root = (0, react.useRef)(null), [view, setView] = (0, react.useState)("visual");
-	const matrix = (0, react.useMemo)(() => singleSampleMatrix(data), [data]);
-	(0, react.useEffect)(() => {
-		const element = root.current;
-		const click = (event) => {
-			const target = event.target, tab = target.closest("[data-lx-single-view]")?.dataset.lxSingleView;
-			if (tab) setView(tab);
-			if (target.closest("[data-lx-batch=\"row\"]")) setView("visual");
-		};
-		element?.addEventListener("click", click);
-		return () => element?.removeEventListener("click", click);
-	}, []);
-	return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-		ref: root,
-		children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-			className: "lx-analysis-toolbar",
-			children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-				className: "lx-plot-tabs",
-				"aria-label": "解释数据视图",
-				children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
-					type: "button",
-					"data-lx-single-view": "visual",
-					"aria-pressed": view === "visual",
-					children: "可视化"
-				}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
-					type: "button",
-					"data-lx-single-view": "raw",
-					"aria-pressed": view === "raw",
-					children: "原始数据"
-				})]
-			}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)(ExplanationExport, {
-				filename: `${data.target}-单样本解释`,
-				build: (theme) => contributionExportSvg(matrix, void 0, `原始行 ${data.row_number ?? 1}`, theme)
-			})]
-		}), view === "visual" ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)(LocalExplanation, { data }) : /* @__PURE__ */ (0, react_jsx_runtime.jsx)(ExplanationDataTable, { data: matrix })]
-	});
-}
-
-//#endregion
-//#region src/client/ContributionLegend.tsx
-function ContributionLegend({ maximum, unknown, neutral = false }) {
-	return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-		className: "lx-contribution-legend",
-		"aria-label": "贡献色阶：蓝色负向，绿色正向，深色贡献大",
-		children: [
-			/* @__PURE__ */ (0, react_jsx_runtime.jsx)("style", { children: `
-      .lx-contribution-legend{width:218px;max-width:100%;flex-shrink:0;font-size:10px;color:var(--dsw-alias-label-secondary)}
-      .lx-contribution-scale-labels{display:flex;justify-content:space-between;gap:8px;font-variant-numeric:tabular-nums;margin-bottom:5px}
-      .lx-contribution-scale{height:7px;border-radius:2px}
-      .lx-contribution-unknown{display:flex;align-items:center;justify-content:flex-end;gap:5px;margin-top:5px}.lx-contribution-unknown i{width:7px;height:7px;border-radius:50%}
-    ` }),
-			maximum > 0 ? /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-				className: "lx-contribution-scale-labels",
-				children: [
-					/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", { children: ["负向 −", number(maximum)] }),
-					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { children: "0" }),
-					/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", { children: [
-						"+",
-						number(maximum),
-						" 正向"
-					] })
-				]
-			}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
-				className: "lx-contribution-scale",
-				role: "img",
-				"aria-label": `负向 ${number(maximum)} 到正向 ${number(maximum)}；深浅表示贡献绝对值`,
-				style: { background: `linear-gradient(to right, ${contributionFill(maximum, -1, maximum)}, ${contributionBase} 50%, ${contributionFill(maximum, 1, maximum)})` }
-			})] }) : /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { children: "贡献均为 0" }),
-			neutral && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
-				className: "lx-contribution-unknown",
-				children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("i", { style: { background: contributionColors.neutral } }), "灰蓝：中性"]
-			}),
-			unknown && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
-				className: "lx-contribution-unknown",
-				children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("i", { style: { background: contributionColors.unknown } }), "灰色：方向未定"]
-			})
-		]
-	});
-}
-
-//#endregion
 //#region src/client/ContributionHeatmap.tsx
 const CSS$4 = `
+.lx-middle-legend .lx-contribution-legend{width:90px;position:relative;padding-top:26px}.lx-middle-legend .lx-contribution-scale{width:10px;height:175px;margin-left:4px;background:linear-gradient(to top,#4168a9,#fff 50%,#248575)!important}.lx-middle-legend .lx-contribution-scale-labels{display:flex;position:absolute;left:20px;top:26px;height:175px;flex-direction:column-reverse;font-size:8px;gap:0}.lx-middle-legend .lx-contribution-scale-labels>span{white-space:nowrap;display:block;line-height:1.5}.lx-middle-legend .lx-contribution-unknown{justify-content:flex-start;font-size:8px}.lx-cell-popover{position:absolute;z-index:8;width:250px;padding:14px;border:1px solid var(--dsw-alias-border-primary,#dce1e8);border-radius:8px;background:var(--dsw-alias-background-primary,#fff);box-shadow:0 4px 20px #0002;font-size:12px;line-height:1.7}.lx-cell-popover p{margin:7px 0}.lx-cell-popover dl{display:grid;grid-template-columns:auto 1fr;gap:5px 14px;margin:10px 0}.lx-cell-popover dt{color:var(--dsw-alias-label-secondary)}.lx-cell-popover dd{margin:0;text-align:right;font-variant-numeric:tabular-nums}.lx-cell-actions{display:flex;justify-content:flex-end;margin-top:10px}.lx-cell-popover button{color:var(--dsw-alias-state-business-primary,#3465ce)}.lx-cell-close{float:right}.lx-matrix-display{position:relative;font-size:11px;color:var(--dsw-alias-label-secondary);margin:0}.lx-matrix-display>.lx-plot-tabs{position:absolute;right:0;top:24px;z-index:4;white-space:nowrap;background:var(--dsw-alias-background-primary,#fff);padding:10px;border:1px solid var(--dsw-alias-border-primary,#ddd);border-radius:6px}.lx-matrix-display summary{cursor:pointer}
 .lx-matrix-heading{display:flex;justify-content:space-between;align-items:center;gap:12px;font-size:11px;color:var(--dsw-alias-label-secondary);margin:2px 0 14px}
 .lx-matrix-scroll{overflow-x:auto}.lx-matrix-svg{display:block;width:100%;min-width:650px;max-height:430px;color:var(--dsw-alias-label-primary)}
 .lx-matrix-svg text{fill:currentColor;font-family:inherit;pointer-events:none}.lx-matrix-cell{cursor:pointer}.lx-matrix-cell:hover,.lx-matrix-cell:focus{outline:none;stroke:var(--dsw-alias-label-primary,#26364a);stroke-width:1;paint-order:fill stroke}
@@ -1790,7 +1993,7 @@ function shortLabel(label, limit) {
 	return start$1 + "…" + end$1;
 }
 function ContributionHeatmap({ data, scope = "全部", scales }) {
-	const root = (0, react.useRef)(null), [hint, setHint] = (0, react.useState)(""), [expanded, setExpanded] = (0, react.useState)(false), [readable, setReadable] = (0, react.useState)(false);
+	const root = (0, react.useRef)(null), [hint, setHint] = (0, react.useState)(""), [picked, setPicked] = (0, react.useState)(null), [expanded, setExpanded] = (0, react.useState)(false), [readable, setReadable] = (0, react.useState)(false);
 	const matrix = (0, react.useMemo)(() => contributionMatrix(data), [data]);
 	const samples = data.samples ?? [], names = data.feature_names ?? [];
 	const { helpRef, helpId, helpOpen } = useExplanationHelp(!!samples.length && !!names.length);
@@ -1803,10 +2006,10 @@ function ContributionHeatmap({ data, scope = "全部", scales }) {
 		return `特征 ${index + 1} · ${label && label !== name ? `${label} · 字段：` : ""}${name}`;
 	};
 	const unknown = samples.some((s) => s.directions.some((d) => !knownDirection(d)));
-	const neutral = samples.some((s) => s.directions.includes(0)), prediction = explanationPrediction(data);
+	const neutral = samples.some((s) => s.directions.includes(0));
 	const ranking = expanded ? matrix.ranking : matrix.ranking.slice(0, 16), maxMean = (scales?.meanMaximum ?? Math.abs(ranking[0]?.mean ?? 0)) || 1, maximum = scales?.maximum ?? matrix.maximum;
 	const barStart = 720, barEnd = 838, barZero = (barStart + barEnd) / 2;
-	const summaryHelp = "每个样本的贡献按方向带上正负号，再求平均；正负会抵消。按平均值的绝对大小排序。" + (data.task_type === "classification" ? "分类任务的正负仅表示服务返回方向，不对应指定类别概率。" : "");
+	const summaryHelp = "展示当前样本范围的平均贡献。每个样本的贡献按方向带上正负号，再求平均；正负会抵消。按平均值的绝对大小排序。" + (data.task_type === "classification" ? "分类任务的正负仅表示服务返回方向，不对应指定类别概率。" : "");
 	const rowTicks = [...new Set([
 		0,
 		.25,
@@ -1816,10 +2019,12 @@ function ContributionHeatmap({ data, scope = "全部", scales }) {
 	].map((t) => Math.round(t * (samples.length - 1))))];
 	(0, react.useEffect)(() => {
 		setHint("");
+		setPicked(null);
 	}, [data]);
 	(0, react.useEffect)(() => {
 		const element = root.current;
 		const click = (event) => {
+			if (event.target.closest("[data-lx-cell-close]")) setPicked(null);
 			if (event.target.closest("[data-lx-matrix-expand]")) setExpanded((v) => !v);
 			const mode = event.target.closest("[data-lx-matrix-size]")?.getAttribute("data-lx-matrix-size");
 			if (mode) setReadable(mode === "readable");
@@ -1831,9 +2036,27 @@ function ContributionHeatmap({ data, scope = "全部", scales }) {
 		const element = root.current;
 		const describe = (event) => {
 			const target = event.target.closest("[data-lx-matrix-cell], [data-lx-feature-label]");
-			if (target) setHint(target.getAttribute("aria-label") ?? "");
+			if (target) {
+				const text$1 = target.getAttribute("aria-label") ?? "";
+				setHint(text$1);
+				if (event.type === "click" && target.hasAttribute("data-lx-matrix-cell")) {
+					const bounds = target.getBoundingClientRect(), container = element.getBoundingClientRect();
+					setPicked({
+						row: Number(target.getAttribute("data-row")),
+						feature: Number(target.getAttribute("data-feature")),
+						hint: text$1,
+						x: Math.max(0, Math.min(container.width - 260, bounds.right - container.left + 10)),
+						y: Math.max(0, bounds.top - container.top - 80)
+					});
+				}
+			}
 		};
 		const keydown = (event) => {
+			if (event.key === "Escape" && element?.querySelector(".lx-cell-popover")) {
+				setPicked(null);
+				event.stopPropagation();
+				return;
+			}
 			const cell = event.target.closest("[data-lx-matrix-cell]");
 			if (!cell) {
 				if (["Enter", " "].includes(event.key) && event.target.closest("[data-lx-feature-label]")) {
@@ -1881,6 +2104,7 @@ function ContributionHeatmap({ data, scope = "全部", scales }) {
 			element?.removeEventListener("keydown", keydown);
 		};
 	}, [samples.length, names.length]);
+	const pickedSample = picked ? samples.find((s) => s.row_number === picked.row) : void 0;
 	if (!samples.length || !names.length) return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 		ref: root,
 		children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
@@ -1893,6 +2117,7 @@ function ContributionHeatmap({ data, scope = "全部", scales }) {
 	});
 	return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 		ref: root,
+		style: { position: "relative" },
 		className: expanded ? "lx-matrix-expanded" : void 0,
 		children: [
 			/* @__PURE__ */ (0, react_jsx_runtime.jsx)("style", { children: CSS$4 }),
@@ -1904,26 +2129,24 @@ function ContributionHeatmap({ data, scope = "全部", scales }) {
 					samples.length,
 					" 个样本 · ",
 					names.length,
-					" 个特征 · 不分页"
-				] }), /* @__PURE__ */ (0, react_jsx_runtime.jsx)(ContributionLegend, {
-					maximum,
-					unknown,
-					neutral
-				})]
-			}),
-			/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-				className: "lx-plot-tabs",
-				"aria-label": "热力图显示尺寸",
-				children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
-					type: "button",
-					"data-lx-matrix-size": "overview",
-					"aria-pressed": !readable,
-					children: "全部概览"
-				}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
-					type: "button",
-					"data-lx-matrix-size": "readable",
-					"aria-pressed": readable,
-					children: "清晰细看"
+					" 个特征"
+				] }), /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("details", {
+					className: "lx-matrix-display",
+					children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("summary", { children: "显示设置" }), /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+						className: "lx-plot-tabs",
+						"aria-label": "热力图显示尺寸",
+						children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+							type: "button",
+							"data-lx-matrix-size": "overview",
+							"aria-pressed": !readable,
+							children: "全部概览"
+						}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+							type: "button",
+							"data-lx-matrix-size": "readable",
+							"aria-pressed": readable,
+							children: "清晰细看"
+						})]
+					})]
 				})]
 			}),
 			/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
@@ -1931,28 +2154,51 @@ function ContributionHeatmap({ data, scope = "全部", scales }) {
 				children: /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("svg", {
 					className: "lx-matrix-svg",
 					style: readable ? {
-						minWidth: plotWidth + 352,
+						minWidth: plotWidth + 452,
 						maxHeight: "none"
 					} : void 0,
-					viewBox: `0 0 ${plotWidth + 352} ${plotHeight + (angledLabels ? 138 : 72)}`,
+					viewBox: `0 0 ${plotWidth + 452} ${plotHeight + (angledLabels ? 138 : 72)}`,
 					role: "group",
 					"aria-label": `${scope} ${samples.length} 个样本、${names.length} 个特征的贡献热力图，共 ${matrix.cellCount} 个色块`,
 					children: [
+						/* @__PURE__ */ (0, react_jsx_runtime.jsx)("foreignObject", {
+							x: plotWidth + 65,
+							y: 65,
+							width: "95",
+							height: "260",
+							children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+								className: "lx-middle-legend",
+								children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(ContributionLegend, {
+									maximum,
+									unknown,
+									neutral,
+									vertical: true
+								})
+							})
+						}),
+						/* @__PURE__ */ (0, react_jsx_runtime.jsx)("text", {
+							x: "36",
+							y: "12",
+							fontSize: "11",
+							fontWeight: "500",
+							children: "整体贡献分布"
+						}),
 						/* @__PURE__ */ (0, react_jsx_runtime.jsx)("text", {
 							x: "0",
-							y: "12",
+							y: "25",
 							fontSize: "10",
 							opacity: ".6",
 							children: data.task_type === "timeseries" ? "预测步" : "原始行"
 						}),
 						/* @__PURE__ */ (0, react_jsx_runtime.jsx)("g", {
-							transform: `translate(${plotWidth - 548} 0)`,
+							transform: `translate(${plotWidth - 448} 0)`,
 							role: "group",
 							"aria-label": "各影响因子影响分数对比",
 							children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)("text", {
 								x: "626",
 								y: "12",
 								fontSize: "11",
+								fontWeight: "500",
 								children: "各影响因子影响分数对比"
 							})
 						}),
@@ -1966,7 +2212,7 @@ function ContributionHeatmap({ data, scope = "全部", scales }) {
 						}, i)),
 						matrix.rows.map((row) => /* @__PURE__ */ (0, react_jsx_runtime.jsx)("g", { children: row.cells.map((cell) => {
 							const sample = samples[row.sampleIndex], label = data.labels?.[cell.name] ?? cell.name;
-							const hint$1 = `${sampleLabel(sample, data)} · ${label} ${cell.name} · 贡献 ${number(cell.score)} · ${directionLabel(cell.direction)}${sample.prediction === void 0 ? "" : ` · ${prediction.label} ${typeof sample.prediction === "number" ? number(sample.prediction) : sample.prediction}${prediction.unit ? " " + prediction.unit : ""}`}`;
+							const hint$1 = `${sampleLabel(sample, data)} · ${label} ${cell.name} · 贡献 ${number(cell.score)} · ${directionLabel(cell.direction)}`;
 							return /* @__PURE__ */ (0, react_jsx_runtime.jsx)("rect", {
 								className: "lx-matrix-cell",
 								x: 36 + cell.featureIndex * columnWidth,
@@ -1977,14 +2223,26 @@ function ContributionHeatmap({ data, scope = "全部", scales }) {
 								role: "button",
 								tabIndex: row.sampleIndex === 0 && cell.featureIndex === 0 ? 0 : -1,
 								"data-lx-matrix-cell": true,
-								"data-lx-batch": "row",
+								"aria-pressed": picked?.row === row.rowNumber && picked?.feature === cell.featureIndex,
+								stroke: picked?.row === row.rowNumber && picked?.feature === cell.featureIndex ? "currentColor" : void 0,
+								strokeWidth: 1,
 								"data-row": row.rowNumber,
 								"data-index": row.sampleIndex,
 								"data-feature": cell.featureIndex,
 								"aria-label": hint$1,
-								children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)("title", { children: `${hint$1}；点击查看此样本，方向键选择色块` })
+								children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)("title", { children: `${hint$1}；点击固定读数，方向键选择色块` })
 							}, cell.name);
 						}) }, row.rowNumber)),
+						picked && samples.some((s) => s.row_number === picked.row) && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("rect", {
+							x: "35.5",
+							y: 30 + samples.findIndex((s) => s.row_number === picked.row) * rowHeight,
+							width: plotWidth + 1,
+							height: rowHeight,
+							fill: "none",
+							stroke: "var(--dsw-alias-state-business-primary,#3465ce)",
+							strokeWidth: "1.5",
+							pointerEvents: "none"
+						}),
 						names.map((name, i) => {
 							const label = data.labels?.[name] ?? name;
 							return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("g", {
@@ -2009,7 +2267,7 @@ function ContributionHeatmap({ data, scope = "全部", scales }) {
 							}, name);
 						}),
 						/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("g", {
-							transform: `translate(${plotWidth - 548} 0)`,
+							transform: `translate(${plotWidth - 448} 0)`,
 							role: "group",
 							"aria-label": "带正负的平均贡献，按绝对大小排序",
 							children: [
@@ -2085,6 +2343,7 @@ function ContributionHeatmap({ data, scope = "全部", scales }) {
 								/* @__PURE__ */ (0, react_jsx_runtime.jsx)("text", {
 									x: barStart,
 									y: plotHeight + 46,
+									textAnchor: "middle",
 									fontSize: "10",
 									opacity: ".6",
 									children: scales ? `−${number(scales.meanMaximum)}` : "负向"
@@ -2092,7 +2351,7 @@ function ContributionHeatmap({ data, scope = "全部", scales }) {
 								/* @__PURE__ */ (0, react_jsx_runtime.jsx)("text", {
 									x: barEnd,
 									y: plotHeight + 46,
-									textAnchor: "end",
+									textAnchor: "middle",
 									fontSize: "10",
 									opacity: ".6",
 									children: scales ? `+${number(scales.meanMaximum)}` : "正向"
@@ -2101,7 +2360,7 @@ function ContributionHeatmap({ data, scope = "全部", scales }) {
 						}),
 						/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("g", {
 							ref: helpRef,
-							transform: `translate(${plotWidth - 548} 0)`,
+							transform: `translate(${plotWidth - 448} 0)`,
 							children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("g", {
 								className: "lx-matrix-help-trigger",
 								"data-lx-help-trigger": true,
@@ -2153,7 +2412,49 @@ function ContributionHeatmap({ data, scope = "全部", scales }) {
 			/* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
 				className: "lx-matrix-readout",
 				role: "status",
-				children: hint || "悬停或点击特征名查看全称；点击色块查看该样本。"
+				children: hint || "点击色块查看详情；整体平均贡献不随选中样本改变。"
+			}),
+			picked && pickedSample && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+				className: "lx-cell-popover",
+				role: "dialog",
+				"aria-label": "样本贡献详情",
+				style: {
+					left: picked.x,
+					top: picked.y
+				},
+				children: [
+					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+						className: "lx-cell-close",
+						type: "button",
+						"data-lx-cell-close": true,
+						"aria-label": "关闭样本详情",
+						children: "×"
+					}),
+					/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("strong", { children: [
+						sampleLabel(pickedSample, data),
+						" · ",
+						data.labels?.[names[picked.feature]] ?? names[picked.feature]
+					] }),
+					/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("dl", { children: [
+						/* @__PURE__ */ (0, react_jsx_runtime.jsx)("dt", { children: "贡献分数" }),
+						/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("dd", { children: [
+							number(pickedSample.scores[picked.feature]),
+							" · ",
+							directionLabel(pickedSample.directions[picked.feature])
+						] }),
+						/* @__PURE__ */ (0, react_jsx_runtime.jsx)("dt", { children: "特征原值" }),
+						/* @__PURE__ */ (0, react_jsx_runtime.jsx)("dd", { children: String(pickedSample.feature_values?.[picked.feature] ?? "—") })
+					] }),
+					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+						className: "lx-cell-actions",
+						children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+							type: "button",
+							"data-lx-batch": "row",
+							"data-row": picked.row,
+							children: "查看单条解释 →"
+						})
+					})
+				]
 			}),
 			samples.length > plotHeight && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
 				className: "lx-explain-foot",
@@ -2253,7 +2554,7 @@ function filterDescription(filter, data) {
 
 //#endregion
 //#region src/client/ExplanationFilter.tsx
-function ExplanationFilter({ data, value, onApply }) {
+function ExplanationFilter({ data, value, onApply, embedded = false }) {
 	const root = (0, react.useRef)(null), [open, setOpen] = (0, react.useState)(false), [draft, setDraft] = (0, react.useState)(value), [error, setError] = (0, react.useState)("");
 	const fields = filterFields(data), field = fields.find((f) => f.key === draft.field);
 	(0, react.useEffect)(() => {
@@ -2328,7 +2629,7 @@ function ExplanationFilter({ data, value, onApply }) {
 	return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 		className: "lx-filter",
 		ref: root,
-		children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("button", {
+		children: [!embedded && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("button", {
 			type: "button",
 			"data-lx-filter-action": "toggle",
 			"aria-expanded": open,
@@ -2342,7 +2643,7 @@ function ExplanationFilter({ data, value, onApply }) {
 					children: open ? "⌃" : "⌄"
 				})
 			]
-		}), open && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+		}), (embedded || open) && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 			className: "lx-filter-panel",
 			children: [
 				/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("label", { children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { children: data.task_type === "timeseries" ? "预测步范围" : "原始行范围" }), /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
@@ -2411,25 +2712,35 @@ function ExplanationFilter({ data, value, onApply }) {
 
 //#endregion
 //#region src/client/ExplanationBatch.tsx
-function ExplanationBatch({ data }) {
+function ExplanationBatch({ data, showRaw = false, showPredictionCheck = false, onVisual }) {
 	const root = (0, react.useRef)(null);
 	const [tab, setTab] = (0, react.useState)("distribution"), [view, setView] = (0, react.useState)("visual");
+	const [group, setGroup] = (0, react.useState)("all");
+	const groups = (0, react.useMemo)(() => predictionGroups(data), [data]);
 	const [filter, setFilter] = (0, react.useState)(emptyFilter);
 	const applyFilter = (0, react.useCallback)((value) => {
 		setFilter(value);
+		setGroup("all");
 		setPage(0);
 		setSelected(null);
+		setTab("distribution");
 	}, []);
 	const active = filterActive(filter), description = filterDescription(filter, data);
-	const visible = (0, react.useMemo)(() => active ? {
+	const visible = (0, react.useMemo)(() => groups && group === "low" ? groups.low : groups && group === "high" ? groups.high : active ? {
 		...data,
 		samples: filterSamples(data, filter)
 	} : data, [
 		data,
 		filter,
-		active
+		active,
+		groups,
+		group
 	]);
-	const scales = (0, react.useMemo)(() => contributionScales(data, visible), [data, visible]);
+	const scales = (0, react.useMemo)(() => contributionScales(data, visible, ...groups ? [groups.low, groups.high] : []), [
+		data,
+		visible,
+		groups
+	]);
 	const [selected, setSelected] = (0, react.useState)(null);
 	const [page, setPage] = (0, react.useState)(0);
 	const samples = visible.samples ?? [], allSamples = data.samples ?? [], names = data.feature_names ?? [];
@@ -2440,8 +2751,17 @@ function ExplanationBatch({ data }) {
 			const button = event.target.closest("[data-lx-batch]");
 			if (!button || !element?.contains(button)) return;
 			const action = button.dataset.lxBatch;
+			if ([
+				"row",
+				"distribution",
+				"sample"
+			].includes(action)) onVisual?.();
 			if (action === "visual" || action === "raw") setView(action);
-			if (action === "distribution" || action === "sample") setTab(action);
+			if (action === "distribution" || action === "sample") {
+				setTab(action);
+				setView("visual");
+				if (action === "sample" && selected === null) setSelected(samples[0]?.row_number ?? null);
+			}
 			if (action === "row") {
 				setSelected(Number(button.dataset.row));
 				setTab("sample");
@@ -2449,9 +2769,20 @@ function ExplanationBatch({ data }) {
 			}
 			if (action === "previous") setPage((p) => Math.max(0, p - 1));
 			if (action === "next") setPage((p) => Math.min(pages - 1, p + 1));
-			if (action === "table") setSelected(null);
+			if (action === "table") setTab("distribution");
+			if (action === "sample-prev" || action === "sample-next") {
+				const i = allSamples.findIndex((s) => s.row_number === selected);
+				setSelected(allSamples[Math.max(0, Math.min(allSamples.length - 1, i + (action === "sample-prev" ? -1 : 1)))].row_number);
+			}
 		};
 		const change = (event) => {
+			if (event.target.matches("[data-lx-prediction-group]")) {
+				setGroup(event.target.value);
+				setFilter(emptyFilter);
+				setSelected(null);
+				setPage(0);
+				setTab("distribution");
+			}
 			if (event.target.matches("[data-lx-sample-select]")) setSelected(Number(event.target.value));
 		};
 		element?.addEventListener("click", click);
@@ -2460,33 +2791,25 @@ function ExplanationBatch({ data }) {
 			element?.removeEventListener("click", click);
 			element?.removeEventListener("change", change);
 		};
-	}, [pages]);
+	}, [
+		pages,
+		selected,
+		samples,
+		allSamples,
+		onVisual
+	]);
 	const cellMax = scales.maximum;
 	const unknown = samples.some((s) => s.directions.some((d) => !knownDirection(d)));
 	const neutral = samples.some((s) => s.directions.includes(0));
 	const selectedSample = selected === null ? void 0 : allSamples.find((s) => s.row_number === selected);
 	return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 		ref: root,
+		className: "lx-batch-view",
 		children: [
-			/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-				className: "lx-batch-summary",
-				children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("strong", { children: [
-					data.explained_count ?? allSamples.length,
-					" / ",
-					data.requested_count ?? allSamples.length,
-					" 个样本"
-				] }), /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-					className: "lx-batch-meta",
-					children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", { children: [
-						names.length,
-						" 个特征",
-						data.input_rows ? ` · 输入共 ${data.input_rows} 行` : ""
-					] }), /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(ExplanationHelp, {
-						label: "数据说明",
-						children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", { children: data.mapping === "forecast_steps" ? "按接口返回的预测步与时间对应；特征包含服务生成的时间和季节性特征。" : data.mapping === "input_order" ? "样本按输入顺序对应；接口未返回样本索引，返回数量与请求一致。" : "样本按接口返回的样本索引对应。" }), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", { children: "贡献用于解释预测，不代表实际调节收益。" })]
-					})]
-				})]
-			}),
+			tab === "sample" && selectedSample ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)(ExplanationInsight, { data: singleSampleMatrix(sampleView(data, selectedSample)) }) : group === "compare" && groups ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)(GroupInsight, {
+				low: groups.low,
+				high: groups.high
+			}) : /* @__PURE__ */ (0, react_jsx_runtime.jsx)(ExplanationInsight, { data: visible }),
 			data.input_rows && allSamples.length < data.input_rows && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("p", {
 				className: "lx-explain-foot",
 				children: [
@@ -2507,31 +2830,108 @@ function ExplanationBatch({ data }) {
 					"。整体排序只统计已返回样本。"
 				]
 			}),
+			/* @__PURE__ */ (0, react_jsx_runtime.jsx)("style", { children: `.lx-batch-toolbar button,.lx-batch-toolbar summary{font-family:inherit!important;font-size:12px!important;font-weight:400!important;line-height:20px!important}.lx-batch-toolbar .lx-plot-tabs button[aria-pressed=true]{font-weight:400!important;text-decoration:none}.lx-batch-view .lx-sample-control{justify-content:flex-end;gap:6px;margin:0}.lx-batch-view .lx-sample-control button{display:flex;align-items:center;justify-content:center;width:28px;height:28px;padding:0}.lx-batch-view .lx-sample-control label{display:flex;align-items:center;gap:8px}.lx-batch-view .lx-sample-control select{margin:0;font:inherit;min-height:30px}.lx-batch-config-body .lx-analysis-toolbar{display:block;margin-top:14px}.lx-batch-config-body select{font:inherit;color:inherit;background:var(--dsw-alias-background-primary,#fff);border:1px solid var(--dsw-alias-border-primary,#ddd);border-radius:5px;padding:6px 8px;max-width:100%}.lx-batch-config-body .lx-analysis-toolbar label{display:flex;align-items:center;gap:8px}.lx-batch-config-body .lx-analysis-toolbar select{margin-left:auto;max-width:210px}.lx-batch-config-body .lx-explain-foot{display:block;margin-top:8px;font-size:11px}.lx-batch-config-body .lx-filter-panel{margin:0;border:0;padding:0;background:transparent;display:grid;grid-template-columns:1fr 1fr;gap:12px}.lx-batch-config-body .lx-filter-panel label{min-width:0}.lx-batch-config-body .lx-filter-panel select{width:100%;margin:0}.lx-batch-config-body .lx-filter-range input{width:100%;min-width:0}.lx-batch-config-body .lx-filter-range{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr)}.lx-batch-config-body .lx-filter-actions{grid-column:1/-1;justify-content:flex-end}.lx-batch-config-body .lx-filter-error{grid-column:1/-1}.lx-batch-config-body .lx-analysis-toolbar{border-top:1px solid var(--dsw-alias-border-primary,#ddd);padding-top:12px}.lx-batch-toolbar{display:flex;min-height:32px;align-items:center;gap:12px;margin:12px 0;border-bottom:1px solid var(--dsw-alias-border-primary,#ddd);padding-bottom:0}.lx-batch-toolbar>.lx-export{margin:0;padding:0;display:flex;align-items:center}.lx-batch-toolbar>.lx-export>.lx-export-status:empty{display:none}.lx-batch-toolbar>.lx-plot-tabs{margin:0;align-items:stretch}.lx-batch-toolbar .lx-plot-tabs button{position:relative;height:40px;text-decoration:none!important}.lx-batch-toolbar .lx-plot-tabs button[aria-pressed=true]:after{content:"";position:absolute;bottom:-1px;left:0;right:0;height:2px;background:var(--dsw-alias-state-business-primary,#3465ce)}.lx-batch-toolbar button,.lx-batch-toolbar summary{display:inline-flex;align-items:center;min-height:28px;line-height:20px!important;padding-top:0!important;padding-bottom:0!important}.lx-batch-config{margin-left:auto;position:relative;font-size:12px}.lx-batch-config>summary{cursor:pointer;list-style:none}.lx-batch-config-body{position:absolute;right:0;top:30px;width:min(400px,75vw);z-index:12;padding:16px;background:var(--dsw-alias-background-primary,#fff);border:1px solid var(--dsw-alias-border-primary,#ddd);border-radius:8px;box-shadow:0 6px 20px #0002}.lx-batch-footer{display:flex;gap:12px;border-top:1px solid var(--dsw-alias-border-primary,#ddd);padding-top:8px;margin-top:10px;font-size:12px}.lx-batch-overview .lx-matrix-svg{max-height:min(560px,60vh)}.lx-fullscreen-dialog[open] .lx-explain .lx-batch-overview .lx-matrix-svg{max-height:max(260px,calc(100dvh - 330px))}` }),
 			/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-				className: "lx-explain-tabs",
-				"aria-label": "解释数据视图",
-				children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
-					type: "button",
-					"data-lx-batch": "visual",
-					"aria-pressed": view === "visual",
-					children: "可视化"
-				}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
-					type: "button",
-					"data-lx-batch": "raw",
-					"aria-pressed": view === "raw",
-					children: "原始数据"
-				})]
-			}),
-			/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-				className: "lx-analysis-toolbar",
-				children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)(ExplanationFilter, {
-					data,
-					value: filter,
-					onApply: applyFilter
-				}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)(ExplanationExport, {
-					filename: `${data.target}-解释${active ? "-筛选对比" : ""}`,
-					build: (theme) => contributionExportSvg(data, active ? visible : void 0, description, theme)
-				})]
+				className: "lx-batch-toolbar",
+				children: [
+					/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+						className: "lx-plot-tabs",
+						"aria-label": "解释图表",
+						children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+							type: "button",
+							"data-lx-batch": "distribution",
+							"aria-pressed": tab === "distribution" && view === "visual",
+							children: "影响因子热力图"
+						}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+							type: "button",
+							"data-lx-batch": "sample",
+							"aria-pressed": tab === "sample" && view === "visual",
+							children: "单条解释"
+						})]
+					}),
+					/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("details", {
+						className: "lx-batch-config",
+						children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("summary", { children: "筛选与分组" }), /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+							className: "lx-batch-config-body",
+							children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)(ExplanationFilter, {
+								embedded: true,
+								data,
+								value: filter,
+								onApply: applyFilter
+							}), groups && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+								className: "lx-analysis-toolbar",
+								children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("label", { children: [
+									"快捷分组 ",
+									/* @__PURE__ */ (0, react_jsx_runtime.jsxs)(ExplanationHelp, {
+										label: "快捷分组说明",
+										children: [
+											/* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", { children: "将本次已解释的全部样本按预测值从小到大排列，取中间值作为分界；样本数为偶数时，取中间两个值的平均数。" }),
+											/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("p", { children: [
+												"本次采用",
+												groups.label,
+												"，分界为 ",
+												number(groups.median),
+												data.unit ? ` ${data.unit}` : "",
+												"。低于分界的 ",
+												groups.low.samples?.length ?? 0,
+												" 条归低预测组，等于或高于分界的 ",
+												groups.high.samples?.length ?? 0,
+												" 条归高预测组；两组数量不一定相等。"
+											] }),
+											/* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", { children: "选择“高低预测组对比”，可比较两组的影响因子热力图和平均贡献。高低只表示预测值大小，不代表质量等级或预测准确程度。" }),
+											/* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", { children: "优先使用原预测；原预测不完整时，统一使用解释时预测。切换快捷分组会清除手动筛选，不会重新调用模型。" })
+										]
+									}),
+									/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("select", {
+										"aria-label": "预测分组",
+										"data-lx-prediction-group": true,
+										value: group,
+										onChange: () => {},
+										children: [
+											/* @__PURE__ */ (0, react_jsx_runtime.jsx)("option", {
+												value: "all",
+												children: "全部样本"
+											}),
+											/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("option", {
+												value: "low",
+												children: [
+													"低于",
+													groups.label,
+													"中位数"
+												]
+											}),
+											/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("option", {
+												value: "high",
+												children: [
+													"不低于",
+													groups.label,
+													"中位数"
+												]
+											}),
+											/* @__PURE__ */ (0, react_jsx_runtime.jsx)("option", {
+												value: "compare",
+												children: "高低预测组对比"
+											})
+										]
+									})
+								] }), /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
+									className: "lx-explain-foot",
+									children: [
+										"按",
+										groups.label,
+										" ",
+										number(groups.median),
+										" 分组；不是质量等级"
+									]
+								})]
+							})]
+						})]
+					}),
+					/* @__PURE__ */ (0, react_jsx_runtime.jsx)(ExplanationExport, {
+						filename: `${data.target}-解释${active ? "-筛选对比" : ""}`,
+						build: (theme) => tab === "sample" && selectedSample ? singleContributionExportSvg(sampleView(data, selectedSample), theme) : group === "compare" && groups ? contributionExportSvg(groups.high, groups.low, `低预测组 / 高预测组；分界 ${groups.median}`, theme, ["低预测组", "高预测组"]) : contributionExportSvg(data, active || group !== "all" ? visible : void 0, group === "all" ? description : `${group === "low" ? "低" : "高"}预测组`, theme)
+					})
+				]
 			}),
 			active && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 				className: "lx-filter-summary",
@@ -2543,48 +2943,81 @@ function ExplanationBatch({ data }) {
 					"%"
 				] }), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { children: description })]
 			}),
-			view === "raw" ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)(ExplanationDataTable, { data: visible }) : /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-				className: "lx-plot-tabs",
-				"aria-label": "解释图表",
-				children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
-					type: "button",
-					"data-lx-batch": "distribution",
-					"aria-pressed": tab === "distribution",
-					children: "贡献热力图"
-				}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
-					type: "button",
-					"data-lx-batch": "sample",
-					"aria-pressed": tab === "sample",
-					children: "逐样本"
-				})]
-			}), tab === "distribution" ? /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-				className: active ? "lx-matrix-comparison" : "",
-				children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)(ContributionHeatmap, {
-					data: visible,
-					scope: active ? "当前筛选" : "全部",
-					scales: active ? scales : void 0
-				}), active && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(ContributionHeatmap, {
-					data,
-					scope: "全样本",
-					scales
-				})]
-			}) : selectedSample ? /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-				className: "lx-sample-control",
-				children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
-					type: "button",
-					"data-lx-batch": "table",
-					children: "← 返回样本表"
-				}), /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("label", { children: ["选择样本 ", /* @__PURE__ */ (0, react_jsx_runtime.jsx)("select", {
-					"data-lx-sample-select": true,
-					value: selected ?? 0,
-					onChange: () => {},
-					"aria-label": "选择原始样本行",
-					children: allSamples.map((s) => /* @__PURE__ */ (0, react_jsx_runtime.jsx)("option", {
-						value: s.row_number,
-						children: sampleLabel(s, data)
-					}, s.row_number))
-				})] })]
-			}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)(LocalExplanation, { data: sampleView(data, selectedSample) }, selectedSample.row_number)] }) : /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [
+			showPredictionCheck && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(PredictionCheck, { data: tab === "sample" && selectedSample ? {
+				...data,
+				samples: [selectedSample]
+			} : visible }),
+			showRaw ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)(ExplanationDataTable, { data: visible }) : /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+				className: "lx-batch-overview",
+				style: { display: tab === "distribution" ? "block" : "none" },
+				children: group === "compare" && groups ? /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+					className: "lx-matrix-comparison lx-prediction-comparison",
+					children: [
+						/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("p", {
+							className: "lx-explain-foot",
+							children: [
+								"两组共用贡献色阶与均值轴；低组 ",
+								groups.low.samples.length,
+								" 行，高组 ",
+								groups.high.samples.length,
+								" 行。"
+							]
+						}),
+						/* @__PURE__ */ (0, react_jsx_runtime.jsx)(ContributionHeatmap, {
+							data: groups.low,
+							scope: "低预测组",
+							scales
+						}),
+						/* @__PURE__ */ (0, react_jsx_runtime.jsx)(ContributionHeatmap, {
+							data: groups.high,
+							scope: "高预测组",
+							scales
+						})
+					]
+				}) : /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+					className: active ? "lx-matrix-comparison" : "",
+					children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)(ContributionHeatmap, {
+						data: visible,
+						scope: group === "low" ? "低预测组" : group === "high" ? "高预测组" : active ? "当前筛选" : "全部",
+						scales
+					}), active && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(ContributionHeatmap, {
+						data,
+						scope: "全样本",
+						scales
+					})]
+				})
+			}), tab === "sample" && (selectedSample ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)(react_jsx_runtime.Fragment, { children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(LocalExplanation, {
+				data: sampleView(data, selectedSample),
+				controls: /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+					className: "lx-sample-control",
+					children: [
+						/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("label", { children: ["选择样本 ", /* @__PURE__ */ (0, react_jsx_runtime.jsx)("select", {
+							"data-lx-sample-select": true,
+							value: selected ?? 0,
+							onChange: () => {},
+							"aria-label": "选择原始样本行",
+							children: allSamples.map((s) => /* @__PURE__ */ (0, react_jsx_runtime.jsx)("option", {
+								value: s.row_number,
+								children: sampleLabel(s, data)
+							}, s.row_number))
+						})] }),
+						/* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+							type: "button",
+							"data-lx-batch": "sample-prev",
+							disabled: selected === allSamples[0]?.row_number,
+							"aria-label": "上一个样本",
+							children: "←"
+						}),
+						/* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+							type: "button",
+							"data-lx-batch": "sample-next",
+							disabled: selected === allSamples[allSamples.length - 1]?.row_number,
+							"aria-label": "下一个样本",
+							children: "→"
+						})
+					]
+				})
+			}, selectedSample.row_number) }) : /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [
 				/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 					className: "lx-heatmap-heading",
 					children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { children: "样本贡献明细" }), /* @__PURE__ */ (0, react_jsx_runtime.jsx)(ContributionLegend, {
@@ -2655,39 +3088,51 @@ function ExplanationBatch({ data }) {
 						})
 					] })]
 				})
-			] })] })
+			] }))] })
 		]
 	});
 }
 
 //#endregion
 //#region src/client/ExplanationGraph.tsx
-function ExplanationGraph({ data }) {
+function ExplanationGraph({ data, onPair, detail, selectedPair = [], onClearPair, toolbar }) {
 	const root = (0, react.useRef)(null), id = (0, react.useId)().replace(/:/g, "");
-	const [focus, setFocus] = (0, react.useState)(false), [selected, setSelected] = (0, react.useState)(null), [expanded, setExpanded] = (0, react.useState)(false);
-	const [view, setView] = (0, react.useState)("visual");
+	const [focus, setFocus] = (0, react.useState)(null), [selected, setSelected] = (0, react.useState)(null);
+	const canvas = (0, react.useRef)(null), [aspect, setAspect] = (0, react.useState)(2);
+	(0, react.useEffect)(() => {
+		const element = canvas.current;
+		if (!element) return;
+		const observer = new ResizeObserver(([entry]) => {
+			const { width: width$1, height: height$1 } = entry.contentRect;
+			if (width$1 > 0 && height$1 > 0) setAspect((previous) => Math.abs(previous - width$1 / height$1) > .05 ? width$1 / height$1 : previous);
+		});
+		observer.observe(element);
+		return () => observer.disconnect();
+	}, []);
 	const allNodes = data.nodes ?? [], allEdges = data.edges ?? [];
 	const label = (n) => data.labels?.[n] ?? n;
-	const edges = focus ? allEdges.filter((e) => e.source === data.target || e.target === data.target) : allEdges;
-	const neighbors = new Set([data.target, ...edges.flatMap((e) => [e.source, e.target])]);
+	const edges = focus ? allEdges.filter((e) => e.source === focus || e.target === focus) : allEdges;
+	const neighbors = new Set([focus ?? data.target, ...edges.flatMap((e) => [e.source, e.target])]);
 	const nodes = focus ? allNodes.filter((n) => neighbors.has(n)) : allNodes;
-	const { positions, width, height, isolated, cycles } = graphLayout(nodes, edges);
+	const { positions, width, height, isolated, cycles } = graphLayout(nodes, edges, aspect);
 	(0, react.useEffect)(() => {
 		const element = root.current;
 		const click = (event) => {
 			const button = event.target.closest("[data-lx-graph]");
 			if (!button || !element?.contains(button)) return;
+			if (button.dataset.lxGraph === "edge") {
+				setSelected(null);
+				onPair?.(button.dataset.source, button.dataset.target);
+			} else onClearPair?.();
 			if (button.dataset.lxGraph === "focus") {
-				setFocus((v) => !v);
+				setFocus((v) => v ? null : selected);
 				setSelected(null);
 			}
-			if (button.dataset.lxGraph === "details") setExpanded((v) => !v);
 			if (button.dataset.lxGraph === "node") setSelected((v) => v === button.dataset.node ? null : button.dataset.node);
 			if (button.dataset.lxGraph === "clear") setSelected(null);
-			if (button.dataset.lxGraph === "visual" || button.dataset.lxGraph === "raw") setView(button.dataset.lxGraph);
 		};
 		const keydown = (e) => {
-			if ((e.key === "Enter" || e.key === " ") && e.target.matches("[data-lx-graph=\"node\"]")) {
+			if ((e.key === "Enter" || e.key === " ") && e.target.matches("[data-lx-graph=\"node\"],[data-lx-graph=\"edge\"]")) {
 				e.preventDefault();
 				click(e);
 			}
@@ -2698,85 +3143,68 @@ function ExplanationGraph({ data }) {
 			element?.removeEventListener("click", click);
 			element?.removeEventListener("keydown", keydown);
 		};
-	}, []);
-	const active = new Set(selected ? [selected, ...edges.filter((e) => e.source === selected || e.target === selected).flatMap((e) => [e.source, e.target])] : nodes);
+	}, [
+		onPair,
+		onClearPair,
+		selected
+	]);
+	const active = new Set(selected ? [selected, ...edges.filter((e) => e.source === selected || e.target === selected).flatMap((e) => [e.source, e.target])] : selectedPair.length ? selectedPair : nodes);
 	return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+		className: "lx-network-view",
 		ref: root,
-		children: [
-			/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-				className: "lx-explain-subtitle",
-				children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+		children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+			className: "lx-network-toolbar",
+			children: [
+				/* @__PURE__ */ (0, react_jsx_runtime.jsx)("strong", { children: "因果关系网络" }),
+				/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
 					className: "lx-graph-mode",
-					children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { children: data.mode === "directed" ? "全局因果 · 有向" : "全局因果 · 无向" }), /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(ExplanationHelp, {
+					children: [data.mode === "directed" ? "有向" : "无向", /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(ExplanationHelp, {
 						label: "关系图说明",
-						children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", { children: "连线表示模型发现的关系，数值为关系分数。" }), data.mode === "directed" && cycles.length > 0 && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", { children: "图中含双向或循环关系，不代表确定的因果顺序。" })]
+						children: [
+							/* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", { children: "连线表示模型发现的关系，数值为关系分数。点击变量看分数，点击连线看原始数据。" }),
+							!!isolated.length && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("p", { children: [isolated.length, " 个变量暂无关联连线（当前模型结果）。"] }),
+							data.mode === "directed" && cycles.length > 0 && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", { children: "图中含双向或循环关系，不代表确定的因果顺序。" })
+						]
 					})]
-				}), /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", { children: [
-					allNodes.length,
-					" 个变量 · ",
-					allEdges.length,
-					" 条关系"
-				] })]
-			}),
-			/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-				className: "lx-explain-tabs",
-				"aria-label": "关系数据视图",
-				children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+				}),
+				(selected || focus) && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
 					type: "button",
-					"data-lx-graph": "visual",
-					"aria-pressed": view === "visual",
-					children: "可视化"
-				}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+					"data-lx-graph": "focus",
+					"aria-pressed": !!focus,
+					children: focus ? "显示全部" : "聚焦此变量"
+				}),
+				(selected || selectedPair.length > 0) && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
 					type: "button",
-					"data-lx-graph": "raw",
-					"aria-pressed": view === "raw",
-					children: "原始数据"
-				})]
-			}),
+					"data-lx-graph": "clear",
+					children: "清除高亮"
+				}),
+				/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+					className: "lx-network-actions",
+					children: [toolbar, /* @__PURE__ */ (0, react_jsx_runtime.jsx)(ExplanationExport, {
+						menuLabel: "更多",
+						filename: `${data.target}-关系图`,
+						build: (theme) => graphExportSvg({
+							...data,
+							nodes,
+							edges
+						}, theme, focus ? "目标关系" : "完整网络")
+					})]
+				})
+			]
+		}), /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [
 			/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-				className: "lx-analysis-toolbar",
-				children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-					className: "lx-graph-toolbar",
-					children: [
-						/* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
-							type: "button",
-							"data-lx-graph": "focus",
-							"aria-pressed": focus,
-							children: focus ? "显示全部关系" : "聚焦目标关系"
-						}),
-						/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { children: focus ? `当前 ${nodes.length} 个变量 · ${edges.length} 条关系` : "完整网络 · 点击变量高亮关联" }),
-						selected && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
-							type: "button",
-							"data-lx-graph": "clear",
-							children: "清除高亮"
-						})
-					]
-				}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)(ExplanationExport, {
-					filename: `${data.target}-关系图`,
-					build: (theme) => graphExportSvg({
-						...data,
-						nodes,
-						edges
-					}, theme, focus ? "目标关系" : "完整网络")
-				})]
-			}),
-			view === "raw" ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)(ExplanationDataTable, { data: {
-				...data,
-				edges
-			} }) : /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [
-				/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+				className: `lx-network-stage${detail ? " has-detail" : ""}`,
+				children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
 					className: "lx-graph-scroll",
+					ref: canvas,
 					children: /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("svg", {
-						className: "lx-causal-graph",
+						className: "lx-causal-graph lx-network-svg",
 						viewBox: `0 0 ${width} ${height}`,
-						style: {
-							minWidth: Math.min(width, 720),
-							maxHeight: 460
-						},
+						style: { minWidth: 520 },
 						role: "group",
 						"aria-label": `${nodes.length} 个变量、${edges.length} 条真实${data.mode === "directed" ? "有向" : "无向"}关系`,
 						children: [
-							/* @__PURE__ */ (0, react_jsx_runtime.jsx)("defs", { children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)("marker", {
+							/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("defs", { children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("marker", {
 								id: `lx-arrow-${id}`,
 								markerWidth: "7",
 								markerHeight: "7",
@@ -2788,29 +3216,84 @@ function ExplanationGraph({ data }) {
 									fill: "none",
 									stroke: "#6f8ebd"
 								})
-							}) }),
+							}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("marker", {
+								id: `lx-orange-arrow-${id}`,
+								markerWidth: "7",
+								markerHeight: "7",
+								refX: "6",
+								refY: "3.5",
+								orient: "auto",
+								children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)("path", {
+									d: "M 0 1 L 6 3.5 L 0 6",
+									fill: "none",
+									stroke: "#ff5b2a"
+								})
+							})] }),
 							edges.map((e, i) => {
 								const a = positions.get(e.source), b = positions.get(e.target);
 								if (!a || !b) return null;
 								const right = b[0] > a[0], same = b[0] === a[0];
 								const ax = a[0] + (right || same ? 68 : -68), bx = b[0] + (right ? -68 : 68);
-								const path = same ? `M ${ax} ${a[1]} C ${ax + 30} ${a[1]}, ${bx + 30} ${b[1]}, ${bx} ${b[1]}` : `M ${ax} ${a[1]} C ${(ax + bx) / 2} ${a[1]}, ${(ax + bx) / 2} ${b[1]}, ${bx} ${b[1]}`;
-								const emphasized = !selected || e.source === selected || e.target === selected;
+								const port = (node, other, outgoing) => {
+									const peers = edges.filter((edge) => outgoing ? edge.source === node : edge.target === node).map((edge) => outgoing ? edge.target : edge.source).sort((x, y) => (positions.get(x)?.[1] ?? 0) - (positions.get(y)?.[1] ?? 0));
+									return peers.length > 1 ? -14 + 28 * peers.indexOf(other) / (peers.length - 1) : 0;
+								};
+								const ay = a[1] + port(e.source, e.target, true), by = b[1] + port(e.target, e.source, false);
+								const path = same ? `M ${ax} ${ay} C ${ax + 30} ${ay}, ${bx + 30} ${by}, ${bx} ${by}` : `M ${ax} ${ay} C ${(ax + bx) / 2} ${ay}, ${(ax + bx) / 2} ${by}, ${bx} ${by}`;
+								const chosen = selectedPair[0] === e.source && selectedPair[1] === e.target;
+								const emphasized = selectedPair.length ? chosen : !selected || e.source === selected || e.target === selected;
 								return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("g", {
+									"data-lx-graph": "edge",
+									"data-source": e.source,
+									"data-target": e.target,
+									className: "lx-graph-edge-button",
+									"aria-pressed": chosen,
+									role: "button",
+									tabIndex: 0,
+									"aria-label": `查看${label(e.source)}到${label(e.target)}的关系`,
 									opacity: emphasized ? 1 : .12,
-									children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("path", {
-										className: "lx-causal-edge",
-										d: path,
-										style: { strokeWidth: selected && emphasized ? 2.1 : 1.25 },
-										markerEnd: data.mode === "directed" ? `url(#lx-arrow-${id})` : void 0,
-										children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)("title", { children: `${label(e.source)} ${data.mode === "directed" ? "→" : "—"} ${label(e.target)}：${number(e.weight)}` })
-									}), edges.length <= 5 && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("text", {
-										x: (ax + bx) / 2,
-										y: (a[1] + b[1]) / 2 - 7,
-										textAnchor: "middle",
-										fontSize: "11",
-										children: number(e.weight)
-									})]
+									children: [
+										/* @__PURE__ */ (0, react_jsx_runtime.jsx)("path", {
+											d: path,
+											fill: "none",
+											stroke: "transparent",
+											strokeWidth: "12",
+											style: { cursor: "pointer" }
+										}),
+										/* @__PURE__ */ (0, react_jsx_runtime.jsx)("path", {
+											className: "lx-causal-edge",
+											d: path,
+											style: {
+												stroke: chosen ? "#ff5b2a" : void 0,
+												strokeWidth: chosen ? 2.6 : selected && emphasized ? 2.1 : 1.25
+											},
+											markerEnd: data.mode === "directed" ? `url(#${chosen ? "lx-orange-arrow" : "lx-arrow"}-${id})` : void 0,
+											children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)("title", { children: `${label(e.source)} ${data.mode === "directed" ? "→" : "—"} ${label(e.target)}：${number(e.weight)}` })
+										}),
+										(chosen || (selected ? emphasized : focus)) && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("g", {
+											transform: `translate(${same ? ax + 22.5 : (ax + bx) / 2},${(ay + by) / 2})`,
+											className: "lx-edge-score",
+											children: [
+												/* @__PURE__ */ (0, react_jsx_runtime.jsx)("title", { children: `模型关系分数 ${e.weight}；来源 result.edges[].weight` }),
+												/* @__PURE__ */ (0, react_jsx_runtime.jsx)("rect", {
+													x: "-23",
+													y: "-9",
+													width: "46",
+													height: "18",
+													rx: "4",
+													fill: "var(--dsw-alias-background-primary,#fff)",
+													stroke: chosen ? "#ff5b2a" : "#cbd7e8"
+												}),
+												/* @__PURE__ */ (0, react_jsx_runtime.jsx)("text", {
+													y: "4",
+													textAnchor: "middle",
+													fontSize: "10",
+													style: { fill: chosen ? "#ff5b2a" : void 0 },
+													children: e.weight.toFixed(3)
+												})
+											]
+										})
+									]
 								}, i);
 							}),
 							nodes.map((n) => {
@@ -2856,33 +3339,596 @@ function ExplanationGraph({ data }) {
 							})
 						]
 					})
+				}), detail && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("aside", {
+					className: "lx-network-detail",
+					"aria-label": "关系原值预览",
+					children: detail
+				})]
+			}),
+			/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+				className: "lx-network-count",
+				children: [
+					nodes.length,
+					" 个变量 · ",
+					edges.length,
+					" 条关系"
+				]
+			}),
+			!edges.length && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
+				className: "lx-explain-foot",
+				children: "当前返回结果未发现与目标直接相连的关系。"
+			})
+		] })]
+	});
+}
+
+//#endregion
+//#region src/client/relationship-data.ts
+function graphEdges(data, t) {
+	const names = data.nodes ?? [];
+	return names.flatMap((source, i) => names.flatMap((target, j) => {
+		const weight = data.graph_weights?.[i]?.[j];
+		return i !== j && typeof weight === "number" && Number.isFinite(weight) && weight > 0 && weight >= t ? [{
+			source,
+			target,
+			weight
+		}] : [];
+	}));
+}
+function graphConclusion(data) {
+	const edges = data.edges ?? [], target = data.target_label ?? data.target, label = (n) => data.labels?.[n] ?? n;
+	const connected = edges.filter((e) => data.mode === "directed" ? e.target === data.target : e.target === data.target || e.source === data.target).sort((a, b) => b.weight - a.weight);
+	if (!edges.length) return "当前结果未检出关系。可以检查数据范围与分析条件，不能据此认定变量之间没有实际联系。";
+	if (!connected.length) return `当前显示 ${edges.length} 条变量关系，但未检出${target}的${data.mode === "directed" ? "入向" : "直接"}关系。`;
+	return `模型发现 ${connected.length} 条与${target}${data.mode === "directed" ? "相连的入向" : "直接相连的"}关系，分数较高的包括${connected.slice(0, 3).map((e) => label(e.source === data.target ? e.target : e.source)).join("、")}。点击关系可查看对应分数与原始数据。`;
+}
+function rankedRelations(data) {
+	return (data.comparison?.records ?? []).filter((r) => r.left_present || r.right_present).slice().sort((a, b) => Math.abs(b.right_weight - b.left_weight) - Math.abs(a.right_weight - a.left_weight) || a.source.localeCompare(b.source) || a.target.localeCompare(b.target));
+}
+
+//#endregion
+//#region src/client/RelationshipView.tsx
+function Matrix({ data, threshold, onPair, selectedPair = [] }) {
+	const root = (0, react.useRef)(null), names = data.nodes ?? [], weights = data.graph_weights;
+	(0, react.useEffect)(() => {
+		const node = root.current;
+		const click = (e) => {
+			const hit = e.target.closest("[data-pair]");
+			if (hit && node?.contains(hit)) {
+				const [i, j] = hit.dataset.pair.split(",").map(Number);
+				onPair?.(names[i], names[j]);
+			}
+		};
+		const key = (e) => {
+			if (e.key === "Enter" || e.key === " ") {
+				e.preventDefault();
+				click(e);
+			}
+		};
+		node?.addEventListener("click", click);
+		node?.addEventListener("keydown", key);
+		return () => {
+			node?.removeEventListener("click", click);
+			node?.removeEventListener("keydown", key);
+		};
+	}, [names, onPair]);
+	if (!weights) return /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
+		className: "lx-explain-foot",
+		children: "此历史结果未保存完整关系矩阵；仍可查看网络与关系明细。"
+	});
+	const size = 24, left = 120, top = 95, w = left + names.length * size + 20, h = top + names.length * size + 30;
+	return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+		className: "lx-graph-scroll lx-relationship-matrix",
+		ref: root,
+		children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("svg", {
+			className: "lx-causal-graph lx-matrix-svg",
+			viewBox: `0 0 ${w} ${h}`,
+			style: {
+				minWidth: Math.min(w, 420),
+				maxHeight: 400
+			},
+			role: "group",
+			"aria-label": "关系矩阵，行来源、列去向",
+			children: [names.map((a, i) => /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("g", { children: [
+				/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("text", {
+					x: left - 8,
+					y: top + i * size + 16,
+					textAnchor: "end",
+					fontSize: "10",
+					children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("title", { children: data.labels?.[a] ?? a }), (data.labels?.[a] ?? a).length > 12 ? (data.labels?.[a] ?? a).slice(0, 10) + "…" : data.labels?.[a] ?? a]
 				}),
-				!edges.length && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
-					className: "lx-explain-foot",
-					children: "当前返回结果未发现与目标直接相连的关系。"
+				/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("text", {
+					transform: `translate(${left + i * size + 13},${top - 10}) rotate(-45)`,
+					fontSize: "10",
+					children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("title", { children: data.labels?.[a] ?? a }), (data.labels?.[a] ?? a).length > 12 ? (data.labels?.[a] ?? a).slice(0, 10) + "…" : data.labels?.[a] ?? a]
 				}),
-				!!isolated.length && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("p", {
-					className: "lx-explain-foot",
-					children: [isolated.length, " 个变量未检出连线"]
-				}),
-				/* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
-					type: "button",
-					className: "lx-explain-toggle",
-					"data-lx-graph": "details",
-					"aria-expanded": expanded,
-					children: expanded ? "收起关系明细 ↑" : `查看 ${edges.length} 条关系明细 ↓`
-				}),
-				expanded && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("ul", {
-					className: "lx-edge-list",
-					children: edges.map((e, i) => /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("li", { children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", { children: [
-						label(e.source),
-						" ",
-						data.mode === "directed" ? "→" : "—",
-						" ",
-						label(e.target)
-					] }), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { children: number(e.weight) })] }, i))
+				names.map((b, j) => {
+					const v = weights[i][j], shown = i !== j && v > 0 && (threshold === void 0 || v >= threshold);
+					return /* @__PURE__ */ (0, react_jsx_runtime.jsx)("rect", {
+						"data-pair": `${i},${j}`,
+						stroke: selectedPair[0] === a && selectedPair[1] === b ? "#ff5b2a" : void 0,
+						strokeWidth: "2",
+						role: onPair ? "button" : void 0,
+						tabIndex: onPair ? 0 : void 0,
+						"aria-label": `${data.labels?.[a] ?? a} 到 ${data.labels?.[b] ?? b}，分数 ${number(v)}`,
+						x: left + j * size,
+						y: top + i * size,
+						width: size - 1,
+						height: size - 1,
+						fill: shown ? `color-mix(in srgb,#4168a9 ${Math.max(0, Math.min(1, v)) * 100}%,var(--dsw-alias-background-primary,#fff))` : "var(--dsw-alias-interactive-bg-hover,#f0f2f5)",
+						style: { cursor: onPair ? "pointer" : void 0 },
+						children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)("title", { children: `${a} → ${b}：${number(v)}${shown ? "" : "，当前未显示连线"}` })
+					}, b);
 				})
-			] })
+			] }, a)), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("text", {
+				x: left,
+				y: h - 5,
+				fontSize: "11",
+				children: "行：来源变量 → 列：去向变量"
+			})]
+		}), /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+			className: "lx-explain-foot",
+			children: [
+				"分数 0 ",
+				/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { style: {
+					display: "inline-block",
+					width: 100,
+					height: 8,
+					background: "linear-gradient(90deg,var(--dsw-alias-background-primary,#fff),#4168a9)"
+				} }),
+				" 1 · 浅灰：未达到显示阈值或对角项"
+			]
+		})]
+	});
+}
+function Scatter({ data, a, b, bounds, color = "#4168a9" }) {
+	const names = data.graph_sample_names ?? [], i = names.indexOf(a), j = names.indexOf(b), rows$1 = data.graph_samples ?? [];
+	if (i < 0 || j < 0 || !rows$1.length) return /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
+		className: "lx-explain-foot",
+		children: "此结果没有可用的原始数据预览。"
+	});
+	const xs = rows$1.map((r) => r[i]), ys = rows$1.map((r) => r[j]), minX = bounds?.[0] ?? Math.min(...xs), maxX = bounds?.[1] ?? Math.max(...xs), minY = bounds?.[2] ?? Math.min(...ys), maxY = bounds?.[3] ?? Math.max(...ys);
+	return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("svg", {
+		className: "lx-causal-graph",
+		viewBox: "0 0 300 225",
+		"aria-label": "原始数据散点图",
+		role: "img",
+		children: [
+			/* @__PURE__ */ (0, react_jsx_runtime.jsx)("path", {
+				d: "M45 20V175H285",
+				fill: "none",
+				stroke: "#bdc8d6"
+			}),
+			rows$1.map((r, k) => /* @__PURE__ */ (0, react_jsx_runtime.jsx)("circle", {
+				cx: 45 + (r[i] - minX) / (maxX - minX || 1) * 235,
+				cy: 175 - (r[j] - minY) / (maxY - minY || 1) * 145,
+				r: "1.7",
+				fill: color,
+				opacity: ".3"
+			}, k)),
+			/* @__PURE__ */ (0, react_jsx_runtime.jsx)("text", {
+				x: "45",
+				y: "194",
+				fontSize: "10",
+				children: number(minX)
+			}),
+			/* @__PURE__ */ (0, react_jsx_runtime.jsx)("text", {
+				x: "280",
+				y: "194",
+				textAnchor: "end",
+				fontSize: "10",
+				children: number(maxX)
+			}),
+			/* @__PURE__ */ (0, react_jsx_runtime.jsx)("text", {
+				x: "40",
+				y: "32",
+				textAnchor: "end",
+				fontSize: "10",
+				children: number(maxY)
+			}),
+			/* @__PURE__ */ (0, react_jsx_runtime.jsx)("text", {
+				x: "40",
+				y: "175",
+				textAnchor: "end",
+				fontSize: "10",
+				children: number(minY)
+			}),
+			/* @__PURE__ */ (0, react_jsx_runtime.jsx)("text", {
+				x: "160",
+				y: "216",
+				textAnchor: "middle",
+				fontSize: "11",
+				children: data.labels?.[a] ?? a
+			}),
+			/* @__PURE__ */ (0, react_jsx_runtime.jsx)("text", {
+				x: "45",
+				y: "12",
+				fontSize: "11",
+				children: data.labels?.[b] ?? b
+			})
+		]
+	}), /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("p", {
+		className: "lx-explain-foot",
+		children: [rows$1.length === (data.input_rows ?? rows$1.length) ? `${rows$1.length} 条样本` : `展示 ${rows$1.length} / ${data.input_rows} 条样本`, /* @__PURE__ */ (0, react_jsx_runtime.jsx)(ExplanationHelp, {
+			label: "散点图说明",
+			children: /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("p", { children: ["散点展示两个变量的原始观测值及数据关联。", rows$1.length !== (data.input_rows ?? rows$1.length) ? "预览采用等距抽样。" : ""] })
+		})]
+	})] });
+}
+function RelationshipView({ data }) {
+	const root = (0, react.useRef)(null), [view, setView] = (0, react.useState)("network"), [threshold, setThreshold] = (0, react.useState)(void 0), [pair, setPair] = (0, react.useState)([]);
+	const clearPair = (0, react.useCallback)(() => setPair([]), []);
+	const select = (0, react.useCallback)((a$1, b$1) => setPair([a$1, b$1]), []), t = threshold ?? data.graph_threshold ?? void 0;
+	(0, react.useEffect)(() => {
+		const node = root.current;
+		const click = (e) => {
+			const b$1 = e.target.closest("[data-relationship]");
+			if (b$1 && node?.contains(b$1)) if (b$1.dataset.relationship === "close") setPair([]);
+			else if (b$1.dataset.relationship === "default") {
+				setThreshold(void 0);
+				setPair([]);
+			} else {
+				setView(b$1.dataset.relationship);
+				setPair([]);
+			}
+		};
+		const change = (e) => {
+			const x = e.target;
+			if (x.matches("[data-relationship-threshold]")) {
+				setThreshold(Number(x.value));
+				setPair([]);
+			}
+			if (x.matches("[data-relationship-pair]")) {
+				const [a$1, b$1] = x.value.split(",").map(Number);
+				select(data.nodes[a$1], data.nodes[b$1]);
+			}
+		};
+		node?.addEventListener("click", click);
+		node?.addEventListener("change", change);
+		node?.addEventListener("input", change);
+		return () => {
+			node?.removeEventListener("click", click);
+			node?.removeEventListener("change", change);
+			node?.removeEventListener("input", change);
+		};
+	}, [data, select]);
+	if (data.comparison) return /* @__PURE__ */ (0, react_jsx_runtime.jsx)(Comparison, { data });
+	const edges = threshold === void 0 ? data.edges ?? [] : graphEdges(data, threshold), shown = {
+		...data,
+		edges
+	}, names = data.nodes ?? [], a = pair[0], b = pair[1], score = a && b ? data.graph_weights?.[names.indexOf(a)]?.[names.indexOf(b)] : void 0;
+	const detail = a && b ? /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [
+		/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+			className: "lx-network-detail-head",
+			children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("strong", { children: [
+				data.labels?.[a] ?? a,
+				" ",
+				data.mode === "directed" ? "→" : "—",
+				" ",
+				data.labels?.[b] ?? b
+			] }), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+				"data-relationship": "close",
+				"aria-label": "关闭原值预览",
+				children: "×"
+			})]
+		}),
+		/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+			className: "lx-explain-foot",
+			title: "接口字段：result.edges[].weight；完整矩阵 result.edge_weights",
+			children: [
+				"模型关系分数 ",
+				number(score ?? edges.find((e) => e.source === a && e.target === b)?.weight ?? 0),
+				a === b ? " · 对角项" : ""
+			]
+		}),
+		/* @__PURE__ */ (0, react_jsx_runtime.jsx)(Scatter, {
+			data,
+			a,
+			b
+		})
+	] }) : null;
+	const settings = data.mode === "directed" && data.graph_weights && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("details", {
+		className: "lx-relationship-settings",
+		children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("summary", {
+			"aria-label": "图表显示设置",
+			title: "图表显示设置",
+			children: /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("svg", {
+				width: "18",
+				height: "18",
+				viewBox: "0 0 24 24",
+				fill: "none",
+				stroke: "currentColor",
+				strokeWidth: "1.5",
+				children: [
+					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("path", { d: "M4 7h6m4 0h6M4 17h10m4 0h2" }),
+					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("circle", {
+						cx: "12",
+						cy: "7",
+						r: "2"
+					}),
+					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("circle", {
+						cx: "16",
+						cy: "17",
+						r: "2"
+					})
+				]
+			})
+		}), /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+			className: "lx-analysis-toolbar",
+			children: [
+				/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("label", { children: [
+					"显示阈值 ",
+					t === void 0 ? "服务端默认" : number(t),
+					" ",
+					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("input", {
+						"aria-label": "关系显示阈值",
+						"data-relationship-threshold": true,
+						type: "range",
+						min: "0",
+						max: "1",
+						step: "0.01",
+						value: t ?? 0,
+						onChange: () => {}
+					})
+				] }),
+				/* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+					"data-relationship": "default",
+					children: "恢复服务端结果"
+				}),
+				/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+					className: "lx-explain-foot",
+					children: "仅调整显示，不重新计算"
+				})
+			]
+		})]
+	});
+	const auxiliary = /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+		title: "以矩阵查看同一份关系分数",
+		"data-relationship": "matrix",
+		children: "关系矩阵"
+	}), settings] });
+	return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+		className: "lx-relationship-view",
+		ref: root,
+		children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
+			className: "lx-insight",
+			role: "status",
+			children: graphConclusion(shown)
+		}), view === "matrix" ? /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+			className: "lx-network-toolbar",
+			children: [
+				/* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+					"data-relationship": "network",
+					children: "← 返回关系网络"
+				}),
+				/* @__PURE__ */ (0, react_jsx_runtime.jsx)("strong", { children: "关系矩阵" }),
+				/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+					className: "lx-network-actions",
+					children: settings
+				})
+			]
+		}), /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+			className: `lx-network-stage lx-matrix-stage${detail ? " has-detail" : ""}`,
+			children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)(Matrix, {
+				data,
+				threshold: t,
+				onPair: select,
+				selectedPair: pair
+			}), detail && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("aside", {
+				className: "lx-network-detail",
+				children: detail
+			})]
+		})] }) : /* @__PURE__ */ (0, react_jsx_runtime.jsx)(ExplanationGraph, {
+			data: shown,
+			toolbar: auxiliary,
+			onPair: select,
+			detail,
+			selectedPair: pair,
+			onClearPair: clearPair
+		})]
+	});
+}
+function Comparison({ data }) {
+	const root = (0, react.useRef)(null), [selected, setSelected] = (0, react.useState)(null), [expanded, setExpanded] = (0, react.useState)(false), [panel, setPanel] = (0, react.useState)(null);
+	const c = data.comparison, records = rankedRelations(data), key = (r) => JSON.stringify([r.source, r.target]);
+	const common = records.filter((r) => r.left_present && r.right_present).length, left = records.filter((r) => r.left_present && !r.right_present).length, right = records.filter((r) => !r.left_present && r.right_present).length;
+	const label = (n) => data.labels?.[n] ?? n, top = records[0], chosen = records.find((r) => key(r) === selected);
+	(0, react.useEffect)(() => {
+		const el = root.current;
+		const click = (e) => {
+			const b = e.target.closest("[data-compare-pair],[data-compare-expand],[data-compare-panel]");
+			if (!b || !el?.contains(b)) return;
+			if (b.hasAttribute("data-compare-panel")) {
+				const next = b.dataset.comparePanel;
+				setPanel((v) => next === "close" || v === next ? null : next);
+			} else if (b.hasAttribute("data-compare-expand")) setExpanded((v) => !v);
+			else {
+				const k = b.dataset.comparePair;
+				setSelected((v) => v === k ? null : k);
+			}
+		};
+		el?.addEventListener("click", click);
+		return () => el?.removeEventListener("click", click);
+	}, []);
+	const points = chosen ? [c.left, c.right].flatMap((g) => {
+		const i = g.graph_sample_names?.indexOf(chosen.source) ?? -1, j = g.graph_sample_names?.indexOf(chosen.target) ?? -1;
+		return i < 0 || j < 0 ? [] : (g.graph_samples ?? []).filter((r) => Number.isFinite(r[i]) && Number.isFinite(r[j])).map((r) => [r[i], r[j]]);
+	}) : [];
+	const bounds = points.length ? [
+		Math.min(...points.map((p) => p[0])),
+		Math.max(...points.map((p) => p[0])),
+		Math.min(...points.map((p) => p[1])),
+		Math.max(...points.map((p) => p[1]))
+	] : void 0;
+	const colors$1 = ["#4168a9", "#248575"], groups = [c.left, c.right];
+	const hasRaw = groups.some((g) => g.graph_samples?.length);
+	return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+		ref: root,
+		className: "lx-scenario",
+		children: [
+			/* @__PURE__ */ (0, react_jsx_runtime.jsx)("style", { children: `.lx-scenario{font-size:12px;width:100%}.lx-fullscreen-dialog[open] .lx-scenario-matrices .lx-matrix-svg{height:400px;flex:none;max-height:400px!important}.lx-scenario-summary{margin-bottom:16px}.lx-scenario-summary strong{font-weight:600}.lx-scenario-legend{display:flex;flex-wrap:wrap;gap:10px 24px;margin:12px 0;color:var(--dsw-alias-label-secondary)}.lx-scenario-legend i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:6px}.lx-scenario-context{color:var(--dsw-alias-label-secondary);margin:10px 0 18px}.lx-scenario-context summary{cursor:pointer}.lx-scenario-context p{line-height:1.65;max-width:900px}.lx-scenario-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:12px 0}.lx-scenario-meta{font-size:11px;color:var(--dsw-alias-label-secondary)}.lx-scenario-actions{display:flex;align-items:center;gap:16px}.lx-scenario-actions .lx-action-menu>summary{color:var(--dsw-alias-label-secondary)}.lx-scenario-panel-head{display:flex;align-items:center;justify-content:space-between;gap:12px}.lx-scenario-panel{padding:12px 16px;margin:0 0 16px;background:var(--dsw-alias-interactive-bg-hover,#f5f6f8);border-radius:6px}.lx-scenario-panel-head button{font:inherit;color:var(--dsw-alias-label-secondary)}.lx-scenario-list{display:grid;gap:0}.lx-scenario-item{border-top:1px solid var(--dsw-alias-border-primary,#ddd)}.lx-scenario-pair{display:grid;grid-template-columns:minmax(160px,1fr) minmax(170px,1.4fr) minmax(110px,.75fr);gap:22px;align-items:center;width:100%;padding:14px 10px!important;text-align:left!important;color:inherit!important;font:inherit!important;background:transparent;border:0;cursor:pointer}.lx-scenario-pair:disabled{opacity:1!important;cursor:default}.lx-scenario-pair[aria-expanded=true]{background:color-mix(in srgb,#4168a9 5%,transparent)}.lx-scenario-name{font-weight:500;overflow-wrap:anywhere}.lx-scenario-name small{display:block;margin-top:5px;font-weight:400;font-size:11px;color:var(--dsw-alias-label-secondary)}.lx-scenario-bars{display:grid;gap:7px}.lx-scenario-bar{display:grid;grid-template-columns:minmax(0,1fr) 52px;gap:10px;align-items:center}.lx-scenario-track{position:relative;background:var(--dsw-alias-interactive-bg-hover,#f0f2f5);height:9px;border-radius:2px}.lx-scenario-fill{height:100%;border-radius:2px}.lx-scenario-threshold{position:absolute;top:-2px;bottom:-2px;border-left:1px dashed var(--dsw-alias-label-secondary,#888)}.lx-scenario-value{font-variant-numeric:tabular-nums;text-align:right}.lx-scenario-status{font-size:11px;color:var(--dsw-alias-label-secondary);line-height:1.6}.lx-scenario-scatter{padding:14px 18px;background:color-mix(in srgb,#4168a9 3%,transparent)}.lx-scenario-scatter .lx-relationship-columns{max-width:760px;margin:0 auto;gap:32px}.lx-scenario-scatter .lx-causal-graph{max-height:220px;width:100%}.lx-scenario-expand{margin:12px 0}.lx-scenario-matrices .lx-relationship-columns{margin-top:16px}@container(max-width:650px){.lx-scenario-pair{grid-template-columns:minmax(100px,1fr) minmax(130px,1.3fr);gap:12px}.lx-scenario-status{grid-column:1/-1}.lx-scenario-heading{align-items:flex-start;flex-direction:column}}` }),
+			/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+				className: "lx-insight lx-scenario-summary",
+				children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("strong", { children: top && Math.abs(top.right_weight - top.left_weight) > 0 ? `分数差异最大的是“${label(top.source)} → ${label(top.target)}”，两组相差 ${number(Math.abs(top.right_weight - top.left_weight))}。` : records.length ? "两组已显示关系的分数相同。" : "共同阈值下，两组均无显示关系。" }), /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", { children: [
+					"两组共同显示 ",
+					common,
+					" 条关系；仅",
+					c.left.label,
+					"达到阈值的有 ",
+					left,
+					" 条，仅",
+					c.right.label,
+					"达到阈值的有 ",
+					right,
+					" 条。"
+				] })]
+			}),
+			/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+				className: "lx-scenario-legend",
+				children: groups.map((g, i) => /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", { children: [
+					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("i", { style: { background: colors$1[i] } }),
+					g.label,
+					" · ",
+					g.input_rows ?? "未知",
+					" 条样本"
+				] }, i))
+			}),
+			/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+				className: "lx-scenario-heading",
+				children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("strong", { children: "重点关系对比" }), /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+					className: "lx-scenario-actions",
+					children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
+						className: "lx-scenario-meta",
+						children: ["按分数差异排序 · 共用 0—1 刻度 · 虚线为阈值 ", number(c.threshold)]
+					}), /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(ActionMenu, {
+						label: "更多",
+						children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+							type: "button",
+							"data-compare-panel": "context",
+							"aria-pressed": panel === "context",
+							children: "分组依据与比较口径"
+						}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+							type: "button",
+							"data-compare-panel": "matrix",
+							"aria-pressed": panel === "matrix",
+							children: "关系矩阵"
+						})]
+					})]
+				})]
+			}),
+			panel && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("section", {
+				className: "lx-scenario-panel",
+				"aria-label": panel === "context" ? "分组依据与比较口径" : "关系矩阵",
+				children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+					className: "lx-scenario-panel-head",
+					children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("strong", { children: panel === "context" ? "分组依据与比较口径" : "关系矩阵" }), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+						type: "button",
+						"data-compare-panel": "close",
+						"aria-label": "收起辅助内容",
+						children: "收起 ↑"
+					})]
+				}), panel === "context" ? /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+					className: "lx-scenario-context",
+					children: [
+						/* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", { children: c.description }),
+						/* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", { children: c.left.model_type && c.left.model_type === c.right.model_type ? `两组服务返回模型：${c.left.model_type}。` : "此历史结果未保存一致的模型标识，模型口径尚未核验。" }),
+						/* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", { children: "关系分数来自两组独立的模型探索，不是影响幅度或因果概率。样本与取值范围的差异也会影响分数，适合作为进一步核查的线索。" }),
+						!hasRaw && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", { children: "此历史对比未保存原始样本，暂不提供散点预览。" })
+					]
+				}) : /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+					className: "lx-scenario-matrices",
+					children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+						className: "lx-relationship-columns",
+						children: groups.map((g, i) => /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("strong", { children: g.label }), /* @__PURE__ */ (0, react_jsx_runtime.jsx)(Matrix, {
+							data: {
+								...g,
+								nodes: data.nodes,
+								graph_weights: data.nodes.map((a) => data.nodes.map((b) => g.graph_weights[g.nodes.indexOf(a)][g.nodes.indexOf(b)]))
+							},
+							threshold: c.threshold
+						})] }, i))
+					})
+				})]
+			}),
+			/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+				className: "lx-scenario-list",
+				children: (expanded ? records : records.slice(0, 5)).map((r) => /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+					className: "lx-scenario-item",
+					children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("button", {
+						type: "button",
+						className: "lx-scenario-pair",
+						"data-compare-pair": key(r),
+						"aria-expanded": selected === key(r),
+						disabled: !hasRaw,
+						children: [
+							/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
+								className: "lx-scenario-name",
+								children: [
+									label(r.source),
+									" → ",
+									label(r.target),
+									/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("small", { children: ["分数相差 ", number(Math.abs(r.right_weight - r.left_weight))] })
+								]
+							}),
+							/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+								className: "lx-scenario-bars",
+								children: [r.left_weight, r.right_weight].map((v, i) => /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
+									className: "lx-scenario-bar",
+									"aria-label": `${groups[i].label}：${number(v)}`,
+									children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
+										className: "lx-scenario-track",
+										children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+											className: "lx-scenario-fill",
+											style: {
+												display: "block",
+												width: `${Math.max(0, Math.min(1, v)) * 100}%`,
+												background: colors$1[i]
+											}
+										}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+											className: "lx-scenario-threshold",
+											style: { left: `${c.threshold * 100}%` }
+										})]
+									}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+										className: "lx-scenario-value",
+										children: number(v)
+									})]
+								}, i))
+							}),
+							/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
+								className: "lx-scenario-status",
+								children: [r.left_present && r.right_present ? "两组均达到显示阈值" : `仅${r.left_present ? c.left.label : c.right.label}达到显示阈值`, hasRaw && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("br", {}), selected === key(r) ? "收起原始数据 ↑" : "查看原始数据 ↓"] })]
+							})
+						]
+					}), selected === key(r) && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+						className: "lx-scenario-scatter",
+						children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+							className: "lx-relationship-columns",
+							children: groups.map((g, i) => /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("strong", {
+								style: { color: colors$1[i] },
+								children: g.label
+							}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)(Scatter, {
+								data: {
+									...g,
+									labels: data.labels
+								},
+								a: r.source,
+								b: r.target,
+								bounds,
+								color: colors$1[i]
+							})] }, i))
+						}), bounds && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
+							className: "lx-explain-foot",
+							children: "两组共用坐标范围，散点展示原始观测值。"
+						})]
+					})]
+				}, key(r)))
+			}),
+			records.length > 5 && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+				type: "button",
+				className: "lx-scenario-expand",
+				"data-compare-expand": true,
+				children: expanded ? "收起重点关系 ↑" : `查看全部 ${records.length} 条关系 ↓`
+			})
 		]
 	});
 }
@@ -2890,6 +3936,32 @@ function ExplanationGraph({ data }) {
 //#endregion
 //#region src/client/ExplanationView.tsx
 const CSS$3 = `
+.lx-fullscreen-dialog[open]>.lx-relationship-card{height:100dvh;min-height:0;display:flex;flex-direction:column;overflow:hidden}
+.lx-fullscreen-dialog[open]>.lx-relationship-card>.lx-result-meta:empty{display:none}
+.lx-fullscreen-dialog[open]>.lx-relationship-card>.lx-explain{flex:1;min-height:0;display:flex;flex-direction:column;overflow:auto}
+.lx-fullscreen-dialog[open] .lx-relationship-view,.lx-fullscreen-dialog[open] .lx-network-view{flex:1;min-height:0;display:flex;flex-direction:column}
+.lx-fullscreen-dialog[open] .lx-relationship-view>.lx-insight,.lx-fullscreen-dialog[open] .lx-network-toolbar,.lx-fullscreen-dialog[open] .lx-network-count{flex-shrink:0}
+.lx-fullscreen-dialog[open] .lx-relationship-card>.lx-result-actions{flex-shrink:0}
+.lx-fullscreen-dialog[open] .lx-network-stage{flex:1;min-height:0;overflow:auto;align-items:stretch}
+.lx-fullscreen-dialog[open] .lx-network-stage>.lx-graph-scroll{min-height:0;min-width:0;display:flex;flex-direction:column}
+.lx-fullscreen-dialog[open] .lx-network-stage .lx-network-svg{height:100%;max-height:none!important;min-height:0;flex:1;min-width:0!important}
+.lx-fullscreen-dialog[open] .lx-network-detail{align-self:end}
+.lx-fullscreen-dialog[open] .lx-relationship-matrix{max-width:none}
+.lx-fullscreen-dialog[open] .lx-relationship-matrix>.lx-matrix-svg{height:0;flex:1;min-height:0;min-width:0!important;max-height:none!important}
+.lx-fullscreen-dialog[open] .lx-relationship-matrix>.lx-explain-foot{flex-shrink:0}
+
+.lx-network-toolbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;font-size:12px;margin:12px 0 16px}.lx-network-toolbar strong{font-size:13px}.lx-network-toolbar>button{font-size:11px!important}.lx-network-count,.lx-network-toolbar .lx-graph-mode{color:var(--dsw-alias-label-secondary)}.lx-network-actions{display:flex;align-items:center;gap:16px;margin-left:auto}.lx-network-toolbar .lx-export{margin:0;padding:0}.lx-network-toolbar button,.lx-network-toolbar summary,.lx-network-toolbar strong,.lx-network-toolbar .lx-graph-mode{line-height:22px!important}.lx-network-toolbar .lx-network-actions>button{padding:0!important;font-size:12px!important}.lx-network-toolbar .lx-action-menu>summary{padding:0}.lx-network-count{text-align:right;font-size:11px;margin-top:8px}.lx-network-stage{display:grid;grid-template-columns:minmax(0,1fr);gap:16px;align-items:end}.lx-network-stage.has-detail{grid-template-columns:minmax(0,1fr) 220px}.lx-network-detail{box-sizing:border-box;border:1px solid var(--dsw-alias-border-l3,#dce2eb);border-radius:8px;padding:10px;background:var(--dsw-alias-background-primary,#fff);font-size:12px;min-width:0}.lx-network-detail-head{display:flex;gap:8px;justify-content:space-between;align-items:start}.lx-network-detail-head button{font-size:18px!important;line-height:1!important}.lx-network-detail .lx-explain-foot{margin-top:6px;font-size:10px}.lx-network-detail .lx-causal-graph{height:145px!important;max-height:145px!important;min-width:0!important}.lx-network-stage .lx-network-svg{height:360px;max-height:360px!important}.lx-edge-score{cursor:pointer}.lx-graph-edge-button:focus{outline:none!important}.lx-graph-edge-button:focus-visible .lx-causal-edge{stroke-width:3;stroke-dasharray:4 2}.lx-relationship-nav [data-relationship="matrix"]{margin-left:auto}.lx-relationship-nav{align-items:center}.lx-relationship-settings{position:relative}.lx-relationship-settings summary{list-style:none;cursor:pointer;padding:6px;display:flex}.lx-relationship-settings summary::-webkit-details-marker{display:none}.lx-relationship-settings[open] .lx-analysis-toolbar{position:absolute;z-index:5;right:0;top:32px;width:300px;padding:12px;border:1px solid var(--dsw-alias-border-l3,#dce2eb);border-radius:8px;background:var(--dsw-alias-background-primary,#fff);box-shadow:0 4px 16px #0001;display:flex;flex-wrap:wrap;gap:12px}.lx-matrix-stage{margin-top:16px}.lx-matrix-svg{height:400px;max-height:400px!important}.lx-matrix-stage>.lx-graph-scroll{min-width:0}.lx-network-detail .lx-explain-foot{display:flex;gap:4px;align-items:center}.lx-relationship-matrix{width:100%;max-width:620px;justify-self:center}.lx-relationship-matrix>.lx-explain-foot{text-align:center}.lx-relationship-matrix [data-pair]:focus{outline:none}.lx-relationship-matrix [data-pair]:focus-visible{stroke:#ff5b2a;stroke-width:2}@container(max-width:760px){.lx-network-stage.has-detail{grid-template-columns:1fr}.lx-network-detail{width:min(100%,220px);justify-self:end}}
+
+@container(min-width:1000px){.lx-prediction-comparison{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px}.lx-prediction-comparison>p{grid-column:1/-1}.lx-prediction-comparison>div+div{border-top:0!important;margin-top:0!important;padding-top:0!important}.lx-prediction-comparison .lx-matrix-svg{min-width:0}.lx-prediction-comparison .lx-matrix-expanded .lx-matrix-svg{min-width:650px}}
+.lx-insight{padding:12px 15px;border-left:3px solid #4168a9;background:color-mix(in srgb,#4168a9 5%,transparent);font-size:13px;line-height:1.7;margin:0 0 18px}.lx-relationship-columns{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px}.lx-relationship-detail{margin-top:16px}.lx-relationship-detail select{max-width:100%}.lx-relationship-columns .lx-causal-graph{max-height:380px}@container(max-width:650px){.lx-relationship-columns{grid-template-columns:1fr}}
+.lx-fullscreen-dialog[open]>.lx-contribution-card{height:100dvh;min-height:0;display:flex;flex-direction:column}
+.lx-fullscreen-dialog[open]>.lx-contribution-card>.lx-explain{flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column}
+.lx-fullscreen-dialog[open] .lx-batch-view{flex:1;display:flex;flex-direction:column;min-height:0}
+.lx-fullscreen-dialog[open] .lx-batch-overview{flex:1;min-height:0}
+.lx-fullscreen-dialog[open] .lx-batch-overview:not(:has(.lx-matrix-comparison))>div,.lx-fullscreen-dialog[open] .lx-batch-overview:not(:has(.lx-matrix-comparison))>div>div{height:100%;display:flex;flex-direction:column;min-height:0}
+.lx-fullscreen-dialog[open] .lx-batch-overview .lx-matrix-scroll{flex:1;min-height:0;display:flex}
+.lx-fullscreen-dialog[open] .lx-batch-overview .lx-matrix-svg{height:100%;max-height:none!important;min-height:0}
+.lx-fullscreen-dialog[open] .lx-contribution-card>.lx-result-actions{flex-shrink:0;margin-top:12px}
 .lx-explain{margin:16px 0 8px;container-type:inline-size}
 .lx-explain-head{display:flex;justify-content:space-between;gap:16px;align-items:baseline;margin:0 0 20px}
 .lx-explain-label{font-size:12px;color:var(--dsw-alias-label-secondary);margin-bottom:4px}
@@ -2942,7 +4014,7 @@ const CSS$3 = `
 .lx-graph-toolbar{justify-content:flex-start;margin:4px 0 0}.lx-graph-toolbar button{font-size:11px!important;padding:5px 9px!important;border:1px solid var(--dsw-alias-border-l3,#dce2eb)!important;border-radius:5px!important}
 .lx-analysis-toolbar{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:16px;flex-wrap:wrap}
 .lx-small-button{border:1px solid var(--dsw-alias-border-l3,#dce2eb)!important;border-radius:5px!important;padding:5px 9px!important;font-size:11px!important;white-space:nowrap}
-.lx-filter{flex:1}.lx-filter-panel{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;margin-top:12px;padding:12px;background:var(--dsw-alias-background-secondary,#f7f8fa);border-radius:6px}.lx-filter-panel label{display:grid;gap:6px;font-size:11px;color:var(--dsw-alias-label-secondary)}
+.lx-filter{flex:1}.lx-filter-panel{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;margin-top:12px;padding:10px;background:var(--dsw-alias-background-secondary,#f7f8fa);border-radius:6px}.lx-filter-panel label{display:grid;gap:6px;font-size:11px;color:var(--dsw-alias-label-secondary)}
 .lx-filter input,.lx-filter select,.lx-raw input{box-sizing:border-box;border:1px solid var(--dsw-alias-border-l3,#dce2eb);border-radius:4px;padding:5px 7px;min-height:29px;background:var(--dsw-alias-background-primary,#fff);color:var(--dsw-alias-label-primary,#202734);font:inherit;max-width:220px}.lx-filter-range{display:flex;align-items:center;gap:6px}.lx-filter-range input{width:74px}.lx-filter-actions{display:flex;align-items:center;gap:10px;font-size:11px}.lx-filter-error{width:100%;font-size:11px;color:#986b23;margin:0}
 .lx-filter-summary{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:11px;margin:8px 0 16px;color:var(--dsw-alias-label-secondary)}.lx-filter-summary strong{font-weight:500;color:var(--dsw-alias-label-primary)}
 .lx-export{display:flex;gap:9px;align-items:center;flex-wrap:wrap;font-size:10px;color:var(--dsw-alias-label-secondary);padding-top:5px}.lx-export button{font-size:10px!important;color:var(--dsw-alias-state-business-primary,#3465ce)!important}.lx-export-status:empty{display:none}
@@ -2951,7 +4023,7 @@ const CSS$3 = `
 .lx-raw-toolbar{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:12px 0;font-size:11px;color:var(--dsw-alias-label-secondary)}.lx-raw-toolbar input{width:250px;max-width:70%;font-size:11px}.lx-raw-scroll{overflow:auto;max-height:490px}.lx-raw-table{border-collapse:collapse;width:100%;font-size:11px;font-variant-numeric:tabular-nums;white-space:nowrap}.lx-raw-table th,.lx-raw-table td{text-align:left;padding:7px 10px!important;border-bottom:1px solid var(--dsw-alias-border-l3,#e7e9ed)}.lx-raw-table th{position:sticky;top:0;background:var(--dsw-alias-background-primary,#fff);font-weight:500;color:var(--dsw-alias-label-secondary)}.lx-raw-table button{font-size:11px!important;color:var(--dsw-alias-state-business-primary,#3465ce)!important}
 @container(max-width:520px){.lx-heatmap-heading{display:block}.lx-batch-summary{flex-wrap:wrap}.lx-graph-toolbar{flex-wrap:wrap}}
 `;
-function ExplanationView({ data }) {
+function ExplanationView({ data, showRelationData = false, showPredictionCheck = false, onVisual }) {
 	const [detail, setDetail] = (0, react.useState)(null);
 	const [failure, setFailure] = (0, react.useState)(null), [attempt, setAttempt] = (0, react.useState)(0);
 	const detailKey = batchDetailKey(data), error = failure?.key === detailKey ? failure.message : "";
@@ -2965,14 +4037,14 @@ function ExplanationView({ data }) {
 		return () => element?.removeEventListener("click", click);
 	}, []);
 	(0, react.useEffect)(() => {
-		if (!data.detail_path) return;
+		if (!data.detail_path || !data.detail_sha256 && data.mode !== "local" && !data.graph_sample_count && !data.comparison?.left.graph_sample_count) return;
 		const controller = new AbortController();
 		setFailure(null);
 		setDetail(null);
 		fetch("/limix-ui/artifact?path=" + encodeURIComponent(data.detail_path), { signal: controller.signal }).then(async (response) => {
 			if (!response.ok) throw new Error(`读取失败（${response.status}）`);
-			const value = await response.json();
-			if (!validBatchDetail(value, data)) throw new Error("样本文件与本次结果不一致");
+			const value = data.detail_sha256 ? await parseComparisonDetail(await response.text(), data) : await response.json();
+			if (!data.detail_sha256 && !(data.mode === "local" ? validBatchDetail(value, data) : data.comparison ? validComparisonDetail(value, data) : validGraphDetail(value, data))) throw new Error("样本文件与本次结果不一致");
 			if (!controller.signal.aborted) setDetail({
 				key: detailKey,
 				data: value
@@ -2992,7 +4064,35 @@ function ExplanationView({ data }) {
 		"aria-label": data.mode === "local" ? "样本贡献解释" : "变量关系图",
 		children: [
 			/* @__PURE__ */ (0, react_jsx_runtime.jsx)("style", { children: CSS$3 }),
-			data.mode !== "local" ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)(ExplanationGraph, { data }) : batch ? loaded.samples ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)(ExplanationBatch, { data: loaded }) : /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("p", {
+			data.detail_sha256 && detail?.key !== detailKey ? /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("p", {
+				className: "lx-explain-foot",
+				role: "status",
+				children: [
+					error || "正在加载场景关系对比…",
+					" ",
+					error && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+						"data-lx-explain-retry": true,
+						children: "重试"
+					})
+				]
+			}) : data.mode !== "local" ? /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [showRelationData ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)(ExplanationDataTable, { data: loaded }) : /* @__PURE__ */ (0, react_jsx_runtime.jsx)(RelationshipView, { data: loaded }, detailKey), error && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("p", {
+				role: "alert",
+				className: "lx-explain-foot",
+				children: [
+					"原始数据预览：",
+					error,
+					" ",
+					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+						"data-lx-explain-retry": true,
+						children: "重试"
+					})
+				]
+			})] }) : batch ? loaded.samples ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)(ExplanationBatch, {
+				showPredictionCheck,
+				data: loaded,
+				showRaw: showRelationData,
+				onVisual
+			}) : /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("p", {
 				className: "lx-explain-foot",
 				role: "status",
 				children: [
@@ -3004,7 +4104,10 @@ function ExplanationView({ data }) {
 						children: "重试"
 					})
 				]
-			}) : /* @__PURE__ */ (0, react_jsx_runtime.jsx)(ExplanationSingle, { data }),
+			}) : /* @__PURE__ */ (0, react_jsx_runtime.jsx)(ExplanationSingle, {
+				showPredictionCheck,
+				data
+			}),
 			!!data.risks?.length && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
 				className: "lx-explain-warning",
 				role: "note",
@@ -3396,6 +4499,8 @@ const CSS$1 = `
 function LimixToolCard({ callId, block, inspect, cwd, openFile }) {
 	const settled = !!block && "kind" in block;
 	const [showRaw, setShowRaw] = (0, react.useState)(false);
+	const [showPredictionCheck, setShowPredictionCheck] = (0, react.useState)(false);
+	const [showRelationData, setShowRelationData] = (0, react.useState)(false);
 	const [showMetrics, setShowMetrics] = (0, react.useState)(false);
 	const fullscreen = useCardFullscreen();
 	const rootRef = (0, react.useRef)(null);
@@ -3410,6 +4515,8 @@ function LimixToolCard({ callId, block, inspect, cwd, openFile }) {
 			const hit = e.target.closest?.("[data-lx]");
 			if (!hit || !el.contains(hit)) return;
 			if (hit.dataset.lx === "raw") setShowRaw((s) => !s);
+			else if (hit.dataset.lx === "prediction-check") setShowPredictionCheck((s) => !s);
+			else if (hit.dataset.lx === "relation-data") setShowRelationData((s) => !s);
 			else if (hit.dataset.lx === "metrics") setShowMetrics((s) => !s);
 			else if (hit.dataset.lx === "inspect") inspectRef.current?.();
 			else if (hit.dataset.lx === "file" && hit.dataset.path) openFileRef.current?.(hit.dataset.path);
@@ -3673,7 +4780,7 @@ function LimixToolCard({ callId, block, inspect, cwd, openFile }) {
 			"aria-modal": fullscreen.expanded,
 			"aria-label": fullscreen.expanded ? `${title}${target ? ` · ${target}` : ""}` : void 0,
 			children: /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("section", {
-				className: `lx-result${compact ? " lx-result-compact" : ""}`,
+				className: `lx-result${compact ? " lx-result-compact" : ""}${explanation?.mode === "local" && ((explanation.requested_count ?? 1) > 1 || explanation.task_type === "timeseries") ? " lx-contribution-card" : ""}${explanation && explanation.mode !== "local" && !explanation.comparison ? " lx-relationship-card" : ""}`,
 				ref: rootRef,
 				"aria-label": `LimiX ${title}`,
 				children: [
@@ -3798,7 +4905,12 @@ function LimixToolCard({ callId, block, inspect, cwd, openFile }) {
 							role: "alert",
 							children: "本次解释存在限制，请结合返回说明使用结果。"
 						}),
-						explanation && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(ExplanationView, { data: explanation }),
+						explanation && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(ExplanationView, {
+							showPredictionCheck,
+							data: explanation,
+							showRelationData,
+							onVisual: () => setShowRelationData(false)
+						}),
 						!help && command === "explain" && !settled && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
 							className: "lx-result-note",
 							children: "正在分析变量贡献与关系…"
@@ -3848,36 +4960,51 @@ function LimixToolCard({ callId, block, inspect, cwd, openFile }) {
 								"data-path": parsed.report_path,
 								children: "打开完整报告 ↗"
 							}),
-							explanation && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [(typeof parsed?.csv_path === "string" || file) && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(ActionMenu, {
-								label: "下载数据",
-								up: true,
-								children: [typeof parsed?.csv_path === "string" && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("a", {
-									href: "/limix-ui/artifact?path=" + encodeURIComponent(parsed.csv_path),
-									download: true,
-									children: explanation.mode === "local" ? "贡献数据 CSV" : "关系数据 CSV"
-								}), file && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("a", {
-									href: "/limix-ui/artifact?path=" + encodeURIComponent(file),
-									download: true,
-									children: "原始结果 JSON"
-								})]
-							}), /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(ActionMenu, {
-								label: "更多",
-								up: true,
-								children: [
-									file && openFile && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
-										type: "button",
-										"data-lx": "file",
-										"data-path": file,
-										children: "打开结果文件 ↗"
-									}),
-									rawToggle,
-									inspect && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
-										type: "button",
-										"data-lx": "inspect",
-										children: "检视调用 ↗"
-									})
-								]
-							})] }),
+							explanation && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [
+								!explanation.comparison && (explanation.mode !== "local" || (explanation.requested_count ?? 1) > 1 || explanation.task_type === "timeseries") && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+									type: "button",
+									"data-lx": "relation-data",
+									"aria-pressed": showRelationData,
+									children: showRelationData ? "返回图表" : "原始数据"
+								}),
+								(typeof parsed?.csv_path === "string" || file) && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(ActionMenu, {
+									label: "下载数据",
+									up: true,
+									children: [typeof parsed?.csv_path === "string" && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("a", {
+										href: "/limix-ui/artifact?path=" + encodeURIComponent(parsed.csv_path),
+										download: true,
+										children: explanation.mode === "local" ? "贡献数据 CSV" : "关系数据 CSV"
+									}), file && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("a", {
+										href: "/limix-ui/artifact?path=" + encodeURIComponent(file),
+										download: true,
+										children: "原始结果 JSON"
+									})]
+								}),
+								/* @__PURE__ */ (0, react_jsx_runtime.jsxs)(ActionMenu, {
+									label: "更多",
+									up: true,
+									children: [
+										explanation.mode === "local" && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+											type: "button",
+											"data-lx": "prediction-check",
+											"aria-pressed": showPredictionCheck,
+											children: showPredictionCheck ? "收起预测值核对" : "预测值核对"
+										}),
+										file && openFile && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+											type: "button",
+											"data-lx": "file",
+											"data-path": file,
+											children: "打开结果文件 ↗"
+										}),
+										rawToggle,
+										inspect && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+											type: "button",
+											"data-lx": "inspect",
+											children: "检视调用 ↗"
+										})
+									]
+								})
+							] }),
 							savedCsv && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("a", {
 								href: "/limix-ui/csv?path=" + encodeURIComponent(savedCsv) + "&download=1",
 								download: savedCsv.split("/").pop(),

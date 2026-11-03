@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 完整贡献样本或关系边；可选筛选后的样本子集。
- * [OUTPUT]: 原始数值表；保留行步、时间、原值、中性和缺失方向。
+ * [OUTPUT]: 原始数值表与双场景关系分数；保留行步、时间、原值、中性和缺失方向。
  * [POS]: 解释的原始数据视图；查询不会改变图表统计范围。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
@@ -8,6 +8,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { directionLabel, explanationPrediction, sampleLabel, type ExplanationData } from './explanation-data'
 
 export function explanationRecords(data: ExplanationData) {
+  if (data.comparison) return data.comparison.records.map((r,i)=>({key:`${i}:${r.source}:${r.target}`,row:undefined,values:[data.labels?.[r.source]??r.source,r.source,data.labels?.[r.target]??r.target,r.target,String(r.left_weight),String(r.right_weight),r.left_present&&r.right_present?'两组均达到显示阈值':`仅${r.left_present?data.comparison!.left.label:data.comparison!.right.label}达到显示阈值`]}))
   if (data.mode !== 'local') return (data.edges ?? []).map((e, i) => ({ key: `${i}:${e.source}:${e.target}`, row: undefined, values: [data.labels?.[e.source] ?? e.source, e.source, data.labels?.[e.target] ?? e.target, e.target, String(e.weight)] }))
   return (data.samples ?? []).flatMap(s => (data.feature_names ?? []).map((name, index) => ({ key: `${s.row_number}:${name}`, row: s.row_number, values: [sampleLabel(s, data), s.prediction === undefined ? '—' : String(s.prediction), data.labels?.[name] ?? name, name, s.feature_values?.[index] === undefined || s.feature_values[index] === null ? '—' : String(s.feature_values[index]), String(s.scores[index]), directionLabel(s.directions[index])] })))
 }
@@ -23,7 +24,7 @@ export function ExplanationDataTable({ data }: { data: ExplanationData }) {
     element?.addEventListener('input', input); element?.addEventListener('click', click)
     return () => { element?.removeEventListener('input', input); element?.removeEventListener('click', click) }
   }, [pages])
-  const headings = data.mode === 'local' ? [data.task_type === 'timeseries' ? '预测步 / 时间' : '原始行', explanationPrediction(data).label, '影响因子', '字段名', '特征原值', '贡献分数', '方向'] : ['起点', '起点字段', '终点', '终点字段', '关系分数']
+  const headings = data.comparison ? ['起点','起点字段','终点','终点字段',data.comparison.left.label,data.comparison.right.label,'显示情况'] : data.mode === 'local' ? [data.task_type === 'timeseries' ? '预测步 / 时间' : '原始行', explanationPrediction(data).label, '影响因子', '字段名', '特征原值', '贡献分数', '方向'] : ['起点', '起点字段', '终点', '终点字段', '关系分数']
   return <div ref={root} className="lx-raw">
     <div className="lx-raw-toolbar"><input data-lx-raw-search value={query} onChange={() => {}} aria-label="检索解释数据" placeholder="检索行号、字段或数值"/><span>{filtered.length} / {records.length} 条记录</span></div>
     <div className="lx-raw-scroll"><table className="lx-raw-table"><thead><tr>{headings.map(h => <th key={h}>{h}</th>)}</tr></thead><tbody>

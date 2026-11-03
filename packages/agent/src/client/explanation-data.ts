@@ -41,9 +41,20 @@ export interface ExplanationData {
   explained_count?: number
   missing_rows?: number[]
   mapping?: 'sample_index' | 'input_order' | 'forecast_steps'
+  detail_sha256?: string
   detail_path?: string
   nodes?: string[]
   edges?: Edge[]
+  model_type?: string
+  graph_backend?: string
+  graph_standardize?: boolean
+  graph_weights?: number[][]
+  graph_threshold?: number | null
+  graph_sample_names?: string[]
+  graph_samples?: number[][]
+  graph_sample_count?: number
+  source_sha256?: string
+  comparison?: { left: ExplanationData & {label:string}; right: ExplanationData & {label:string}; threshold:number; description:string; records:Array<{source:string;target:string;left_weight:number;right_weight:number;left_present:boolean;right_present:boolean}> }
   risks?: unknown[]
 }
 export const number = (v: number) => Number(v.toFixed(4)).toLocaleString('zh-CN', { maximumFractionDigits: 4 })
@@ -65,10 +76,11 @@ export function explanationPrediction(data: ExplanationData) {
 
 /** 仅跟踪会改变文件归属的字段；新对象引用和展示文案不触发重读。 */
 export function batchDetailKey(data: ExplanationData) {
-  return JSON.stringify([data.detail_path, data.mode, data.target, data.task_type, data.mapping,
+  return JSON.stringify([data.detail_path, data.detail_sha256, data.mode, data.target, data.task_type, data.mapping,
     data.result_version_id, data.source_task_id, data.input_rows, data.horizon,
     data.requested_count, data.explained_count, data.feature_names,
-    data.row_numbers ?? data.samples?.map(sample => sample.row_number)])
+    data.row_numbers ?? data.samples?.map(sample => sample.row_number),
+    data.comparison && [data.comparison.left.source_task_id,data.comparison.left.source_sha256,data.comparison.right.source_task_id,data.comparison.right.source_sha256,data.comparison.threshold]])
 }
 
 export function validBatchDetail(value: any, expected: ExplanationData): value is ExplanationData {
@@ -121,4 +133,34 @@ export function singleSampleMatrix(data: ExplanationData): ExplanationData {
     samples: [{ row_number: data.row_number ?? 1, step: data.step, timestamp: data.timestamp, prediction: data.prediction,
       scores: features.map(feature => feature.score), directions: features.map(feature => feature.direction), feature_values: values }],
   }
+}
+
+/** 图详情只补原值，不接受其他任务或变量顺序。 */
+export function validGraphDetail(value:any,expected:ExplanationData):value is ExplanationData {
+  const names=value?.nodes
+  return value?.mode===expected.mode && value.target===expected.target && value.source_task_id===expected.source_task_id
+    && JSON.stringify(names)===JSON.stringify(expected.nodes) && value.input_rows===expected.input_rows
+    && value.source_sha256===expected.source_sha256
+    && value.model_type===expected.model_type && value.graph_backend===expected.graph_backend && value.graph_standardize===expected.graph_standardize
+    && Array.isArray(value.graph_sample_names) && JSON.stringify(value.graph_sample_names)===JSON.stringify(names)
+    && Array.isArray(value.graph_samples) && value.graph_samples.length===expected.graph_sample_count
+    && value.graph_samples.length<=2000 && value.graph_samples.every((r:any)=>Array.isArray(r)&&r.length===names.length&&r.every(Number.isFinite))
+    && JSON.stringify(value.graph_weights)===JSON.stringify(expected.graph_weights)
+}
+
+/** 对比详情须同时匹配两组身份和全部分数；只允许补入原值样本。 */
+export function validComparisonDetail(value:any,expected:ExplanationData):value is ExplanationData {
+  const c=expected.comparison,v=value?.comparison
+  if(!c||!v||value.mode!==expected.mode||value.target!==expected.target||JSON.stringify(value.nodes)!==JSON.stringify(expected.nodes))return false
+  if(v.threshold!==c.threshold||v.description!==c.description||JSON.stringify(v.records)!==JSON.stringify(c.records))return false
+  return (['left','right'] as const).every(side=>v[side]?.label===c[side].label && validGraphDetail(v[side],c[side]))
+}
+
+/** 场景对比回执只传 SHA256；完整内容验证通过后再进入图表。 */
+export async function parseComparisonDetail(text: string, expected: ExplanationData): Promise<ExplanationData> {
+  const digest = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text))), b => b.toString(16).padStart(2, '0')).join('')
+  if (digest !== expected.detail_sha256) throw new Error('场景对比文件已变化，请重新生成比较结果')
+  const value = JSON.parse(text)
+  if (value.mode !== expected.mode || value.target !== expected.target || !validComparisonDetail(value, value)) throw new Error('场景对比文件格式不匹配')
+  return value
 }

@@ -112,6 +112,8 @@ const CSS = `
 export function LimixToolCard({ callId, block, inspect, cwd, openFile }: Props): JSX.Element {
   const settled = !!block && 'kind' in block
   const [showRaw, setShowRaw] = useState(false)
+  const [showPredictionCheck, setShowPredictionCheck] = useState(false)
+  const [showRelationData, setShowRelationData] = useState(false)
   const [showMetrics, setShowMetrics] = useState(false)
   const fullscreen = useCardFullscreen()
 
@@ -130,6 +132,8 @@ export function LimixToolCard({ callId, block, inspect, cwd, openFile }: Props):
       const hit = (e.target as HTMLElement).closest?.('[data-lx]') as HTMLElement | null
       if (!hit || !el.contains(hit)) return
       if (hit.dataset.lx === 'raw') setShowRaw(s => !s)
+      else if (hit.dataset.lx === 'prediction-check') setShowPredictionCheck(s => !s)
+      else if (hit.dataset.lx === 'relation-data') setShowRelationData(s => !s)
       else if (hit.dataset.lx === 'metrics') setShowMetrics(s => !s)
       else if (hit.dataset.lx === 'inspect') inspectRef.current?.()
       else if (hit.dataset.lx === 'file' && hit.dataset.path) openFileRef.current?.(hit.dataset.path)
@@ -323,7 +327,7 @@ export function LimixToolCard({ callId, block, inspect, cwd, openFile }: Props):
   return (
     <div className="lx-card-host" ref={fullscreen.hostRef}>
     <dialog className="lx-fullscreen-dialog" ref={fullscreen.dialogRef} role={fullscreen.expanded ? 'dialog' : 'presentation'} aria-modal={fullscreen.expanded} aria-label={fullscreen.expanded ? `${title}${target ? ` · ${target}` : ''}` : undefined}>
-    <section className={`lx-result${compact ? ' lx-result-compact' : ''}`} ref={rootRef} aria-label={`LimiX ${title}`}>
+    <section className={`lx-result${compact ? ' lx-result-compact' : ''}${explanation?.mode === 'local' && ((explanation.requested_count ?? 1)>1 || explanation.task_type === 'timeseries') ? ' lx-contribution-card' : ''}${explanation && explanation.mode !== 'local' && !explanation.comparison ? ' lx-relationship-card' : ''}`} ref={rootRef} aria-label={`LimiX ${title}`}>
       <style>{CSS + CARD_FULLSCREEN_CSS}</style>
       {!compact && <div className="lx-result-brand">LimiX</div>}
       <div className="lx-result-head">
@@ -349,7 +353,7 @@ export function LimixToolCard({ callId, block, inspect, cwd, openFile }: Props):
       {parsed?.baseline_evaluation && <details className="lx-result-note"><summary>查看预测时可用的时序基线对照</summary><p>{parsed.baseline_evaluation.description}</p>{parsed.baseline_evaluation.metrics && <p>MAE {parsed.baseline_evaluation.metrics?.mae} · RMSE {parsed.baseline_evaluation.metrics?.rmse} · R² {parsed.baseline_evaluation.metrics?.r2 ?? '无定义'}</p>}</details>}
       {cliFailed ? <p className="lx-result-note" role="alert">{errorMessage}{hint && <><br />{hint}</>}</p> : <>
         {status.kind === 'warning' && !benchmark && <p className="lx-result-note" role="alert">本次解释存在限制，请结合返回说明使用结果。</p>}
-        {explanation && <ExplanationView data={explanation} />}
+        {explanation && <ExplanationView showPredictionCheck={showPredictionCheck} data={explanation} showRelationData={showRelationData} onVisual={() => setShowRelationData(false)} />}
         {!help && command === 'explain' && !settled && <p className="lx-result-note">正在分析变量贡献与关系…</p>}
         {metrics.length > 0 && <dl className="lx-result-metrics">
           {metrics.map(metric => <div key={metric.key}><dt>{metric.label}</dt><dd>{metric.value}</dd></div>)}
@@ -367,11 +371,13 @@ export function LimixToolCard({ callId, block, inspect, cwd, openFile }: Props):
         {benchmark && file && <a href={'/limix-ui/artifact?path=' + encodeURIComponent(file)} download>下载比较 JSON ↓</a>}
         {benchmark && typeof parsed?.report_path === 'string' && openFile && <button type="button" data-lx="file" data-path={parsed.report_path}>打开完整报告 ↗</button>}
         {explanation && <>
+          {!explanation.comparison && (explanation.mode !== 'local' || (explanation.requested_count ?? 1)>1 || explanation.task_type === 'timeseries') && <button type="button" data-lx="relation-data" aria-pressed={showRelationData}>{showRelationData ? '返回图表' : '原始数据'}</button>}
           {(typeof parsed?.csv_path === 'string' || file) && <ActionMenu label="下载数据" up>
             {typeof parsed?.csv_path === 'string' && <a href={'/limix-ui/artifact?path=' + encodeURIComponent(parsed.csv_path)} download>{explanation.mode === 'local' ? '贡献数据 CSV' : '关系数据 CSV'}</a>}
             {file && <a href={'/limix-ui/artifact?path=' + encodeURIComponent(file)} download>原始结果 JSON</a>}
           </ActionMenu>}
           <ActionMenu label="更多" up>
+            {explanation.mode === 'local' && <button type="button" data-lx="prediction-check" aria-pressed={showPredictionCheck}>{showPredictionCheck ? '收起预测值核对' : '预测值核对'}</button>}
             {file && openFile && <button type="button" data-lx="file" data-path={file}>打开结果文件 ↗</button>}
             {rawToggle}
             {inspect && <button type="button" data-lx="inspect">检视调用 ↗</button>}

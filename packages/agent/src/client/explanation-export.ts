@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 真实贡献矩阵、关系网络、筛选说明与已解析的主题颜色。
- * [OUTPUT]: 独立 SVG；同尺度完整矩阵、方向语义与有向或无向关系。
+ * [OUTPUT]: 独立 SVG；单样本双向贡献图、同尺度矩阵、明确分组口径与关系图。
  * [POS]: 图片导出的纯渲染层；与界面共用数值计算和关系布局。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
@@ -17,9 +17,10 @@ const end = '</g></svg>'
 const short = (s: string) => Array.from(s).length > 24 ? Array.from(s).slice(0, 12).join('') + '…' + Array.from(s).slice(-10).join('') : s
 const signed = (v: number | null) => v === null ? '方向未定' : `${v > 0 ? '+' : ''}${number(v)}`
 
-export function contributionExportSvg(data: ExplanationData, filtered?: ExplanationData, description = '', theme = defaultExportTheme) {
+export function contributionExportSvg(data: ExplanationData, filtered?: ExplanationData, description = '', theme = defaultExportTheme, groupTitles?: [string, string]) {
   const coverage = data.samples?.length ? (filtered?.samples?.length ?? 0) / data.samples.length * 100 : 0
   const groups = filtered ? [{ data: filtered, title: `当前筛选 · ${filtered.samples?.length ?? 0} 个样本 · 覆盖率 ${number(coverage)}%` }, { data, title: `${data.input_rows && (data.samples?.length ?? 0) < data.input_rows ? '本次已解释' : '全样本'} · ${data.samples?.length ?? 0} 个样本${data.input_rows ? ` / 输入 ${data.input_rows} 行` : ''}` }] : [{ data, title: `${data.input_rows && (data.samples?.length ?? 0) < data.input_rows ? '本次已解释' : '全样本'} · ${data.samples?.length ?? 0} 个样本${data.input_rows ? ` / 输入 ${data.input_rows} 行` : ''}` }]
+  if (groupTitles && filtered) groups.forEach((group, i) => { group.title = `${groupTitles[i]} · ${group.data.samples?.length ?? 0} 个样本` })
   const plotWidth = Math.max(700, (data.feature_names?.length ?? 1) * 32)
   const labelWidth = Math.min(250, Math.max(100, ...(data.feature_names ?? []).map(n => (data.labels?.[n] ?? n).length * 10)))
   const width = 80 + plotWidth + 64 + labelWidth + 20 + 290 + 110
@@ -60,6 +61,25 @@ export function contributionExportSvg(data: ExplanationData, filtered?: Explanat
   })
   svg += text(36, height - 36, '蓝色负向 · 绿色正向 · 灰蓝中性 · 灰色方向未定；中性按 0 计入均值，正负会抵消。', 12)
   return svg + end
+}
+
+export function singleContributionExportSvg(data: ExplanationData, theme = defaultExportTheme) {
+  const factors = (data.features ?? []).filter(f => Number.isFinite(f.score)).sort((a,b) => Math.abs(b.score)-Math.abs(a.score))
+  const maximum = Math.max(...factors.map(f => Math.abs(f.score)), .00001)
+  const width = 1000, height = 160 + factors.length * 34, zero = 570, half = 270
+  const title = `单条解释 · ${data.target_label ?? data.target}`
+  let svg = start(width, height, theme, title) + text(36, 38, title, 22, 'font-weight="600"')
+  svg += text(36, 68, sampleLabel({row_number:data.row_number ?? 1,step:data.step,timestamp:data.timestamp}, data))
+  svg += `<line x1="${zero}" x2="${zero}" y1="90" y2="${90+factors.length*34}" stroke="${theme.border}"/>`
+  factors.forEach((factor, i) => {
+    const y = 110 + i * 34, known = [-1,0,1].includes(factor.direction as number)
+    const value = factor.direction === 0 ? 0 : Math.abs(factor.score) * (factor.direction === -1 ? -1 : 1)
+    const w = known ? Math.abs(value) / maximum * half : 0
+    svg += `<g><title>${escape(`${factor.label} · ${factor.name}`)}</title>` + text(36, y, short(factor.label || factor.name))
+    svg += `<rect x="${value<0?zero-w:zero}" y="${y-9}" width="${w}" height="10" fill="${value<0?contributionColors.negative:contributionColors.positive}"/>`
+    svg += text(964, y, known ? signed(value) : `${number(factor.score)} · 方向未定`, 12, 'text-anchor="end"') + '</g>'
+  })
+  return svg + text(zero-half,height-32,'负向',12) + text(zero,height-32,'0',12,'text-anchor="middle"') + text(zero+half,height-32,'正向',12,'text-anchor="end"') + end
 }
 
 export function graphExportSvg(data: ExplanationData, theme = defaultExportTheme, scope = '完整网络') {

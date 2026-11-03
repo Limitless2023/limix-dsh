@@ -1,17 +1,44 @@
 /**
  * [INPUT]: explain 精简结果与受控批量视图文件；宿主主题。
- * [OUTPUT]: 单条/批量归因与关系网络；详情及重试错误绑定稳定任务身份。
- * [POS]: 解释视图入口；按需加载完整矩阵，避免挤占 Agent 上下文。
+ * [OUTPUT]: 单条/批量归因与关系网络，透传可选预测核对状态；详情及重试错误绑定稳定任务身份。
+ * [POS]: 解释视图入口；按需加载完整矩阵与两组原值，避免挤占 Agent 上下文。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
 import { useEffect, useRef, useState } from 'react'
+import { ExplanationDataTable } from './ExplanationDataTable'
 import { ExplanationSingle } from './ExplanationSingle'
 import { ExplanationBatch } from './ExplanationBatch'
-import { ExplanationGraph } from './ExplanationGraph'
-import { batchDetailKey, validBatchDetail, type ExplanationData } from './explanation-data'
+import { RelationshipView } from './RelationshipView'
+import { batchDetailKey, parseComparisonDetail, validBatchDetail, validGraphDetail, validComparisonDetail, type ExplanationData } from './explanation-data'
 export type { ExplanationData } from './explanation-data'
 
 const CSS = `
+.lx-fullscreen-dialog[open]>.lx-relationship-card{height:100dvh;min-height:0;display:flex;flex-direction:column;overflow:hidden}
+.lx-fullscreen-dialog[open]>.lx-relationship-card>.lx-result-meta:empty{display:none}
+.lx-fullscreen-dialog[open]>.lx-relationship-card>.lx-explain{flex:1;min-height:0;display:flex;flex-direction:column;overflow:auto}
+.lx-fullscreen-dialog[open] .lx-relationship-view,.lx-fullscreen-dialog[open] .lx-network-view{flex:1;min-height:0;display:flex;flex-direction:column}
+.lx-fullscreen-dialog[open] .lx-relationship-view>.lx-insight,.lx-fullscreen-dialog[open] .lx-network-toolbar,.lx-fullscreen-dialog[open] .lx-network-count{flex-shrink:0}
+.lx-fullscreen-dialog[open] .lx-relationship-card>.lx-result-actions{flex-shrink:0}
+.lx-fullscreen-dialog[open] .lx-network-stage{flex:1;min-height:0;overflow:auto;align-items:stretch}
+.lx-fullscreen-dialog[open] .lx-network-stage>.lx-graph-scroll{min-height:0;min-width:0;display:flex;flex-direction:column}
+.lx-fullscreen-dialog[open] .lx-network-stage .lx-network-svg{height:100%;max-height:none!important;min-height:0;flex:1;min-width:0!important}
+.lx-fullscreen-dialog[open] .lx-network-detail{align-self:end}
+.lx-fullscreen-dialog[open] .lx-relationship-matrix{max-width:none}
+.lx-fullscreen-dialog[open] .lx-relationship-matrix>.lx-matrix-svg{height:0;flex:1;min-height:0;min-width:0!important;max-height:none!important}
+.lx-fullscreen-dialog[open] .lx-relationship-matrix>.lx-explain-foot{flex-shrink:0}
+
+.lx-network-toolbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;font-size:12px;margin:12px 0 16px}.lx-network-toolbar strong{font-size:13px}.lx-network-toolbar>button{font-size:11px!important}.lx-network-count,.lx-network-toolbar .lx-graph-mode{color:var(--dsw-alias-label-secondary)}.lx-network-actions{display:flex;align-items:center;gap:16px;margin-left:auto}.lx-network-toolbar .lx-export{margin:0;padding:0}.lx-network-toolbar button,.lx-network-toolbar summary,.lx-network-toolbar strong,.lx-network-toolbar .lx-graph-mode{line-height:22px!important}.lx-network-toolbar .lx-network-actions>button{padding:0!important;font-size:12px!important}.lx-network-toolbar .lx-action-menu>summary{padding:0}.lx-network-count{text-align:right;font-size:11px;margin-top:8px}.lx-network-stage{display:grid;grid-template-columns:minmax(0,1fr);gap:16px;align-items:end}.lx-network-stage.has-detail{grid-template-columns:minmax(0,1fr) 220px}.lx-network-detail{box-sizing:border-box;border:1px solid var(--dsw-alias-border-l3,#dce2eb);border-radius:8px;padding:10px;background:var(--dsw-alias-background-primary,#fff);font-size:12px;min-width:0}.lx-network-detail-head{display:flex;gap:8px;justify-content:space-between;align-items:start}.lx-network-detail-head button{font-size:18px!important;line-height:1!important}.lx-network-detail .lx-explain-foot{margin-top:6px;font-size:10px}.lx-network-detail .lx-causal-graph{height:145px!important;max-height:145px!important;min-width:0!important}.lx-network-stage .lx-network-svg{height:360px;max-height:360px!important}.lx-edge-score{cursor:pointer}.lx-graph-edge-button:focus{outline:none!important}.lx-graph-edge-button:focus-visible .lx-causal-edge{stroke-width:3;stroke-dasharray:4 2}.lx-relationship-nav [data-relationship="matrix"]{margin-left:auto}.lx-relationship-nav{align-items:center}.lx-relationship-settings{position:relative}.lx-relationship-settings summary{list-style:none;cursor:pointer;padding:6px;display:flex}.lx-relationship-settings summary::-webkit-details-marker{display:none}.lx-relationship-settings[open] .lx-analysis-toolbar{position:absolute;z-index:5;right:0;top:32px;width:300px;padding:12px;border:1px solid var(--dsw-alias-border-l3,#dce2eb);border-radius:8px;background:var(--dsw-alias-background-primary,#fff);box-shadow:0 4px 16px #0001;display:flex;flex-wrap:wrap;gap:12px}.lx-matrix-stage{margin-top:16px}.lx-matrix-svg{height:400px;max-height:400px!important}.lx-matrix-stage>.lx-graph-scroll{min-width:0}.lx-network-detail .lx-explain-foot{display:flex;gap:4px;align-items:center}.lx-relationship-matrix{width:100%;max-width:620px;justify-self:center}.lx-relationship-matrix>.lx-explain-foot{text-align:center}.lx-relationship-matrix [data-pair]:focus{outline:none}.lx-relationship-matrix [data-pair]:focus-visible{stroke:#ff5b2a;stroke-width:2}@container(max-width:760px){.lx-network-stage.has-detail{grid-template-columns:1fr}.lx-network-detail{width:min(100%,220px);justify-self:end}}
+
+@container(min-width:1000px){.lx-prediction-comparison{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px}.lx-prediction-comparison>p{grid-column:1/-1}.lx-prediction-comparison>div+div{border-top:0!important;margin-top:0!important;padding-top:0!important}.lx-prediction-comparison .lx-matrix-svg{min-width:0}.lx-prediction-comparison .lx-matrix-expanded .lx-matrix-svg{min-width:650px}}
+.lx-insight{padding:12px 15px;border-left:3px solid #4168a9;background:color-mix(in srgb,#4168a9 5%,transparent);font-size:13px;line-height:1.7;margin:0 0 18px}.lx-relationship-columns{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px}.lx-relationship-detail{margin-top:16px}.lx-relationship-detail select{max-width:100%}.lx-relationship-columns .lx-causal-graph{max-height:380px}@container(max-width:650px){.lx-relationship-columns{grid-template-columns:1fr}}
+.lx-fullscreen-dialog[open]>.lx-contribution-card{height:100dvh;min-height:0;display:flex;flex-direction:column}
+.lx-fullscreen-dialog[open]>.lx-contribution-card>.lx-explain{flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column}
+.lx-fullscreen-dialog[open] .lx-batch-view{flex:1;display:flex;flex-direction:column;min-height:0}
+.lx-fullscreen-dialog[open] .lx-batch-overview{flex:1;min-height:0}
+.lx-fullscreen-dialog[open] .lx-batch-overview:not(:has(.lx-matrix-comparison))>div,.lx-fullscreen-dialog[open] .lx-batch-overview:not(:has(.lx-matrix-comparison))>div>div{height:100%;display:flex;flex-direction:column;min-height:0}
+.lx-fullscreen-dialog[open] .lx-batch-overview .lx-matrix-scroll{flex:1;min-height:0;display:flex}
+.lx-fullscreen-dialog[open] .lx-batch-overview .lx-matrix-svg{height:100%;max-height:none!important;min-height:0}
+.lx-fullscreen-dialog[open] .lx-contribution-card>.lx-result-actions{flex-shrink:0;margin-top:12px}
 .lx-explain{margin:16px 0 8px;container-type:inline-size}
 .lx-explain-head{display:flex;justify-content:space-between;gap:16px;align-items:baseline;margin:0 0 20px}
 .lx-explain-label{font-size:12px;color:var(--dsw-alias-label-secondary);margin-bottom:4px}
@@ -64,7 +91,7 @@ const CSS = `
 .lx-graph-toolbar{justify-content:flex-start;margin:4px 0 0}.lx-graph-toolbar button{font-size:11px!important;padding:5px 9px!important;border:1px solid var(--dsw-alias-border-l3,#dce2eb)!important;border-radius:5px!important}
 .lx-analysis-toolbar{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:16px;flex-wrap:wrap}
 .lx-small-button{border:1px solid var(--dsw-alias-border-l3,#dce2eb)!important;border-radius:5px!important;padding:5px 9px!important;font-size:11px!important;white-space:nowrap}
-.lx-filter{flex:1}.lx-filter-panel{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;margin-top:12px;padding:12px;background:var(--dsw-alias-background-secondary,#f7f8fa);border-radius:6px}.lx-filter-panel label{display:grid;gap:6px;font-size:11px;color:var(--dsw-alias-label-secondary)}
+.lx-filter{flex:1}.lx-filter-panel{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;margin-top:12px;padding:10px;background:var(--dsw-alias-background-secondary,#f7f8fa);border-radius:6px}.lx-filter-panel label{display:grid;gap:6px;font-size:11px;color:var(--dsw-alias-label-secondary)}
 .lx-filter input,.lx-filter select,.lx-raw input{box-sizing:border-box;border:1px solid var(--dsw-alias-border-l3,#dce2eb);border-radius:4px;padding:5px 7px;min-height:29px;background:var(--dsw-alias-background-primary,#fff);color:var(--dsw-alias-label-primary,#202734);font:inherit;max-width:220px}.lx-filter-range{display:flex;align-items:center;gap:6px}.lx-filter-range input{width:74px}.lx-filter-actions{display:flex;align-items:center;gap:10px;font-size:11px}.lx-filter-error{width:100%;font-size:11px;color:#986b23;margin:0}
 .lx-filter-summary{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:11px;margin:8px 0 16px;color:var(--dsw-alias-label-secondary)}.lx-filter-summary strong{font-weight:500;color:var(--dsw-alias-label-primary)}
 .lx-export{display:flex;gap:9px;align-items:center;flex-wrap:wrap;font-size:10px;color:var(--dsw-alias-label-secondary);padding-top:5px}.lx-export button{font-size:10px!important;color:var(--dsw-alias-state-business-primary,#3465ce)!important}.lx-export-status:empty{display:none}
@@ -74,7 +101,7 @@ const CSS = `
 @container(max-width:520px){.lx-heatmap-heading{display:block}.lx-batch-summary{flex-wrap:wrap}.lx-graph-toolbar{flex-wrap:wrap}}
 `
 
-export function ExplanationView({ data }: { data: ExplanationData }) {
+export function ExplanationView({ data, showRelationData = false, showPredictionCheck = false, onVisual }: { data: ExplanationData; showRelationData?:boolean; showPredictionCheck?:boolean; onVisual?: () => void }) {
   const [detail, setDetail] = useState<{ key: string; data: ExplanationData } | null>(null)
   const [failure, setFailure] = useState<{ key: string; message: string } | null>(null), [attempt, setAttempt] = useState(0)
   const detailKey = batchDetailKey(data), error = failure?.key === detailKey ? failure.message : ''
@@ -86,12 +113,12 @@ export function ExplanationView({ data }: { data: ExplanationData }) {
     return () => element?.removeEventListener('click', click)
   }, [])
   useEffect(() => {
-    if (!data.detail_path) return
+    if (!data.detail_path || (!data.detail_sha256 && data.mode!=='local' && !data.graph_sample_count && !data.comparison?.left.graph_sample_count)) return
     const controller = new AbortController(); setFailure(null); setDetail(null)
     fetch('/limix-ui/artifact?path=' + encodeURIComponent(data.detail_path), { signal: controller.signal }).then(async response => {
       if (!response.ok) throw new Error(`读取失败（${response.status}）`)
-      const value = await response.json()
-      if (!validBatchDetail(value, data)) throw new Error('样本文件与本次结果不一致')
+      const value = data.detail_sha256 ? await parseComparisonDetail(await response.text(), data) : await response.json()
+      if (!data.detail_sha256 && !(data.mode==='local'?validBatchDetail(value, data):data.comparison?validComparisonDetail(value,data):validGraphDetail(value,data))) throw new Error('样本文件与本次结果不一致')
       if (!controller.signal.aborted) setDetail({ key: detailKey, data: value })
     }).catch(reason => { if (!controller.signal.aborted) setFailure({ key: detailKey, message: reason.message }) })
     return () => controller.abort()
@@ -99,7 +126,7 @@ export function ExplanationView({ data }: { data: ExplanationData }) {
   const loaded = detail?.key === detailKey ? detail.data : data, batch = (data.requested_count ?? 1) > 1 || data.task_type === 'timeseries'
   return <div className="lx-explain" ref={root} aria-label={data.mode === 'local' ? '样本贡献解释' : '变量关系图'}>
     <style>{CSS}</style>
-    {data.mode !== 'local' ? <ExplanationGraph data={data} /> : batch ? loaded.samples ? <ExplanationBatch data={loaded} /> : <p className="lx-explain-foot" role="status">{error || `正在加载 ${data.explained_count} 个样本的解释…`} {error && <button type="button" data-lx-explain-retry>重试</button>}</p> : <ExplanationSingle data={data} />}
+    {data.detail_sha256 && detail?.key !== detailKey ? <p className="lx-explain-foot" role="status">{error || '正在加载场景关系对比…'} {error && <button data-lx-explain-retry>重试</button>}</p> : data.mode !== 'local' ? <>{showRelationData ? <ExplanationDataTable data={loaded}/> : <RelationshipView key={detailKey} data={loaded} />}{error&&<p role="alert" className="lx-explain-foot">原始数据预览：{error} <button data-lx-explain-retry>重试</button></p>}</> : batch ? loaded.samples ? <ExplanationBatch showPredictionCheck={showPredictionCheck} data={loaded} showRaw={showRelationData} onVisual={onVisual} /> : <p className="lx-explain-foot" role="status">{error || `正在加载 ${data.explained_count} 个样本的解释…`} {error && <button type="button" data-lx-explain-retry>重试</button>}</p> : <ExplanationSingle showPredictionCheck={showPredictionCheck} data={data} />}
     {!!data.risks?.length && <p className="lx-explain-warning" role="note">{data.risks.map(r => typeof r === 'string' ? r : JSON.stringify(r)).join('；')}</p>}
   </div>
 }

@@ -19,8 +19,8 @@ dist/ - 本地分发压缩包；发布前按源码重建。
 LICENSE / LICENSING.md / THIRD-PARTY-NOTICES.md - 非商业授权原文、联系入口与第三方/历史权利。
 README.md - 安装步骤、构建入口和已知边界。
 INSTALL.md - 同事安装说明。
-NPM-DISTRIBUTION.md - npm 0.3.12 分发方案、隔离验收与安装文案。
-RELEASE-NOTES.md - 0.3.12公开发布说明、安装入口与已知边界。
+NPM-DISTRIBUTION.md - npm 0.3.13 分发方案、隔离验收与安装文案。
+RELEASE-NOTES.md - 0.3.13公开发布说明、安装入口与已知边界。
 release.sh - 构建并核验五个插件，输出版本清单与 SHA256；不上传产物。
 </config>
 
@@ -31,4 +31,4 @@ release.sh - 构建并核验五个插件，输出版本清单与 SHA256；不上
 
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 
-五包统一为 0.3.12；工程修复已验证，提示词未通过项作为已知限制保留，见 reviews/report-delivery-0312-review.md。
+五包统一为 0.3.13；工程修复已验证，提示词未通过项作为已知限制保留，见 reviews/causal-ui-0313-review.md。

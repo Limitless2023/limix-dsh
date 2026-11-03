@@ -2,6 +2,8 @@
 
 > L2 | 父级: ../CLAUDE.md
 
+card-files-0314-review.md - 0.3.14 卡片折叠、任务文件、菜单与热力图留白审查及验收边界。
+
 causal-ui-0313-review.md - 0.3.13 因果 UI、场景比较契约、导出与 DSH 实际验收，保留上游错误。
 
 report-delivery-0312-review.md - 0.3.12 工程修复、真实测试与发布回验；保留提示词未通过项。

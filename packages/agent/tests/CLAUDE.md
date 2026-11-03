@@ -10,6 +10,7 @@ fixtures/explanation-timeseries.json - 真实电力时序解释的第 1、2、24
 turn-stack.test.cjs - 验证指标缺失与帮助过滤，不从 stderr 猜数字。
 pipeline-view.test.cjs - 验证 LimiX 分类与次数、接口步骤、失败原因、本地工具名、统一流程归并、官方解释模式、文件去重、运行态与异常指标；验证业务摘要、差异化标题和报告保存/修订状态。
 tool-card.test.cjs - 预测值默认收起及按需核对； 验证单条双向贡献条与全屏全部因素、报告双格式下载、error-only 失败状态、帮助卡、模式隔离、解释全屏、CSV 对齐和比较部分成功。
+task-files.test.cjs - 预测、解释与场景比较文件用途；相对路径、版本 ID、URL、缺失输出、同路径合并及宿主文件按钮。
 fixtures/explanation-local.json - 真实单样本解释的脱敏展示数据。
 fixtures/explanation-directed.json - 真实光学有向图的脱敏展示数据。
 fixtures/regression-node.json - T1 会话实际输出的脱敏节点。

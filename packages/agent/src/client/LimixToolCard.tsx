@@ -7,12 +7,15 @@
  *           任务名称（因果解释沿用官方口径）+ 指标 + 文件下载与打开；指标说明和调用详情默认折叠
  *           + 三类预测图、可全屏的解释/模型比较卡及 JSON/CSV 下载；参数帮助不显示预测完成。
  *           服务连接与参数帮助使用紧凑行，详情按需展开，失败原因保持可见。
+ *           卡片折叠保留图表状态；预测和解释的任务文件通过宿主侧栏打开。
  * [POS]: limix-ui 的工具结果渲染器；对位 Next.js 版 tools-ui 的 DSH 形态。
  *        未认领的其他工具不受影响（keyed 插槽按工具名分派，自有工具=纯增量）。
  *        三类结果图共用 /limix-ui/csv 一条只读通道，取数失败一律静默降级为纯文本卡片
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
 import { ActionMenu } from './ActionMenu'
+import { TaskFiles } from './TaskFiles'
+import { taskFiles } from './task-files'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { ConfusionMatrix } from './ConfusionMatrix.tsx'
 import { ForecastChart, type ForecastChartData } from './ForecastChart.tsx'
@@ -77,6 +80,12 @@ const CSS = `
 .lx-result{border:1px solid var(--dsw-alias-border-l3,#e3e6eb);border-radius:12px;padding:16px 18px;margin:4px 0;font:inherit;font-size:13px;line-height:1.6;min-width:0;overflow-wrap:anywhere;color:var(--dsw-alias-label-primary)}
 .lx-result-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .lx-result-brand{font-size:11px;letter-spacing:.04em;color:var(--dsw-alias-label-tertiary);margin-bottom:5px}
+.lx-result-topline{display:flex;align-items:center;justify-content:space-between;min-height:24px}
+.lx-result button.lx-collapse{display:inline-flex;align-items:center;justify-content:center;width:28px;height:24px;padding:0;border-radius:4px;flex:none}
+.lx-result button.lx-collapse:hover{background:var(--dsw-alias-interactive-bg-hover,#f3f5f8)}
+.lx-result[data-collapsed=true]>:not(style):not(.lx-result-brand):not(.lx-result-head){display:none!important}
+.lx-result[data-collapsed=true] .lx-running-copy>.lx-result-meta{display:none}
+.lx-result.lx-running[data-collapsed=true]>.lx-running-spinner,.lx-result.lx-running[data-collapsed=true]>.lx-running-copy,.lx-result.lx-running[data-collapsed=true]>.lx-collapse{display:flex!important}
 .lx-result h3{margin:0;font:inherit;font-weight:600;font-size:15px}
 .lx-result-status{display:inline-flex;align-items:center;gap:5px;font-size:12px;margin-left:auto;color:var(--dsw-alias-label-secondary)}
 .lx-result-status::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
@@ -115,6 +124,7 @@ export function LimixToolCard({ callId, block, inspect, cwd, openFile }: Props):
   const [showPredictionCheck, setShowPredictionCheck] = useState(false)
   const [showRelationData, setShowRelationData] = useState(false)
   const [showMetrics, setShowMetrics] = useState(false)
+  const [collapsed, setCollapsed] = useState(false)
   const fullscreen = useCardFullscreen()
 
   // 与原样例库（现 TryRunBridge 一脉）同因：宿主截断冒泡中的 click，React 根级委托收不到；
@@ -131,12 +141,24 @@ export function LimixToolCard({ callId, block, inspect, cwd, openFile }: Props):
     const onNativeClick = (e: Event) => {
       const hit = (e.target as HTMLElement).closest?.('[data-lx]') as HTMLElement | null
       if (!hit || !el.contains(hit)) return
-      if (hit.dataset.lx === 'raw') setShowRaw(s => !s)
+      if (hit.dataset.lx === 'collapse') {
+        el.querySelectorAll<HTMLDetailsElement>('details.lx-action-menu[open]').forEach(menu => { menu.open = false })
+        setCollapsed(s => !s)
+      }
+      else if (hit.dataset.lx === 'expand-card') setCollapsed(false)
+      else if (hit.dataset.lx === 'raw') setShowRaw(s => !s)
       else if (hit.dataset.lx === 'prediction-check') setShowPredictionCheck(s => !s)
       else if (hit.dataset.lx === 'relation-data') setShowRelationData(s => !s)
       else if (hit.dataset.lx === 'metrics') setShowMetrics(s => !s)
       else if (hit.dataset.lx === 'inspect') inspectRef.current?.()
-      else if (hit.dataset.lx === 'file' && hit.dataset.path) openFileRef.current?.(hit.dataset.path)
+      else if (hit.dataset.lx === 'file' && hit.dataset.path) {
+        // 宿主侧栏位于 dialog 外；先退出全屏，避免文件被模态层遮住。
+        const dialog = fullscreen.dialogRef.current
+        if (dialog?.open) {
+          dialog.setAttribute('aria-modal', 'false'); dialog.setAttribute('role', 'presentation'); dialog.close()
+        }
+        openFileRef.current?.(hit.dataset.path)
+      }
     }
     el.addEventListener('click', onNativeClick)
     return () => el.removeEventListener('click', onNativeClick)
@@ -301,6 +323,11 @@ export function LimixToolCard({ callId, block, inspect, cwd, openFile }: Props):
   const detailsId = `lx-result-details-${String(callId).replace(/[^a-zA-Z0-9_-]/g, '-')}`
   const metricsId = `${detailsId}-metrics`
   const compact = help || command === 'health' || command === 'runtime' || parsed?.kind === 'report_facts'
+  const files = help ? [] : taskFiles(command, argList, parsed, cwd)
+  const fileLinks = openFile && <TaskFiles files={files} />
+  const collapseButton = !fullscreen.expanded && <button type="button" className="lx-collapse" data-lx="collapse" aria-label={collapsed ? '展开卡片' : '收起卡片'} title={collapsed ? '展开卡片' : '收起卡片'} aria-expanded={!collapsed}>
+    <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={collapsed ? 'm5 7 5 5 5-5' : 'm5 12 5-5 5 5'} /></svg>
+  </button>
   const rawToggle = text && <button type="button" data-lx="raw" className={compact ? 'lx-result-details-toggle' : undefined} aria-label={compact ? `${showRaw ? '收起' : '展开'}${title}详情` : undefined} aria-expanded={showRaw} aria-controls={detailsId}>
     {compact ? <>{showRaw ? '收起' : '详情'}<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d={showRaw ? 'M4 10l4-4 4 4' : 'M4 6l4 4 4-4'} /></svg></> : showRaw ? '收起详情 ↑' : '调用详情 ↓'}
   </button>
@@ -317,25 +344,27 @@ export function LimixToolCard({ callId, block, inspect, cwd, openFile }: Props):
     const runningTitle = help ? '正在读取参数说明…' : command === 'explain'
       ? (['directed','undirected'].includes(flagValue('--mode') ?? '') ? 'LimiX 正在探索变量关系…' : 'LimiX 正在分析影响因素…')
       : RUNNING_LABELS[command] ?? 'LimiX 正在执行任务…'
-    return <div className="lx-card-host" ref={fullscreen.hostRef}><dialog className="lx-fullscreen-dialog" ref={fullscreen.dialogRef} role="presentation"><section ref={rootRef} className="lx-result lx-running" aria-label={runningTitle}>
+    return <div className="lx-card-host" ref={fullscreen.hostRef}><dialog className="lx-fullscreen-dialog" ref={fullscreen.dialogRef} role="presentation"><section ref={rootRef} className="lx-result lx-running" data-collapsed={collapsed} aria-label={runningTitle}>
       <style>{CSS + CARD_FULLSCREEN_CSS}</style><span className="lx-running-spinner" aria-hidden="true" />
       <div className="lx-running-copy"><h3 role="status">{runningTitle}</h3>{target && <p className="lx-result-meta">{target}</p>}</div>
       <span className="lx-running-time" title="本次界面等待时长；重新打开页面会重新计时">已等待 {waitingSeconds < 60 ? `${waitingSeconds} 秒` : `${Math.floor(waitingSeconds / 60)} 分 ${waitingSeconds % 60} 秒`}</span>
+      {collapseButton}
     </section></dialog></div>
   }
 
   return (
     <div className="lx-card-host" ref={fullscreen.hostRef}>
     <dialog className="lx-fullscreen-dialog" ref={fullscreen.dialogRef} role={fullscreen.expanded ? 'dialog' : 'presentation'} aria-modal={fullscreen.expanded} aria-label={fullscreen.expanded ? `${title}${target ? ` · ${target}` : ''}` : undefined}>
-    <section className={`lx-result${compact ? ' lx-result-compact' : ''}${explanation?.mode === 'local' && ((explanation.requested_count ?? 1)>1 || explanation.task_type === 'timeseries') ? ' lx-contribution-card' : ''}${explanation && explanation.mode !== 'local' && !explanation.comparison ? ' lx-relationship-card' : ''}`} ref={rootRef} aria-label={`LimiX ${title}`}>
+    <section className={`lx-result${compact ? ' lx-result-compact' : ''}${explanation?.mode === 'local' && ((explanation.requested_count ?? 1)>1 || explanation.task_type === 'timeseries') ? ' lx-contribution-card' : ''}${explanation && explanation.mode !== 'local' && !explanation.comparison ? ' lx-relationship-card' : ''}`} ref={rootRef} data-collapsed={collapsed} aria-label={`LimiX ${title}`}>
       <style>{CSS + CARD_FULLSCREEN_CSS}</style>
-      {!compact && <div className="lx-result-brand">LimiX</div>}
+      {!compact && <div className="lx-result-brand lx-result-topline"><span>LimiX</span>{collapseButton}</div>}
       <div className="lx-result-head">
         {compact && <span className="lx-result-brand">LimiX</span>}
         <h3>{title}{target ? ` · ${target}` : ''}</h3>
         <span className="lx-result-status" data-state={status.kind} role="status">{!help && command === 'health' && status.kind === 'done' ? '连接正常' : status.label}</span>
-        {compact && rawToggle}
-        {(explanation || benchmark) && <button type="button" className="lx-fullscreen-button" data-lx-fullscreen aria-label={fullscreen.expanded ? '退出全屏查看' : benchmark ? '全屏查看模型比较' : '全屏查看解释'} title={fullscreen.expanded ? '退出全屏（Esc）' : benchmark ? '全屏查看模型比较' : '全屏查看解释'} aria-expanded={fullscreen.expanded}>
+        {compact && !collapsed && rawToggle}
+        {compact && collapseButton}
+        {(explanation || benchmark) && <button type="button" className="lx-fullscreen-button" data-lx="expand-card" data-lx-fullscreen aria-label={fullscreen.expanded ? '退出全屏查看' : benchmark ? '全屏查看模型比较' : '全屏查看解释'} title={fullscreen.expanded ? '退出全屏（Esc）' : benchmark ? '全屏查看模型比较' : '全屏查看解释'} aria-expanded={fullscreen.expanded}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={fullscreen.expanded ? 'M9 3v6H3M15 3v6h6M3 15h6v6M21 15h-6v6' : 'M8 3H3v5M16 3h5v5M3 16v5h5M21 16v5h-5'} /></svg>
         </button>}
       </div>
@@ -378,20 +407,26 @@ export function LimixToolCard({ callId, block, inspect, cwd, openFile }: Props):
           </ActionMenu>}
           <ActionMenu label="更多" up>
             {explanation.mode === 'local' && <button type="button" data-lx="prediction-check" aria-pressed={showPredictionCheck}>{showPredictionCheck ? '收起预测值核对' : '预测值核对'}</button>}
-            {file && openFile && <button type="button" data-lx="file" data-path={file}>打开结果文件 ↗</button>}
             {rawToggle}
             {inspect && <button type="button" data-lx="inspect">检视调用 ↗</button>}
+            {fileLinks}
           </ActionMenu>
         </>}
         {savedCsv && <a href={'/limix-ui/csv?path=' + encodeURIComponent(savedCsv) + '&download=1'} download={savedCsv.split('/').pop()}>下载 CSV ↓</a>}
-        {!explanation && file && (openFile
+        {!explanation && !prediction && file && (openFile
           ? <button type="button" data-lx="file" data-path={file}>打开结果 · {file.split('/').pop()} ↗</button>
           : <span className="lx-result-meta">已保存 · {file.split('/').pop()}</span>)}
-        {!explanation && rawToggle}
-        {metrics.length > 0 && <button type="button" data-lx="metrics" aria-expanded={showMetrics} aria-controls={metricsId}>
+        {prediction && <ActionMenu label="更多" up>
+          {rawToggle}
+          {metrics.length > 0 && <button type="button" data-lx="metrics" aria-expanded={showMetrics} aria-controls={metricsId}>{showMetrics ? '收起指标说明' : '指标说明'}</button>}
+          {inspect && <button type="button" data-lx="inspect">检视调用 ↗</button>}
+          {fileLinks}
+        </ActionMenu>}
+        {!explanation && !prediction && rawToggle}
+        {!prediction && metrics.length > 0 && <button type="button" data-lx="metrics" aria-expanded={showMetrics} aria-controls={metricsId}>
           {showMetrics ? '收起指标说明 ↑' : '指标说明 ↓'}
         </button>}
-        {!explanation && showRaw && inspect && <button type="button" data-lx="inspect">检视调用 ↗</button>}
+        {!explanation && !prediction && showRaw && inspect && <button type="button" data-lx="inspect">检视调用 ↗</button>}
       </div>}
       {showMetrics && <dl id={metricsId} className="lx-result-note">
         {metrics.map(metric => <div key={metric.key} style={{ marginTop: 8 }}>

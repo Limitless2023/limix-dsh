@@ -1,12 +1,12 @@
 # LimiX 五插件 npm 分发
 
-当前套件版本：**0.3.13**。五包统一更新，咨询推断的已知问题见 [提示词验收记录](docs/PROMPT-EVALUATION.md)。GitHub Release tgz 分发继续保留。
+当前套件版本：**0.3.14**。五包统一更新，咨询推断的已知问题见 [提示词验收记录](docs/PROMPT-EVALUATION.md)。GitHub Release tgz 分发继续保留。
 
 ## 发布方案
 
 保留五个包名：`dsh-limix-data`、`dsh-limix-tool`、`dsh-limix-agent`、`dsh-limix-preset`、`dsh-limix-cover`。五包统一版本；npm 与 GitHub Release 使用同一批 tgz，SHA256SUMS 校验这些文件。
 
-0.3.10 的 npm 首装与 tgz 迁移验证保留为历史记录；本次使用新版本 0.3.13，避免同一版本存在不同包内容。发布前从干净提交打包，并核对源码提交与包清单。
+0.3.10 的 npm 首装与 tgz 迁移验证保留为历史记录；本次使用新版本 0.3.14，避免同一版本存在不同包内容。发布前从干净提交打包，并核对源码提交与包清单。
 
 五包没有互相声明 npm 依赖，需一次安装全部五包。preset 在 LimiX 模式中加载 tool；tool 的空 bundle patch 是有意设计，不额外挂载全局工具。data 保留 mysql2、pg 运行依赖；其余包随包提供构建产物，使用者无需编译。不会打包另一份 Harness。
 
@@ -34,7 +34,7 @@ DSH='/Applications/DeepSeek Harness.app/Contents/Resources/runtime/cli/bin/dsh'
 先完全退出 DeepSeek Harness。在终端执行以下**一条命令**，安装五个同版本插件：
 
 ```sh
-dsh plugin --profile desktop add --save-exact --registry=https://registry.npmjs.org/ dsh-limix-data@0.3.13 dsh-limix-tool@0.3.13 dsh-limix-agent@0.3.13 dsh-limix-preset@0.3.13 dsh-limix-cover@0.3.13
+dsh plugin --profile desktop add --save-exact --registry=https://registry.npmjs.org/ dsh-limix-data@0.3.14 dsh-limix-tool@0.3.14 dsh-limix-agent@0.3.14 dsh-limix-preset@0.3.14 dsh-limix-cover@0.3.14
 ```
 
 macOS 若使用上方 `DSH` 变量，把命令开头 `dsh` 换成 `"$DSH"`。Web 用户将 `desktop` 换成实际使用的 profile，例如 `web`。不要新建 profile 代替原 profile，否则会看不到原来的插件与配置选择。
@@ -43,7 +43,7 @@ macOS 若使用上方 `DSH` 变量，把命令开头 `dsh` 换成 `"$DSH"`。Web
 
 升级前备份自己的 DSH_HOME 和 `~/.limix/config.json`，备份仅留本机。默认 DSH_HOME 为 `~/.dsh`；自定义环境应使用原路径。数据源存于 `DSH_HOME/limix-datasource.json`；API Key 使用 `LIMIX_API_KEY` 或 `~/.limix/config.json`。环境变量必须对实际启动 DSH 的进程可见。
 
-重启后，在“插件”确认五包均为 0.3.13；进入“设置 → 数据源”检查已有连接；新建会话选择 LimiX Agent，执行服务连接检查。标准模式默认选择会保留。历史会话仍沿用自己的预设。
+重启后，在“插件”确认五包均为 0.3.14；进入“设置 → 数据源”检查已有连接；新建会话选择 LimiX Agent，执行服务连接检查。标准模式默认选择会保留。历史会话仍沿用自己的预设。
 
 命令行核对：
 
@@ -57,9 +57,11 @@ GitHub tgz 安装继续支持：从对应 Release 下载五个文件，在“插
 
 ## 验证范围
 
-公共 npm 0.3.13 五包下载与 GitHub Release 的 SHA256 一致。独立环境已验证公共 npm 首装和 0.3.9 tgz 迁移；0.3.10→0.3.11、0.3.11→0.3.12 和本次 0.3.12→0.3.13 已完成公共 npm 跨版本升级验证；五包版本、标准模式选择与数据源配置保留通过。本轮没有重做首次安装或 tgz 迁移。配置保留不等于验证数据库真实连接。
+上一版公共 npm 0.3.13 五包下载与 GitHub Release 的 SHA256 一致。独立环境已验证公共 npm 首装和 0.3.9 tgz 迁移；0.3.10→0.3.11、0.3.11→0.3.12 和 0.3.12→0.3.13 已完成公共 npm 跨版本升级验证；五包版本、标准模式选择与数据源配置保留通过。本轮没有重做首次安装或 tgz 迁移。配置保留不等于验证数据库真实连接。
 
 详细历史结果、peer 提示和未验收项见 [分发审查](reviews/npm-distribution-review.md)。Windows、第二台电脑及隔离环境的真实预测和数据库查询尚未验收。报告仍需人工审阅；光学 20 变量无向解释上游错误未修复。
+
+本次 0.3.14 的公共发布与升级回验待发布后登记。
 
 ## 维护者发布步骤
 

@@ -33,9 +33,28 @@ react_dom = __toESM(react_dom);
 //#region src/client/ActionMenu.tsx
 function ActionMenu({ label, children, up = false }) {
 	const ref = (0, react.useRef)(null);
+	const panelRef = (0, react.useRef)(null);
 	(0, react.useEffect)(() => {
-		const el = ref.current;
-		if (!el) return;
+		const el = ref.current, panel = panelRef.current;
+		if (!el || !panel) return;
+		const floating = typeof panel.showPopover === "function";
+		if (floating) panel.setAttribute("popover", "manual");
+		const place = () => {
+			if (!floating || !el.open) return;
+			const anchor = el.querySelector("summary").getBoundingClientRect();
+			const rect = panel.getBoundingClientRect();
+			const x = up ? anchor.left : anchor.right - rect.width;
+			const above = up || window.innerHeight - anchor.bottom < rect.height + 8;
+			panel.style.left = `${Math.max(8, Math.min(x, window.innerWidth - rect.width - 8))}px`;
+			panel.style.top = `${Math.max(8, Math.min(above ? anchor.top - rect.height - 5 : anchor.bottom + 5, window.innerHeight - rect.height - 8))}px`;
+		};
+		const toggle = () => {
+			if (!floating) return;
+			if (el.open) {
+				panel.showPopover();
+				place();
+			} else if (panel.matches(":popover-open")) panel.hidePopover();
+		};
 		const close = (event) => {
 			if (!el.contains(event.target)) el.open = false;
 		};
@@ -56,10 +75,17 @@ function ActionMenu({ label, children, up = false }) {
 		document.addEventListener("pointerdown", close, true);
 		document.addEventListener("keydown", key, true);
 		el.addEventListener("click", choose);
+		el.addEventListener("toggle", toggle);
+		window.addEventListener("resize", place);
+		document.addEventListener("scroll", place, true);
 		return () => {
 			document.removeEventListener("pointerdown", close, true);
 			document.removeEventListener("keydown", key, true);
 			el.removeEventListener("click", choose);
+			el.removeEventListener("toggle", toggle);
+			window.removeEventListener("resize", place);
+			document.removeEventListener("scroll", place, true);
+			if (floating && panel.matches(":popover-open")) panel.hidePopover();
 		};
 	}, []);
 	return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("details", {
@@ -68,6 +94,7 @@ function ActionMenu({ label, children, up = false }) {
 		"data-up": up,
 		children: [
 			/* @__PURE__ */ (0, react_jsx_runtime.jsx)("style", { children: `.lx-action-menu{position:relative;font-size:12px}.lx-action-menu>summary{display:inline-flex;align-items:center;gap:5px;white-space:nowrap;cursor:pointer;list-style:none;color:var(--dsw-alias-state-business-primary,#3465ce);padding:3px 0}.lx-action-menu>summary::-webkit-details-marker{display:none}.lx-action-menu>summary:focus-visible{outline:2px solid #466eb9;outline-offset:3px}.lx-action-chevron{display:block;flex:none;width:12px;height:12px;transition:transform .15s ease}.lx-action-menu[open]>summary .lx-action-chevron{transform:rotate(180deg)}@media(prefers-reduced-motion:reduce){.lx-action-chevron{transition:none}}.lx-action-menu-panel{position:absolute;z-index:20;top:100%;right:0;min-width:160px;padding:6px;background:var(--dsw-alias-background-primary,#fff);border:1px solid var(--dsw-alias-border-l3,#e3e6eb);border-radius:8px;box-shadow:0 6px 22px #152b4914}.lx-action-menu[data-up=true]>.lx-action-menu-panel{top:auto;bottom:100%;left:0;right:auto}.lx-result .lx-action-menu-panel>a,.lx-result .lx-action-menu-panel>button{display:block;width:100%;padding:7px 10px;text-align:left;white-space:nowrap}.lx-action-menu-panel>a:hover,.lx-action-menu-panel>button:hover{background:var(--dsw-alias-interactive-bg-hover,#f3f5f8)}` }),
+			/* @__PURE__ */ (0, react_jsx_runtime.jsx)("style", { children: `.lx-action-menu>.lx-action-menu-panel[popover]{position:fixed;inset:auto;margin:0;box-sizing:border-box;max-height:calc(100dvh - 16px);max-width:calc(100vw - 16px);overflow:auto;color:inherit;font:inherit}.lx-action-menu[data-up=true]>.lx-action-menu-panel[popover]{bottom:auto;right:auto}` }),
 			/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("summary", { children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { children: label }), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("svg", {
 				className: "lx-action-chevron",
 				width: "12",
@@ -83,10 +110,92 @@ function ActionMenu({ label, children, up = false }) {
 			})] }),
 			/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
 				className: "lx-action-menu-panel",
+				ref: panelRef,
 				children
 			})
 		]
 	});
+}
+
+//#endregion
+//#region src/client/TaskFiles.tsx
+function TaskFiles({ files }) {
+	if (!files.length) return null;
+	return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+		className: "lx-task-files",
+		children: [
+			/* @__PURE__ */ (0, react_jsx_runtime.jsx)("style", { children: `.lx-task-files{border-top:1px solid var(--dsw-alias-border-l3,#e3e6eb);margin-top:5px;padding-top:5px;max-height:260px;overflow:auto}.lx-task-files-label{padding:3px 10px;font-size:11px;color:var(--dsw-alias-label-tertiary,#858d99)}.lx-result .lx-task-files button{display:flex;flex-direction:column;width:100%;max-width:min(310px,65vw);padding:6px 10px;gap:1px;border-radius:4px}.lx-task-files button:hover{background:var(--dsw-alias-interactive-bg-hover,#f3f5f8)}.lx-task-files button span{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.lx-task-files-name{font-size:11px;color:var(--dsw-alias-label-secondary,#767d89)}` }),
+			/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+				className: "lx-task-files-label",
+				children: "任务文件"
+			}),
+			files.map((file) => /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("button", {
+				type: "button",
+				"data-lx": "file",
+				"data-path": file.path,
+				title: file.path,
+				"aria-label": `打开${file.label}：${file.name}`,
+				children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { children: file.label }), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+					className: "lx-task-files-name",
+					children: file.name
+				})]
+			}, file.path))
+		]
+	});
+}
+
+//#endregion
+//#region src/client/task-files.ts
+function localPath(value, cwd) {
+	if (typeof value !== "string" || !value.trim() || /[\0\r\n]/.test(value)) return null;
+	const path = value.replace(/\\/g, "/");
+	if (/^[a-z][a-z\d+.-]*:/i.test(path) && !/^[a-z]:\//i.test(path)) return null;
+	if (path.startsWith("//") || path.startsWith("~")) return null;
+	const absolute = path.startsWith("/") || /^[a-z]:\//i.test(path);
+	if (!absolute && !/\.(csv|xlsx?|parquet|json|tsv)$/i.test(path)) return null;
+	if (absolute) return path;
+	return cwd ? `${cwd.replace(/\\/g, "/").replace(/\/$/, "")}/${path.replace(/^\.\//, "")}` : path;
+}
+function taskFiles(command, args, result, cwd) {
+	if (![
+		"regress",
+		"classify",
+		"forecast",
+		"explain"
+	].includes(command)) return [];
+	const files = [];
+	const flag$1 = (name) => {
+		for (let i = args.length - 1; i >= 0; i--) {
+			if (args[i].startsWith(name + "=")) return args[i].slice(name.length + 1);
+			if (args[i] === name && args[i + 1] && !args[i + 1].startsWith("-")) return args[i + 1];
+		}
+	};
+	const add = (label, value) => {
+		const path = localPath(value, cwd);
+		if (!path) return;
+		const found = files.find((file) => file.path === path);
+		if (found) {
+			found.label += ` / ${label}`;
+			return;
+		}
+		files.push({
+			label,
+			path,
+			name: path.split("/").pop() || path
+		});
+	};
+	add("训练集", flag$1("--train"));
+	add("预测集", flag$1("--predict"));
+	if (command === "explain") {
+		add("待解释数据", flag$1("--data"));
+		add("原预测结果", flag$1("--prediction"));
+		add("场景 A 解释", flag$1("--compare-left"));
+		add("场景 B 解释", flag$1("--compare-right"));
+	}
+	add("评估真值", flag$1("--truth"));
+	add(command === "explain" ? "解释结果" : "预测结果", result?.saved_to);
+	if (command === "explain") add("解释数据 CSV", result?.csv_path);
+	return files;
 }
 
 //#endregion
@@ -1959,7 +2068,7 @@ function ExplanationHelp({ label, children }) {
 const CSS$4 = `
 .lx-middle-legend .lx-contribution-legend{width:90px;position:relative;padding-top:26px}.lx-middle-legend .lx-contribution-scale{width:10px;height:175px;margin-left:4px;background:linear-gradient(to top,#4168a9,#fff 50%,#248575)!important}.lx-middle-legend .lx-contribution-scale-labels{display:flex;position:absolute;left:20px;top:26px;height:175px;flex-direction:column-reverse;font-size:8px;gap:0}.lx-middle-legend .lx-contribution-scale-labels>span{white-space:nowrap;display:block;line-height:1.5}.lx-middle-legend .lx-contribution-unknown{justify-content:flex-start;font-size:8px}.lx-cell-popover{position:absolute;z-index:8;width:250px;padding:14px;border:1px solid var(--dsw-alias-border-primary,#dce1e8);border-radius:8px;background:var(--dsw-alias-background-primary,#fff);box-shadow:0 4px 20px #0002;font-size:12px;line-height:1.7}.lx-cell-popover p{margin:7px 0}.lx-cell-popover dl{display:grid;grid-template-columns:auto 1fr;gap:5px 14px;margin:10px 0}.lx-cell-popover dt{color:var(--dsw-alias-label-secondary)}.lx-cell-popover dd{margin:0;text-align:right;font-variant-numeric:tabular-nums}.lx-cell-actions{display:flex;justify-content:flex-end;margin-top:10px}.lx-cell-popover button{color:var(--dsw-alias-state-business-primary,#3465ce)}.lx-cell-close{float:right}.lx-matrix-display{position:relative;font-size:11px;color:var(--dsw-alias-label-secondary);margin:0}.lx-matrix-display>.lx-plot-tabs{position:absolute;right:0;top:24px;z-index:4;white-space:nowrap;background:var(--dsw-alias-background-primary,#fff);padding:10px;border:1px solid var(--dsw-alias-border-primary,#ddd);border-radius:6px}.lx-matrix-display summary{cursor:pointer}
 .lx-matrix-heading{display:flex;justify-content:space-between;align-items:center;gap:12px;font-size:11px;color:var(--dsw-alias-label-secondary);margin:2px 0 14px}
-.lx-matrix-scroll{overflow-x:auto}.lx-matrix-svg{display:block;width:100%;min-width:650px;max-height:430px;color:var(--dsw-alias-label-primary)}
+.lx-matrix-scroll{overflow-x:auto}.lx-matrix-scroll>.lx-matrix-svg{display:block;width:100%;height:auto;min-width:650px;max-height:430px;color:var(--dsw-alias-label-primary)}
 .lx-matrix-svg text{fill:currentColor;font-family:inherit;pointer-events:none}.lx-matrix-cell{cursor:pointer}.lx-matrix-cell:hover,.lx-matrix-cell:focus{outline:none;stroke:var(--dsw-alias-label-primary,#26364a);stroke-width:1;paint-order:fill stroke}
 .lx-matrix-readout{font-size:11px;min-height:20px;margin:6px 0 0;color:var(--dsw-alias-label-secondary);line-height:1.6;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
 .lx-matrix-feature{cursor:help}.lx-matrix-feature:hover,.lx-matrix-feature:focus-visible{color:var(--dsw-alias-state-business-primary,#3465ce);outline:none}.lx-matrix-feature:focus-visible rect{stroke:currentColor;stroke-width:.7}
@@ -2157,7 +2266,7 @@ function ContributionHeatmap({ data, scope = "全部", scales }) {
 						minWidth: plotWidth + 452,
 						maxHeight: "none"
 					} : void 0,
-					viewBox: `0 0 ${plotWidth + 452} ${plotHeight + (angledLabels ? 138 : 72)}`,
+					viewBox: `0 0 ${plotWidth + 452} ${plotHeight + (angledLabels ? 138 : 60)}`,
 					role: "group",
 					"aria-label": `${scope} ${samples.length} 个样本、${names.length} 个特征的贡献热力图，共 ${matrix.cellCount} 个色块`,
 					children: [
@@ -3950,7 +4059,7 @@ const CSS$3 = `
 .lx-fullscreen-dialog[open] .lx-relationship-matrix>.lx-matrix-svg{height:0;flex:1;min-height:0;min-width:0!important;max-height:none!important}
 .lx-fullscreen-dialog[open] .lx-relationship-matrix>.lx-explain-foot{flex-shrink:0}
 
-.lx-network-toolbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;font-size:12px;margin:12px 0 16px}.lx-network-toolbar strong{font-size:13px}.lx-network-toolbar>button{font-size:11px!important}.lx-network-count,.lx-network-toolbar .lx-graph-mode{color:var(--dsw-alias-label-secondary)}.lx-network-actions{display:flex;align-items:center;gap:16px;margin-left:auto}.lx-network-toolbar .lx-export{margin:0;padding:0}.lx-network-toolbar button,.lx-network-toolbar summary,.lx-network-toolbar strong,.lx-network-toolbar .lx-graph-mode{line-height:22px!important}.lx-network-toolbar .lx-network-actions>button{padding:0!important;font-size:12px!important}.lx-network-toolbar .lx-action-menu>summary{padding:0}.lx-network-count{text-align:right;font-size:11px;margin-top:8px}.lx-network-stage{display:grid;grid-template-columns:minmax(0,1fr);gap:16px;align-items:end}.lx-network-stage.has-detail{grid-template-columns:minmax(0,1fr) 220px}.lx-network-detail{box-sizing:border-box;border:1px solid var(--dsw-alias-border-l3,#dce2eb);border-radius:8px;padding:10px;background:var(--dsw-alias-background-primary,#fff);font-size:12px;min-width:0}.lx-network-detail-head{display:flex;gap:8px;justify-content:space-between;align-items:start}.lx-network-detail-head button{font-size:18px!important;line-height:1!important}.lx-network-detail .lx-explain-foot{margin-top:6px;font-size:10px}.lx-network-detail .lx-causal-graph{height:145px!important;max-height:145px!important;min-width:0!important}.lx-network-stage .lx-network-svg{height:360px;max-height:360px!important}.lx-edge-score{cursor:pointer}.lx-graph-edge-button:focus{outline:none!important}.lx-graph-edge-button:focus-visible .lx-causal-edge{stroke-width:3;stroke-dasharray:4 2}.lx-relationship-nav [data-relationship="matrix"]{margin-left:auto}.lx-relationship-nav{align-items:center}.lx-relationship-settings{position:relative}.lx-relationship-settings summary{list-style:none;cursor:pointer;padding:6px;display:flex}.lx-relationship-settings summary::-webkit-details-marker{display:none}.lx-relationship-settings[open] .lx-analysis-toolbar{position:absolute;z-index:5;right:0;top:32px;width:300px;padding:12px;border:1px solid var(--dsw-alias-border-l3,#dce2eb);border-radius:8px;background:var(--dsw-alias-background-primary,#fff);box-shadow:0 4px 16px #0001;display:flex;flex-wrap:wrap;gap:12px}.lx-matrix-stage{margin-top:16px}.lx-matrix-svg{height:400px;max-height:400px!important}.lx-matrix-stage>.lx-graph-scroll{min-width:0}.lx-network-detail .lx-explain-foot{display:flex;gap:4px;align-items:center}.lx-relationship-matrix{width:100%;max-width:620px;justify-self:center}.lx-relationship-matrix>.lx-explain-foot{text-align:center}.lx-relationship-matrix [data-pair]:focus{outline:none}.lx-relationship-matrix [data-pair]:focus-visible{stroke:#ff5b2a;stroke-width:2}@container(max-width:760px){.lx-network-stage.has-detail{grid-template-columns:1fr}.lx-network-detail{width:min(100%,220px);justify-self:end}}
+.lx-network-toolbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;font-size:12px;margin:12px 0 16px}.lx-network-toolbar strong{font-size:13px}.lx-network-toolbar>button{font-size:11px!important}.lx-network-count,.lx-network-toolbar .lx-graph-mode{color:var(--dsw-alias-label-secondary)}.lx-network-actions{display:flex;align-items:center;gap:16px;margin-left:auto}.lx-network-toolbar .lx-export{margin:0;padding:0}.lx-network-toolbar button,.lx-network-toolbar summary,.lx-network-toolbar strong,.lx-network-toolbar .lx-graph-mode{line-height:22px!important}.lx-network-toolbar .lx-network-actions>button{padding:0!important;font-size:12px!important}.lx-network-toolbar .lx-action-menu>summary{padding:0}.lx-network-count{text-align:right;font-size:11px;margin-top:8px}.lx-network-stage{display:grid;grid-template-columns:minmax(0,1fr);gap:16px;align-items:end}.lx-network-stage.has-detail{grid-template-columns:minmax(0,1fr) 220px}.lx-network-detail{box-sizing:border-box;border:1px solid var(--dsw-alias-border-l3,#dce2eb);border-radius:8px;padding:10px;background:var(--dsw-alias-background-primary,#fff);font-size:12px;min-width:0}.lx-network-detail-head{display:flex;gap:8px;justify-content:space-between;align-items:start}.lx-network-detail-head button{font-size:18px!important;line-height:1!important}.lx-network-detail .lx-explain-foot{margin-top:6px;font-size:10px}.lx-network-detail .lx-causal-graph{height:145px!important;max-height:145px!important;min-width:0!important}.lx-network-stage .lx-network-svg{height:360px;max-height:360px!important}.lx-edge-score{cursor:pointer}.lx-graph-edge-button:focus{outline:none!important}.lx-graph-edge-button:focus-visible .lx-causal-edge{stroke-width:3;stroke-dasharray:4 2}.lx-relationship-nav [data-relationship="matrix"]{margin-left:auto}.lx-relationship-nav{align-items:center}.lx-relationship-settings{position:relative}.lx-relationship-settings summary{list-style:none;cursor:pointer;padding:6px;display:flex}.lx-relationship-settings summary::-webkit-details-marker{display:none}.lx-relationship-settings[open] .lx-analysis-toolbar{position:absolute;z-index:5;right:0;top:32px;width:300px;padding:12px;border:1px solid var(--dsw-alias-border-l3,#dce2eb);border-radius:8px;background:var(--dsw-alias-background-primary,#fff);box-shadow:0 4px 16px #0001;display:flex;flex-wrap:wrap;gap:12px}.lx-matrix-stage{margin-top:16px}.lx-relationship-matrix>.lx-matrix-svg{height:400px;max-height:400px!important}.lx-matrix-stage>.lx-graph-scroll{min-width:0}.lx-network-detail .lx-explain-foot{display:flex;gap:4px;align-items:center}.lx-relationship-matrix{width:100%;max-width:620px;justify-self:center}.lx-relationship-matrix>.lx-explain-foot{text-align:center}.lx-relationship-matrix [data-pair]:focus{outline:none}.lx-relationship-matrix [data-pair]:focus-visible{stroke:#ff5b2a;stroke-width:2}@container(max-width:760px){.lx-network-stage.has-detail{grid-template-columns:1fr}.lx-network-detail{width:min(100%,220px);justify-self:end}}
 
 @container(min-width:1000px){.lx-prediction-comparison{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px}.lx-prediction-comparison>p{grid-column:1/-1}.lx-prediction-comparison>div+div{border-top:0!important;margin-top:0!important;padding-top:0!important}.lx-prediction-comparison .lx-matrix-svg{min-width:0}.lx-prediction-comparison .lx-matrix-expanded .lx-matrix-svg{min-width:650px}}
 .lx-insight{padding:12px 15px;border-left:3px solid #4168a9;background:color-mix(in srgb,#4168a9 5%,transparent);font-size:13px;line-height:1.7;margin:0 0 18px}.lx-relationship-columns{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px}.lx-relationship-detail{margin-top:16px}.lx-relationship-detail select{max-width:100%}.lx-relationship-columns .lx-causal-graph{max-height:380px}@container(max-width:650px){.lx-relationship-columns{grid-template-columns:1fr}}
@@ -4465,6 +4574,12 @@ const CSS$1 = `
 .lx-result{border:1px solid var(--dsw-alias-border-l3,#e3e6eb);border-radius:12px;padding:16px 18px;margin:4px 0;font:inherit;font-size:13px;line-height:1.6;min-width:0;overflow-wrap:anywhere;color:var(--dsw-alias-label-primary)}
 .lx-result-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .lx-result-brand{font-size:11px;letter-spacing:.04em;color:var(--dsw-alias-label-tertiary);margin-bottom:5px}
+.lx-result-topline{display:flex;align-items:center;justify-content:space-between;min-height:24px}
+.lx-result button.lx-collapse{display:inline-flex;align-items:center;justify-content:center;width:28px;height:24px;padding:0;border-radius:4px;flex:none}
+.lx-result button.lx-collapse:hover{background:var(--dsw-alias-interactive-bg-hover,#f3f5f8)}
+.lx-result[data-collapsed=true]>:not(style):not(.lx-result-brand):not(.lx-result-head){display:none!important}
+.lx-result[data-collapsed=true] .lx-running-copy>.lx-result-meta{display:none}
+.lx-result.lx-running[data-collapsed=true]>.lx-running-spinner,.lx-result.lx-running[data-collapsed=true]>.lx-running-copy,.lx-result.lx-running[data-collapsed=true]>.lx-collapse{display:flex!important}
 .lx-result h3{margin:0;font:inherit;font-weight:600;font-size:15px}
 .lx-result-status{display:inline-flex;align-items:center;gap:5px;font-size:12px;margin-left:auto;color:var(--dsw-alias-label-secondary)}
 .lx-result-status::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
@@ -4502,6 +4617,7 @@ function LimixToolCard({ callId, block, inspect, cwd, openFile }) {
 	const [showPredictionCheck, setShowPredictionCheck] = (0, react.useState)(false);
 	const [showRelationData, setShowRelationData] = (0, react.useState)(false);
 	const [showMetrics, setShowMetrics] = (0, react.useState)(false);
+	const [collapsed, setCollapsed] = (0, react.useState)(false);
 	const fullscreen = useCardFullscreen();
 	const rootRef = (0, react.useRef)(null);
 	const inspectRef = (0, react.useRef)(inspect);
@@ -4514,12 +4630,26 @@ function LimixToolCard({ callId, block, inspect, cwd, openFile }) {
 		const onNativeClick = (e) => {
 			const hit = e.target.closest?.("[data-lx]");
 			if (!hit || !el.contains(hit)) return;
-			if (hit.dataset.lx === "raw") setShowRaw((s) => !s);
+			if (hit.dataset.lx === "collapse") {
+				el.querySelectorAll("details.lx-action-menu[open]").forEach((menu) => {
+					menu.open = false;
+				});
+				setCollapsed((s) => !s);
+			} else if (hit.dataset.lx === "expand-card") setCollapsed(false);
+			else if (hit.dataset.lx === "raw") setShowRaw((s) => !s);
 			else if (hit.dataset.lx === "prediction-check") setShowPredictionCheck((s) => !s);
 			else if (hit.dataset.lx === "relation-data") setShowRelationData((s) => !s);
 			else if (hit.dataset.lx === "metrics") setShowMetrics((s) => !s);
 			else if (hit.dataset.lx === "inspect") inspectRef.current?.();
-			else if (hit.dataset.lx === "file" && hit.dataset.path) openFileRef.current?.(hit.dataset.path);
+			else if (hit.dataset.lx === "file" && hit.dataset.path) {
+				const dialog = fullscreen.dialogRef.current;
+				if (dialog?.open) {
+					dialog.setAttribute("aria-modal", "false");
+					dialog.setAttribute("role", "presentation");
+					dialog.close();
+				}
+				openFileRef.current?.(hit.dataset.path);
+			}
 		};
 		el.addEventListener("click", onNativeClick);
 		return () => el.removeEventListener("click", onNativeClick);
@@ -4705,6 +4835,28 @@ function LimixToolCard({ callId, block, inspect, cwd, openFile }) {
 	const detailsId = `lx-result-details-${String(callId).replace(/[^a-zA-Z0-9_-]/g, "-")}`;
 	const metricsId = `${detailsId}-metrics`;
 	const compact = help || command === "health" || command === "runtime" || parsed?.kind === "report_facts";
+	const files = help ? [] : taskFiles(command, argList$1, parsed, cwd);
+	const fileLinks = openFile && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(TaskFiles, { files });
+	const collapseButton = !fullscreen.expanded && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+		type: "button",
+		className: "lx-collapse",
+		"data-lx": "collapse",
+		"aria-label": collapsed ? "展开卡片" : "收起卡片",
+		title: collapsed ? "展开卡片" : "收起卡片",
+		"aria-expanded": !collapsed,
+		children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)("svg", {
+			width: "16",
+			height: "16",
+			viewBox: "0 0 20 20",
+			fill: "none",
+			stroke: "currentColor",
+			strokeWidth: "1.5",
+			strokeLinecap: "round",
+			strokeLinejoin: "round",
+			"aria-hidden": "true",
+			children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)("path", { d: collapsed ? "m5 7 5 5 5-5" : "m5 12 5-5 5 5" })
+		})
+	});
 	const rawToggle = text$1 && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
 		type: "button",
 		"data-lx": "raw",
@@ -4743,6 +4895,7 @@ function LimixToolCard({ callId, block, inspect, cwd, openFile }) {
 				children: /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("section", {
 					ref: rootRef,
 					className: "lx-result lx-running",
+					"data-collapsed": collapsed,
 					"aria-label": runningTitle,
 					children: [
 						/* @__PURE__ */ (0, react_jsx_runtime.jsx)("style", { children: CSS$1 + CARD_FULLSCREEN_CSS }),
@@ -4764,7 +4917,8 @@ function LimixToolCard({ callId, block, inspect, cwd, openFile }) {
 							className: "lx-running-time",
 							title: "本次界面等待时长；重新打开页面会重新计时",
 							children: ["已等待 ", waitingSeconds < 60 ? `${waitingSeconds} 秒` : `${Math.floor(waitingSeconds / 60)} 分 ${waitingSeconds % 60} 秒`]
-						})
+						}),
+						collapseButton
 					]
 				})
 			})
@@ -4782,12 +4936,13 @@ function LimixToolCard({ callId, block, inspect, cwd, openFile }) {
 			children: /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("section", {
 				className: `lx-result${compact ? " lx-result-compact" : ""}${explanation?.mode === "local" && ((explanation.requested_count ?? 1) > 1 || explanation.task_type === "timeseries") ? " lx-contribution-card" : ""}${explanation && explanation.mode !== "local" && !explanation.comparison ? " lx-relationship-card" : ""}`,
 				ref: rootRef,
+				"data-collapsed": collapsed,
 				"aria-label": `LimiX ${title}`,
 				children: [
 					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("style", { children: CSS$1 + CARD_FULLSCREEN_CSS }),
-					!compact && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
-						className: "lx-result-brand",
-						children: "LimiX"
+					!compact && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+						className: "lx-result-brand lx-result-topline",
+						children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { children: "LimiX" }), collapseButton]
 					}),
 					/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 						className: "lx-result-head",
@@ -4803,10 +4958,12 @@ function LimixToolCard({ callId, block, inspect, cwd, openFile }) {
 								role: "status",
 								children: !help && command === "health" && status.kind === "done" ? "连接正常" : status.label
 							}),
-							compact && rawToggle,
+							compact && !collapsed && rawToggle,
+							compact && collapseButton,
 							(explanation || benchmark) && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
 								type: "button",
 								className: "lx-fullscreen-button",
+								"data-lx": "expand-card",
 								"data-lx-fullscreen": true,
 								"aria-label": fullscreen.expanded ? "退出全屏查看" : benchmark ? "全屏查看模型比较" : "全屏查看解释",
 								title: fullscreen.expanded ? "退出全屏（Esc）" : benchmark ? "全屏查看模型比较" : "全屏查看解释",
@@ -4990,18 +5147,13 @@ function LimixToolCard({ callId, block, inspect, cwd, openFile }) {
 											"aria-pressed": showPredictionCheck,
 											children: showPredictionCheck ? "收起预测值核对" : "预测值核对"
 										}),
-										file && openFile && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
-											type: "button",
-											"data-lx": "file",
-											"data-path": file,
-											children: "打开结果文件 ↗"
-										}),
 										rawToggle,
 										inspect && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
 											type: "button",
 											"data-lx": "inspect",
 											children: "检视调用 ↗"
-										})
+										}),
+										fileLinks
 									]
 								})
 							] }),
@@ -5010,7 +5162,7 @@ function LimixToolCard({ callId, block, inspect, cwd, openFile }) {
 								download: savedCsv.split("/").pop(),
 								children: "下载 CSV ↓"
 							}),
-							!explanation && file && (openFile ? /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("button", {
+							!explanation && !prediction && file && (openFile ? /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("button", {
 								type: "button",
 								"data-lx": "file",
 								"data-path": file,
@@ -5023,15 +5175,35 @@ function LimixToolCard({ callId, block, inspect, cwd, openFile }) {
 								className: "lx-result-meta",
 								children: ["已保存 · ", file.split("/").pop()]
 							})),
-							!explanation && rawToggle,
-							metrics.length > 0 && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+							prediction && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(ActionMenu, {
+								label: "更多",
+								up: true,
+								children: [
+									rawToggle,
+									metrics.length > 0 && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+										type: "button",
+										"data-lx": "metrics",
+										"aria-expanded": showMetrics,
+										"aria-controls": metricsId,
+										children: showMetrics ? "收起指标说明" : "指标说明"
+									}),
+									inspect && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+										type: "button",
+										"data-lx": "inspect",
+										children: "检视调用 ↗"
+									}),
+									fileLinks
+								]
+							}),
+							!explanation && !prediction && rawToggle,
+							!prediction && metrics.length > 0 && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
 								type: "button",
 								"data-lx": "metrics",
 								"aria-expanded": showMetrics,
 								"aria-controls": metricsId,
 								children: showMetrics ? "收起指标说明 ↑" : "指标说明 ↓"
 							}),
-							!explanation && showRaw && inspect && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+							!explanation && !prediction && showRaw && inspect && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
 								type: "button",
 								"data-lx": "inspect",
 								children: "检视调用 ↗"

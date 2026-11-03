@@ -1,6 +1,6 @@
 {
   "name": "dsh-limix-data",
-  "version": "0.3.13",
+  "version": "0.3.14",
   "type": "module",
   "description": "配置数据库连接，查看库表结构，执行只读查询并导出 CSV，供 LimiX 预测分析使用。",
   "main": "lib/index.js",

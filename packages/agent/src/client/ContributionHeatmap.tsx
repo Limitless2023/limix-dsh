@@ -1,7 +1,7 @@
 /**
  * [INPUT]: 完整贡献矩阵、统一图例与 ExplanationHelp 的即时说明交互。
  * [OUTPUT]: 全量热力图、固定平均贡献、同行显示设置和中间竖向色阶、悬停底部读数与精简整行选中浮层；显式按钮跳转样本；密集轴标签斜排，完整字段名即时可查。
- * [POS]: ExplanationBatch 默认视图；父组件执行样本跳转，不重跑解释。
+ * [POS]: ExplanationBatch 默认视图；普通卡按画布比例定高，全屏适配剩余空间；父组件执行样本跳转，不重跑解释。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -13,7 +13,7 @@ import { useExplanationHelp } from './ExplanationHelp'
 const CSS = `
 .lx-middle-legend .lx-contribution-legend{width:90px;position:relative;padding-top:26px}.lx-middle-legend .lx-contribution-scale{width:10px;height:175px;margin-left:4px;background:linear-gradient(to top,#4168a9,#fff 50%,#248575)!important}.lx-middle-legend .lx-contribution-scale-labels{display:flex;position:absolute;left:20px;top:26px;height:175px;flex-direction:column-reverse;font-size:8px;gap:0}.lx-middle-legend .lx-contribution-scale-labels>span{white-space:nowrap;display:block;line-height:1.5}.lx-middle-legend .lx-contribution-unknown{justify-content:flex-start;font-size:8px}.lx-cell-popover{position:absolute;z-index:8;width:250px;padding:14px;border:1px solid var(--dsw-alias-border-primary,#dce1e8);border-radius:8px;background:var(--dsw-alias-background-primary,#fff);box-shadow:0 4px 20px #0002;font-size:12px;line-height:1.7}.lx-cell-popover p{margin:7px 0}.lx-cell-popover dl{display:grid;grid-template-columns:auto 1fr;gap:5px 14px;margin:10px 0}.lx-cell-popover dt{color:var(--dsw-alias-label-secondary)}.lx-cell-popover dd{margin:0;text-align:right;font-variant-numeric:tabular-nums}.lx-cell-actions{display:flex;justify-content:flex-end;margin-top:10px}.lx-cell-popover button{color:var(--dsw-alias-state-business-primary,#3465ce)}.lx-cell-close{float:right}.lx-matrix-display{position:relative;font-size:11px;color:var(--dsw-alias-label-secondary);margin:0}.lx-matrix-display>.lx-plot-tabs{position:absolute;right:0;top:24px;z-index:4;white-space:nowrap;background:var(--dsw-alias-background-primary,#fff);padding:10px;border:1px solid var(--dsw-alias-border-primary,#ddd);border-radius:6px}.lx-matrix-display summary{cursor:pointer}
 .lx-matrix-heading{display:flex;justify-content:space-between;align-items:center;gap:12px;font-size:11px;color:var(--dsw-alias-label-secondary);margin:2px 0 14px}
-.lx-matrix-scroll{overflow-x:auto}.lx-matrix-svg{display:block;width:100%;min-width:650px;max-height:430px;color:var(--dsw-alias-label-primary)}
+.lx-matrix-scroll{overflow-x:auto}.lx-matrix-scroll>.lx-matrix-svg{display:block;width:100%;height:auto;min-width:650px;max-height:430px;color:var(--dsw-alias-label-primary)}
 .lx-matrix-svg text{fill:currentColor;font-family:inherit;pointer-events:none}.lx-matrix-cell{cursor:pointer}.lx-matrix-cell:hover,.lx-matrix-cell:focus{outline:none;stroke:var(--dsw-alias-label-primary,#26364a);stroke-width:1;paint-order:fill stroke}
 .lx-matrix-readout{font-size:11px;min-height:20px;margin:6px 0 0;color:var(--dsw-alias-label-secondary);line-height:1.6;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
 .lx-matrix-feature{cursor:help}.lx-matrix-feature:hover,.lx-matrix-feature:focus-visible{color:var(--dsw-alias-state-business-primary,#3465ce);outline:none}.lx-matrix-feature:focus-visible rect{stroke:currentColor;stroke-width:.7}
@@ -109,7 +109,7 @@ export function ContributionHeatmap({ data, scope = '全部', scales }: { data: 
     <style>{CSS}</style>
     <div className="lx-matrix-heading"><span>{scope} {samples.length} 个样本 · {names.length} 个特征</span>
     <details className="lx-matrix-display"><summary>显示设置</summary><div className="lx-plot-tabs" aria-label="热力图显示尺寸"><button type="button" data-lx-matrix-size="overview" aria-pressed={!readable}>全部概览</button><button type="button" data-lx-matrix-size="readable" aria-pressed={readable}>清晰细看</button></div></details></div>
-    <div className="lx-matrix-scroll"><svg className="lx-matrix-svg" style={readable ? { minWidth: plotWidth + 452, maxHeight: 'none' } : undefined} viewBox={`0 0 ${plotWidth + 452} ${plotHeight + (angledLabels ? 138 : 72)}`} role="group" aria-label={`${scope} ${samples.length} 个样本、${names.length} 个特征的贡献热力图，共 ${matrix.cellCount} 个色块`}>
+    <div className="lx-matrix-scroll"><svg className="lx-matrix-svg" style={readable ? { minWidth: plotWidth + 452, maxHeight: 'none' } : undefined} viewBox={`0 0 ${plotWidth + 452} ${plotHeight + (angledLabels ? 138 : 60)}`} role="group" aria-label={`${scope} ${samples.length} 个样本、${names.length} 个特征的贡献热力图，共 ${matrix.cellCount} 个色块`}>
       <foreignObject x={plotWidth + 65} y={65} width="95" height="260"><div className="lx-middle-legend"><ContributionLegend maximum={maximum} unknown={unknown} neutral={neutral} vertical/></div></foreignObject>
       <text x="36" y="12" fontSize="11" fontWeight="500">整体贡献分布</text><text x="0" y="25" fontSize="10" opacity=".6">{data.task_type === 'timeseries' ? '预测步' : '原始行'}</text>
       <g transform={`translate(${plotWidth - 448} 0)`} role="group" aria-label="各影响因子影响分数对比">

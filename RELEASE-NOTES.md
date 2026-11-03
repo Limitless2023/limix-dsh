@@ -1,28 +1,26 @@
-# LimiX Agent v0.3.13
+# LimiX Agent v0.3.14
 
-五个 Harness 插件统一更新为 0.3.13，保留 npm 与 GitHub Release tgz 分发。本轮功能修改集中在 agent 与 tool；data、preset、cover 同步版本。
+五个 Harness 插件统一更新为 0.3.14。本轮功能修改集中在 agent；data、tool、preset、cover 同步版本。npm 与 GitHub Release 使用同一批 tgz。
 
 ## 本次变化
 
-- 影响因子热力图显示全部返回样本；点击色块固定整行与详情，右侧始终显示当前样本范围的带符号平均贡献。
-- 单条解释独立展示正负贡献图；样本选择器放在右侧。预测重算核对移到“更多”，原始数据与下载入口统一收在底栏。
-- 因果关系网络支持点击节点高亮分数、点击连线显示原值散点、橙色选中边；保留未连接变量。关系矩阵作为辅助入口，显示阈值只在本地筛选。
-- 场景关系对比默认展示分数差异排名与双条图；分组依据和关系矩阵收进“更多”，两组散点共用坐标范围。
-- 比较前核验目标、变量集合、服务返回模型和处理口径；不同模型或缺少模型身份时拒绝比较，支持使用原回执续查。
-- 修复单条导出误带全量样本、分组导出标签歧义，以及场景比较结果过长被 DSH 截断的问题。完整比较文件通过 SHA256 核验后加载。
+- 工具卡右上角支持折叠与展开，保留当前图表和样本选择；刷新会恢复默认展开。
+- 预测与解释卡的“更多”菜单提供本次训练集、预测集、解释输入和已保存结果的本地文件入口。点击后交给 Harness 侧栏打开；全屏中打开文件会先退出全屏。
+- 菜单使用顶层浮层，避免被会话滚动区域裁切。
+- 修复贡献热力图误用关系矩阵固定高度的问题，减少普通卡片上下留白，保留全屏布局和底部操作入口。
 
 ## 安装与更新
 
 最低支持 DeepSeek Harness 0.2.1-rc.5。正常退出桌面应用后，在原 profile 中执行：
 
 ```sh
-dsh plugin --profile desktop add --save-exact --registry=https://registry.npmjs.org/ dsh-limix-data@0.3.13 dsh-limix-tool@0.3.13 dsh-limix-agent@0.3.13 dsh-limix-preset@0.3.13 dsh-limix-cover@0.3.13
+dsh plugin --profile desktop add --save-exact --registry=https://registry.npmjs.org/ dsh-limix-data@0.3.14 dsh-limix-tool@0.3.14 dsh-limix-agent@0.3.14 dsh-limix-preset@0.3.14 dsh-limix-cover@0.3.14
 ```
 
 完整步骤见 [NPM-DISTRIBUTION.md](NPM-DISTRIBUTION.md)。非商业许可与商业授权入口不变。
 
 ## 验证与边界
 
-本轮验收复用真实钢材、光学结果，在独立 DSH Web 环境中续查并操作卡片，不重复提交预测或解释。构建、自动测试、五包打包与树外载入通过。详见 [审查记录](reviews/causal-ui-0313-review.md)。
+五包构建、自动测试、打包检查与树外载入通过。独立 DSH 实测折叠、全屏、输入与结果文件预览，以及热力图普通/全屏/侧栏窄布局；另执行真实回归验证结果文件入口。详见 [审查记录](reviews/card-files-0314-review.md)。
 
-关系分数与贡献分数不等于经过验证的干预效果。场景比较的取值范围、样本组成会影响结果。光学 20 变量无向解释的后端错误保留，本轮不声称修复。报告正文与业务判断仍需人工审阅；咨询推断的既有问题未重新宣称通过。Windows、第二台电脑及全部预测 API 未在本轮重新验收。
+文件被移动或删除后，入口不能保证仍可打开；文件权限继续由 Harness 校验。仅使用远程版本 ID 的任务不补造本地文件入口。报告与业务判断仍需人工审阅。光学 20 变量无向解释的后端错误保留；未宣称修复。Windows、第二台电脑和全部预测 API 未在本轮重新验收。

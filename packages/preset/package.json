@@ -1,6 +1,6 @@
 {
   "name": "dsh-limix-preset",
-  "version": "0.3.13",
+  "version": "0.3.14",
   "type": "module",
   "description": "文理双脑智能体：梳理业务场景，定义预测任务，让 LimiX 落地业务，创造价值；保留用户已保存的默认模式。",
   "files": [

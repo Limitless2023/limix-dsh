@@ -64,3 +64,11 @@ npm提交后有数分钟的处理期，期间404如实记录；待全部可下�
 独立DSH_HOME使用桌面自带CLI完成公共npm0.3.11→0.3.12升级。五包实际版本、精确依赖和bundle去重检查通过；标准模式选择、数据源文件、profile patch保持一致。假凭据通过安装包内实际读取器校验，用户真实API配置哈希不变。npm处理期间首次升级因版本暂不可用失败；保留失败日志，五包全部可下载后原环境重试通过。
 
 验收证据位于Coffee/_recon/npm-0312-public：registry.json、migration-results.json、首次失败与重试日志、github-assets。不上传测试凭据或用户配置。本轮未更新日常desktop安装；未重新验证Windows、第二台电脑、tgz迁移或全部业务API。提示词推断、报告人工审阅和光学20变量无向解释上游问题继续保留。
+
+## 0.3.13 发布与升级
+
+2026-11-03：五包从干净提交8f13893构建。公共npm0.3.13五包真实下载的integrity、SHA256与清单一致；GitHub Release v0.3.13的五个tgz、manifest和SHA256SUMS回下载逐字节一致。
+
+独立DSH_HOME完成公共npm0.3.12→0.3.13升级。五包实际版本与精确依赖一致，bundle无重复；标准模式选择、数据源文件和profile patch保留。安装包实际凭据读取器通过测试，用户真实API配置哈希不变。npm处理期间版本暂不可用，重试通过；一次下载TLS连接中断后重新核对五包通过。
+
+证据位于Coffee/_recon/npm-0313-public。实际DSH因果界面验收和保留问题见[本轮审查](causal-ui-0313-review.md)。本轮未升级日常desktop，未重做首次安装、tgz迁移、Windows或第二台电脑验收。

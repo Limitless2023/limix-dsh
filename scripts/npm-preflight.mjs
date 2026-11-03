@@ -1,5 +1,5 @@
 /**
- * [INPUT]: release.sh 生成的五包、版本清单与 npm CLI。
+ * [INPUT]: release.sh 生成的五包、版本清单与 npm CLI（兼容按包名分组的 JSON 回执）。
  * [OUTPUT]: npm-preflight.json；检查元数据并逐包执行 publish --dry-run。
  * [POS]: npm 发布前检查；无实际发布入口，不修改 registry 或凭据。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
@@ -51,7 +51,9 @@ for (const { dir, manifest } of definitions) {
     assert.equal(packaged, await readFile(resolve(root, filename), 'utf8'), `${expected}: ${filename} 须随包分发且与根目录一致`)
   }
   const result = JSON.parse(execFileSync('npm', ['publish', tarball, '--dry-run', '--ignore-scripts', '--json'], { encoding: 'utf8' }))
-  assert.equal(result.id, `${expected}@${version}`)
+  const published = result[expected] ?? result
+  assert.equal(published.id, `${expected}@${version}`)
+  assert.equal(published.integrity, entry.integrity, `${expected}: dry-run 内容须与候选包一致`)
   checks.push({ name: expected, version, dry_run: 'passed', license: manifest.license || 'UNDECLARED' })
 }
 await writeFile(resolve(output, 'npm-preflight.json'), JSON.stringify({

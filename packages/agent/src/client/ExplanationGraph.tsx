@@ -5,7 +5,7 @@
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
-import { graphLayout } from './graph-layout'
+import { graphLayout, graphEdgeGeometry } from './graph-layout'
 import { number, type ExplanationData } from './explanation-data'
 import { ExplanationHelp } from './ExplanationHelp'
 import { ExplanationExport } from './ExplanationExport'
@@ -58,22 +58,13 @@ export function ExplanationGraph({ data, onPair, detail, selectedPair = [], onCl
     <div className={`lx-network-stage${detail ? ' has-detail' : ''}`}><div className="lx-graph-scroll" ref={canvas}><svg className="lx-causal-graph lx-network-svg" viewBox={`0 0 ${width} ${height}`} style={{ minWidth: 520 }} role="group" aria-label={`${nodes.length} 个变量、${edges.length} 条真实${data.mode === 'directed' ? '有向' : '无向'}关系`}>
       <defs><marker id={`lx-arrow-${id}`} markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M 0 1 L 6 3.5 L 0 6" fill="none" stroke="#6f8ebd" /></marker><marker id={`lx-orange-arrow-${id}`} markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M 0 1 L 6 3.5 L 0 6" fill="none" stroke="#ff5b2a"/></marker></defs>
       {edges.map((e, i) => {
-        const a = positions.get(e.source)!, b = positions.get(e.target)!
-        if (!a || !b) return null
-        const right = b[0] > a[0], same = b[0] === a[0]
-        const ax = a[0] + (right || same ? 68 : -68), bx = b[0] + (right ? -68 : 68)
-        const port = (node: string, other: string, outgoing: boolean) => {
-          const peers = edges.filter(edge => outgoing ? edge.source === node : edge.target === node)
-            .map(edge => outgoing ? edge.target : edge.source)
-            .sort((x,y) => (positions.get(x)?.[1] ?? 0) - (positions.get(y)?.[1] ?? 0))
-          return peers.length > 1 ? -14 + 28 * peers.indexOf(other) / (peers.length - 1) : 0
-        }
-        const ay = a[1] + port(e.source,e.target,true), by = b[1] + port(e.target,e.source,false)
-        const path = same ? `M ${ax} ${ay} C ${ax + 30} ${ay}, ${bx + 30} ${by}, ${bx} ${by}` : `M ${ax} ${ay} C ${(ax+bx)/2} ${ay}, ${(ax+bx)/2} ${by}, ${bx} ${by}`
+        const route = graphEdgeGeometry(e, edges, positions)
+        if (!route) return null
+        const { path } = route
         const chosen = selectedPair[0] === e.source && selectedPair[1] === e.target
         const emphasized = selectedPair.length ? chosen : !selected || e.source === selected || e.target === selected
         return <g key={i} data-lx-graph="edge" data-source={e.source} data-target={e.target} className="lx-graph-edge-button" aria-pressed={chosen} role="button" tabIndex={0} aria-label={`查看${label(e.source)}到${label(e.target)}的关系`} opacity={emphasized ? 1 : .12}><path d={path} fill="none" stroke="transparent" strokeWidth="12" style={{cursor:'pointer'}}/><path className="lx-causal-edge" d={path} style={{ stroke: chosen ? "#ff5b2a" : undefined, strokeWidth: chosen ? 2.6 : selected && emphasized ? 2.1 : 1.25 }} markerEnd={data.mode === 'directed' ? `url(#${chosen ? "lx-orange-arrow" : "lx-arrow"}-${id})` : undefined}><title>{`${label(e.source)} ${data.mode === 'directed' ? '→' : '—'} ${label(e.target)}：${number(e.weight)}`}</title></path>
-          {(chosen || (selected ? emphasized : focus)) && <g transform={`translate(${same ? ax+22.5 : (ax+bx)/2},${(ay+by)/2})`} className="lx-edge-score"><title>{`模型关系分数 ${e.weight}；来源 result.edges[].weight`}</title><rect x="-23" y="-9" width="46" height="18" rx="4" fill="var(--dsw-alias-background-primary,#fff)" stroke={chosen ? "#ff5b2a" : "#cbd7e8"}/><text y="4" textAnchor="middle" fontSize="10" style={{fill:chosen ? "#ff5b2a" : undefined}}>{e.weight.toFixed(3)}</text></g>}
+          {(chosen || (selected ? emphasized : focus)) && <g transform={`translate(${route.label[0]},${route.label[1]})`} className="lx-edge-score"><title>{`模型关系分数 ${e.weight}；来源 result.edges[].weight`}</title><rect x="-23" y="-9" width="46" height="18" rx="4" fill="var(--dsw-alias-background-primary,#fff)" stroke={chosen ? "#ff5b2a" : "#cbd7e8"}/><text y="4" textAnchor="middle" fontSize="10" style={{fill:chosen ? "#ff5b2a" : undefined}}>{e.weight.toFixed(3)}</text></g>}
         </g>
       })}
       {nodes.map(n => { const [x, y] = positions.get(n)!; return <g key={n} data-lx-graph="node" data-node={n} role="button" tabIndex={0} aria-label={`高亮${label(n)}的关系`} aria-pressed={selected === n} opacity={active.has(n) ? 1 : .35} className="lx-graph-node-button">

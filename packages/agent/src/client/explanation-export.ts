@@ -6,7 +6,7 @@
  */
 import { contributionColor, contributionColors, directionLabel, number, sampleLabel, type ExplanationData } from './explanation-data'
 import { contributionMatrix, contributionScales } from './contribution-matrix'
-import { graphLayout } from './graph-layout'
+import { graphLayout, graphEdgeGeometry } from './graph-layout'
 
 export interface ExportTheme { background: string; foreground: string; border: string }
 export const defaultExportTheme: ExportTheme = { background: '#ffffff', foreground: '#202734', border: '#dce2eb' }
@@ -88,11 +88,10 @@ export function graphExportSvg(data: ExplanationData, theme = defaultExportTheme
   let svg = start(width, height, theme, `关系探索 · ${data.target_label ?? data.target}`) + text(36, 38, `关系探索 · ${data.target_label ?? data.target}`, 22, 'font-weight="600"') + text(36, 66, `${scope} · ${nodes.length} 个变量 · ${edges.length} 条关系`, 13)
   svg += `<defs><marker id="arrow" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0 1 L6 3.5 L0 6" fill="none" stroke="#7793c3"/></marker></defs><g transform="translate(36 90)">`
   edges.forEach(e => {
-    const a = layout.positions.get(e.source), b = layout.positions.get(e.target); if (!a || !b) return
-    const right = b[0] > a[0], same = b[0] === a[0], ax = a[0] + (right || same ? 68 : -68), bx = b[0] + (right ? -68 : 68)
-    const d = same ? `M${ax} ${a[1]} C${ax + 30} ${a[1]},${bx + 30} ${b[1]},${bx} ${b[1]}` : `M${ax} ${a[1]} C${(ax + bx) / 2} ${a[1]},${(ax + bx) / 2} ${b[1]},${bx} ${b[1]}`
+    const route = graphEdgeGeometry(e, edges, layout.positions); if (!route) return
+    const d = route.path
     svg += `<path d="${d}" fill="none" stroke="#7793c3" stroke-width="1.5"${data.mode === 'directed' ? ' marker-end="url(#arrow)"' : ''}><title>${escape(`${label(e.source)} ${data.mode === 'directed' ? '→' : '—'} ${label(e.target)}：${e.weight}`)}</title></path>`
-    if (edges.length <= 5) svg += text((ax + bx) / 2, (a[1] + b[1]) / 2 - 7, number(e.weight), 11, 'text-anchor="middle"')
+    if (edges.length <= 5) svg += text(route.label[0], route.label[1] - 7, e.weight.toFixed(3), 10, 'text-anchor="middle"')
   })
   nodes.forEach(name => { const [x, y] = layout.positions.get(name)!; svg += `<rect x="${x - 68}" y="${y - 22}" width="136" height="44" rx="5" fill="${theme.background}" stroke="${name === data.target ? '#7793c3' : theme.border}"/>` + text(x, y - 2, label(name), 12, 'text-anchor="middle"') + text(x, y + 14, name, 10, 'text-anchor="middle" opacity=".65"') })
   return svg + '</g>' + text(36, height - 22, '连线表示模型发现的关系，数值为关系分数。', 12) + end

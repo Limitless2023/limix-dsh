@@ -2,7 +2,7 @@
 
 > L2 | 父级: ../CLAUDE.md
 
-explanation-batch.test.cjs - 验证整体分布默认入口、独立单条入口、819 个色块、带符号均值抵消与排序、缺方向、统一色阶、20 变量网络与环。
+explanation-batch.test.cjs - 验证整体分布默认入口、独立单条入口、819 个色块、带符号均值抵消与排序、缺方向、统一色阶、20 变量网络与环、最右列回绕连线和标签边界。
 explanation-analysis.test.cjs - 单条导出范围与两组导出口径； 验证任务身份、行步边界、中性与缺方向、时序未知尺度、筛选和独立 SVG。
 fixtures/explanation-batch.json - 真实 63×13 解释数据；无凭证。
 fixtures/explanation-network.json - 真实 20 变量、28 条边网络。

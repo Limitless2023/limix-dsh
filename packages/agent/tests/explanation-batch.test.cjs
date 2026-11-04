@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 真实 63×13 贡献与 20 变量网络；批量和布局纯函数。
- * [OUTPUT]: 全量矩阵、带符号均值与未知方向、原始行映射、环图及错误文件验证。
+ * [OUTPUT]: 全量矩阵、带符号均值与未知方向、原始行映射、环图、回绕连线边界及错误文件验证。
  * [POS]: 解释展示契约；交互另在桌面实际验证。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
@@ -142,4 +142,31 @@ test('影响分数只展示带符号均值，先抵消再排序，缺失方向�
   assert.equal(attr(negative,'x')+attr(negative,'width'),attr(positive,'x'),'负向终点与正向起点共享零线')
   assert.match(html,/平均贡献 \+0\.4/); assert.match(html,/平均贡献 -0\.6/)
   assert.match(html,/1 个样本缺少方向/)
+})
+
+test('最右列循环关系的曲线和分数标签完整落在画布内', () => {
+  const { graphEdgeGeometry } = require('../src/client/graph-layout.ts')
+  const nodes = ['source', 'middle', 'pressure1', 'pressure2', 'power']
+  const edges = [['source','middle'], ['middle','pressure1'], ['pressure1','pressure2'], ['pressure2','power'], ['power','pressure1']].map(([source,target]) => ({source,target,weight:.945}))
+  for (const aspect of [1.2, 1.9, 3]) {
+    const layout = graphLayout(nodes, edges, aspect)
+    const right = Math.max(...[...layout.positions.values()].map(([x]) => x))
+    assert.equal(layout.positions.get('pressure2')[0], right)
+    for (const edge of edges) {
+      const route = graphEdgeGeometry(edge, edges, layout.positions)
+      assert.ok(route.right + 12 <= layout.width)
+      assert.ok(route.bottom + 12 <= layout.height)
+      // 逐点检查实际 Bézier 曲线，避免仅验证边界计算本身。
+      const [ax,ay,cx,cy,dx,dy,bx,by] = route.path.match(/-?\d+(?:\.\d+)?/g).map(Number)
+      for (let i=0;i<=100;i++) {
+        const t=i/100, u=1-t
+        const x=u*u*u*ax+3*u*u*t*cx+3*u*t*t*dx+t*t*t*bx
+        const y=u*u*u*ay+3*u*u*t*cy+3*u*t*t*dy+t*t*t*by
+        assert.ok(x>=6 && x<=layout.width-6)
+        assert.ok(y>=6 && y<=layout.height-6)
+      }
+      assert.ok(route.label[0]+23 <= layout.width-12)
+    }
+    assert.equal(layout.positions.size, nodes.length)
+  }
 })

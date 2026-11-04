@@ -20,8 +20,8 @@ dist/ - 本地分发压缩包；发布前按源码重建。
 LICENSE / LICENSING.md / THIRD-PARTY-NOTICES.md - 非商业授权原文、联系入口与第三方/历史权利。
 README.md - 安装步骤、构建入口和已知边界。
 INSTALL.md - 同事安装说明。
-NPM-DISTRIBUTION.md - npm 分发方案与 0.3.16 发布状态、隔离验收与安装文案。
-RELEASE-NOTES.md - 0.3.16 发布说明、安装入口与已知边界。
+NPM-DISTRIBUTION.md - npm 分发方案与 0.3.17 发布状态、隔离验收与安装文案。
+RELEASE-NOTES.md - 0.3.17 发布说明、安装入口与已知边界。
 release.sh - 构建并核验五个插件，输出版本清单与 SHA256；不上传产物。
 </config>
 
@@ -35,3 +35,5 @@ release.sh - 构建并核验五个插件，输出版本清单与 SHA256；不上
 五包 0.3.15 已通过 Actions 可信发布，公共下载与独立 DSH 升级核验通过。提示词未通过项保留，见 reviews/business-acceptance-20261103.md。
 
 0.3.16 五包已通过可信发布与本机 npm 升级；改动集中在 tool、preset。原生客户端验收与保留问题见 reviews/native-validation-0316.md。
+
+0.3.17 修复关系网络画布边界；agent 与 tool 共用连线几何，审查见 reviews/graph-bounds-0317.md。

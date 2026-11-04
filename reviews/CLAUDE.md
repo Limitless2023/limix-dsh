@@ -2,6 +2,8 @@
 
 > L2 | 父级: ../CLAUDE.md
 
+graph-bounds-0317.md - 关系图边界交叉审查、界面验收与正式发布核验。
+
 native-validation-0316.md - 0.3.16 输入与轮询审查、四个本机场景及人工审阅/后端错误边界。
 
 business-acceptance-20261103.md - 业务验收与证据范围的提示词迭代，保留真实模型回答和未通过项。

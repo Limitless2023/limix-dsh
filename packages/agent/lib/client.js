@@ -1559,6 +1559,25 @@ function LocalExplanation({ data, controls }) {
 
 //#endregion
 //#region src/client/graph-layout.ts
+function graphEdgeGeometry(edge, edges, positions) {
+	const a = positions.get(edge.source), b = positions.get(edge.target);
+	if (!a || !b) return null;
+	const right = b[0] > a[0], same = b[0] === a[0];
+	const ax = a[0] + (right || same ? 68 : -68), bx = b[0] + (right ? -68 : 68);
+	const port = (node, other, outgoing) => {
+		const peers = edges.filter((e) => outgoing ? e.source === node : e.target === node).map((e) => outgoing ? e.target : e.source).sort((x, y) => (positions.get(x)?.[1] ?? 0) - (positions.get(y)?.[1] ?? 0));
+		return peers.length > 1 ? -14 + 28 * peers.indexOf(other) / (peers.length - 1) : 0;
+	};
+	const ay = a[1] + port(edge.source, edge.target, true), by = b[1] + port(edge.target, edge.source, false);
+	const cx = same ? ax + 30 : (ax + bx) / 2, dx = same ? bx + 30 : cx;
+	const label = [same ? ax + 22.5 : cx, (ay + by) / 2];
+	return {
+		path: `M ${ax} ${ay} C ${cx} ${ay}, ${dx} ${by}, ${bx} ${by}`,
+		label,
+		right: Math.max(ax + 6, bx + 6, cx + 6, dx + 6, label[0] + 23),
+		bottom: Math.max(ay + 6, by + 6, label[1] + 9)
+	};
+}
 function graphLayout(nodes, edges, aspect = 2) {
 	const adjacency = new Map(nodes.map((n) => [n, edges.filter((e) => e.source === n).map((e) => e.target)]));
 	let index = 0;
@@ -1618,19 +1637,30 @@ function graphLayout(nodes, edges, aspect = 2) {
 		}
 	}
 	const isolateColumns = isolated.length > 4 ? 2 : isolated.length ? 1 : 0;
-	const height = Math.max(230, Math.max(0, ...layers.map((c) => c.length), Math.ceil(isolated.length / Math.max(1, isolateColumns))) * 62 + 40);
+	let height = Math.max(230, Math.max(0, ...layers.map((c) => c.length), Math.ceil(isolated.length / Math.max(1, isolateColumns))) * 62 + 40);
 	const isolateWidth = isolateColumns ? isolateColumns * 154 + 36 : 0;
-	const width = Math.max(620, layers.length * 260 + isolateWidth, height * Math.max(1.2, Math.min(1.9, aspect)));
+	let width = Math.max(620, layers.length * 260 + isolateWidth, height * Math.max(1.2, Math.min(1.9, aspect)));
 	const mainWidth = width - isolateWidth;
 	const positions = /* @__PURE__ */ new Map();
 	layers.forEach((col, i) => col.forEach((n, j) => positions.set(n, [layers.length === 1 ? mainWidth / 2 : 85 + i * (mainWidth - 170) / (layers.length - 1), 20 + (j + .5) * (height - 40) / col.length])));
 	isolated.forEach((n, i) => positions.set(n, [mainWidth + 100 + i % isolateColumns * 154, 55 + Math.floor(i / isolateColumns) * 70]));
+	const cycles = groups.filter((g) => g.length > 1 || edges.some((e) => e.source === g[0] && e.target === g[0]));
+	for (const [x, y] of positions.values()) {
+		width = Math.max(width, x + 68 + 12);
+		height = Math.max(height, y + 22 + 12);
+	}
+	for (const edge of edges) {
+		const route = graphEdgeGeometry(edge, edges, positions);
+		if (!route) continue;
+		width = Math.max(width, route.right + 12);
+		height = Math.max(height, route.bottom + 12);
+	}
 	return {
 		positions,
 		width,
 		height,
 		isolated,
-		cycles: groups.filter((g) => g.length > 1 || edges.some((e) => e.source === g[0] && e.target === g[0]))
+		cycles
 	};
 }
 
@@ -1750,12 +1780,11 @@ function graphExportSvg(data, theme = defaultExportTheme, scope = "完整网络"
 	let svg = start(width, height, theme, `关系探索 · ${data.target_label ?? data.target}`) + text(36, 38, `关系探索 · ${data.target_label ?? data.target}`, 22, "font-weight=\"600\"") + text(36, 66, `${scope} · ${nodes.length} 个变量 · ${edges.length} 条关系`, 13);
 	svg += `<defs><marker id="arrow" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0 1 L6 3.5 L0 6" fill="none" stroke="#7793c3"/></marker></defs><g transform="translate(36 90)">`;
 	edges.forEach((e) => {
-		const a = layout.positions.get(e.source), b = layout.positions.get(e.target);
-		if (!a || !b) return;
-		const right = b[0] > a[0], same = b[0] === a[0], ax = a[0] + (right || same ? 68 : -68), bx = b[0] + (right ? -68 : 68);
-		const d = same ? `M${ax} ${a[1]} C${ax + 30} ${a[1]},${bx + 30} ${b[1]},${bx} ${b[1]}` : `M${ax} ${a[1]} C${(ax + bx) / 2} ${a[1]},${(ax + bx) / 2} ${b[1]},${bx} ${b[1]}`;
+		const route = graphEdgeGeometry(e, edges, layout.positions);
+		if (!route) return;
+		const d = route.path;
 		svg += `<path d="${d}" fill="none" stroke="#7793c3" stroke-width="1.5"${data.mode === "directed" ? " marker-end=\"url(#arrow)\"" : ""}><title>${escape(`${label(e.source)} ${data.mode === "directed" ? "→" : "—"} ${label(e.target)}：${e.weight}`)}</title></path>`;
-		if (edges.length <= 5) svg += text((ax + bx) / 2, (a[1] + b[1]) / 2 - 7, number(e.weight), 11, "text-anchor=\"middle\"");
+		if (edges.length <= 5) svg += text(route.label[0], route.label[1] - 7, e.weight.toFixed(3), 10, "text-anchor=\"middle\"");
 	});
 	nodes.forEach((name) => {
 		const [x, y] = layout.positions.get(name);
@@ -3360,16 +3389,9 @@ function ExplanationGraph({ data, onPair, detail, selectedPair = [], onClearPair
 								})
 							})] }),
 							edges.map((e, i) => {
-								const a = positions.get(e.source), b = positions.get(e.target);
-								if (!a || !b) return null;
-								const right = b[0] > a[0], same = b[0] === a[0];
-								const ax = a[0] + (right || same ? 68 : -68), bx = b[0] + (right ? -68 : 68);
-								const port = (node, other, outgoing) => {
-									const peers = edges.filter((edge) => outgoing ? edge.source === node : edge.target === node).map((edge) => outgoing ? edge.target : edge.source).sort((x, y) => (positions.get(x)?.[1] ?? 0) - (positions.get(y)?.[1] ?? 0));
-									return peers.length > 1 ? -14 + 28 * peers.indexOf(other) / (peers.length - 1) : 0;
-								};
-								const ay = a[1] + port(e.source, e.target, true), by = b[1] + port(e.target, e.source, false);
-								const path = same ? `M ${ax} ${ay} C ${ax + 30} ${ay}, ${bx + 30} ${by}, ${bx} ${by}` : `M ${ax} ${ay} C ${(ax + bx) / 2} ${ay}, ${(ax + bx) / 2} ${by}, ${bx} ${by}`;
+								const route = graphEdgeGeometry(e, edges, positions);
+								if (!route) return null;
+								const { path } = route;
 								const chosen = selectedPair[0] === e.source && selectedPair[1] === e.target;
 								const emphasized = selectedPair.length ? chosen : !selected || e.source === selected || e.target === selected;
 								return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("g", {
@@ -3401,7 +3423,7 @@ function ExplanationGraph({ data, onPair, detail, selectedPair = [], onClearPair
 											children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)("title", { children: `${label(e.source)} ${data.mode === "directed" ? "→" : "—"} ${label(e.target)}：${number(e.weight)}` })
 										}),
 										(chosen || (selected ? emphasized : focus)) && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("g", {
-											transform: `translate(${same ? ax + 22.5 : (ax + bx) / 2},${(ay + by) / 2})`,
+											transform: `translate(${route.label[0]},${route.label[1]})`,
 											className: "lx-edge-score",
 											children: [
 												/* @__PURE__ */ (0, react_jsx_runtime.jsx)("title", { children: `模型关系分数 ${e.weight}；来源 result.edges[].weight` }),

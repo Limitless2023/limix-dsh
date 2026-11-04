@@ -1,16 +1,16 @@
 # LimiX 五插件 npm 分发
 
-本轮发布版本：**0.3.16**（公共发布状态见发布说明）。五包统一更新，咨询推断的已知问题见 [提示词验收记录](docs/PROMPT-EVALUATION.md)。GitHub Release tgz 分发继续保留。
+当前公开版本：**0.3.16**。五包统一更新，咨询推断的已知问题见 [提示词验收记录](docs/PROMPT-EVALUATION.md)。GitHub Release tgz 分发继续保留。
 
 ## 发布方案
 
 保留五个包名：`dsh-limix-data`、`dsh-limix-tool`、`dsh-limix-agent`、`dsh-limix-preset`、`dsh-limix-cover`。五包统一版本；npm 与 GitHub Release 使用同一批 tgz，SHA256SUMS 校验这些文件。
 
-0.3.10 的 npm 首装与 tgz 迁移验证保留为历史记录；后续发布须使用高于 0.3.15 的新版本，避免同一版本存在不同包内容。发布前从干净提交打包，并核对源码提交与包清单。
+0.3.10 的 npm 首装与 tgz 迁移验证保留为历史记录；后续发布须使用高于 0.3.16 的新版本，避免同一版本存在不同包内容。发布前从干净提交打包，并核对源码提交与包清单。
 
 五包没有互相声明 npm 依赖，需一次安装全部五包。preset 在 LimiX 模式中加载 tool；tool 的空 bundle patch 是有意设计，不额外挂载全局工具。data 保留 mysql2、pg 运行依赖；其余包随包提供构建产物，使用者无需编译。不会打包另一份 Harness。
 
-0.3.15 五包通过 GitHub Actions 的 OIDC 身份发布，本轮安装指令使用0.3.16。自有代码采用 PolyForm Noncommercial 1.0.0；商业授权与第三方权利见 [许可说明](LICENSING.md)。
+0.3.16 五包通过 GitHub Actions 的 OIDC 身份发布，本轮安装指令使用0.3.16。自有代码采用 PolyForm Noncommercial 1.0.0；商业授权与第三方权利见 [许可说明](LICENSING.md)。
 
 ## 支持条件
 
@@ -65,7 +65,7 @@ GitHub tgz 安装继续支持：从对应 Release 下载五个文件，在“插
 
 ## 维护者发布步骤
 
-1. 核对 LICENSING.md 与五包许可文件，完成代码和界面验收，五包统一使用新的版本号。已有 0.3.15 不可覆盖。
+1. 核对 LICENSING.md 与五包许可文件，完成代码和界面验收，五包统一使用新的版本号。已有 0.3.16 不可覆盖。
 2. 用 Node 24、npm 11.15.0，在 data/tool/agent 目录分别运行 `npm ci --ignore-scripts`，重建 lib。提交锁文件、源码与构建产物，使再次构建后的工作树保持干净。
 3. 用户批准后，按下方可信发布流程在 Actions 手动发版。若选择本机发布，仍须先在干净提交执行 `./release.sh` 和 `node scripts/npm-preflight.mjs`，并完成 npm 登录及二次验证。
 4. 从公共 npm 按固定版本安装到新 profile，核对五包版本与 tarball integrity，再创建对应 GitHub Release。Actions 发版须上传该次运行归档中的五个 tgz、manifest 和 SHA256SUMS，不在本机重新打包。
@@ -124,3 +124,7 @@ npx --yes npm@11.15.0 trust github dsh-limix-cover --repo Limitless2023/limix-ds
 依据：[npm 可信发布文档](https://docs.npmjs.com/trusted-publishers/)、[npm trust 命令](https://docs.npmjs.com/cli/v11/commands/npm-trust/)、[未验证配置 48 小时到期公告](https://github.blog/changelog/2026-10-02-unvalidated-npm-trusted-publishing-configurations-now-expire/)。核对日期：2026-11-03。
 
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
+
+## 0.3.16 发布回验（2026-11-04）
+
+[Actions 41747158215](https://github.com/Limitless2023/limix-dsh/actions/runs/41747158215)成功。公共 npm 五包下载与该次归档逐字节一致。独立 DSH_HOME 首次安装五包通过；日常 desktop 从0.3.16-rc.1更新为公共npm0.3.16。576个原会话文件、API配置、数据源及服务凭据摘要未变。仅profile的包清单、锁文件和安装器工作区文件按预期更新。未重做tgz迁移、Windows或第二台电脑；报告人工审阅与后端报错边界见[本机验收记录](reviews/native-validation-0316.md)。

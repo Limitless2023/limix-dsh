@@ -20,6 +20,12 @@ Python审查核对输入检查、轮询终态、缺失结果版本和打包新�
 
 液压文字类别局部解释：首次7a9d810d064ace8760ceac56aa6cf1cb、复测67a1acef4c31307c9bcd792e010d3c4b均EXPLANATION_FAILED。仅目标full/reduced/near_failure→0/1/2、保留28特征和相同20条样本后，dc6ced4b5069ad0dc7490b0b16f93430成功。证据指向文字标签兼容性，尚需后端日志确认；这是CLI实调对照，不冒充DSH界面任务。
 
-光学20变量无向解释旧报错未修复，本轮未重测。未重做Windows、第二台电脑、首次安装、tgz迁移及所有下载按钮。没有通过覆盖原始报告或删除首次截图掩盖失败。
+光学20变量无向解释旧报错未修复，本轮未重测。未重做Windows、第二台电脑、tgz迁移及所有下载按钮。没有通过覆盖原始报告或删除首次截图掩盖失败。
+
+## 发布与升级回验
+
+[Actions 41747158215](https://github.com/Limitless2023/limix-dsh/actions/runs/41747158215)基于干净提交2e20023发布五包0.3.16。公共npm真实下载SHA256及SHA512与Actions归档一致。独立DSH_HOME首次安装通过。GitHub Release v0.3.16的五个tgz、manifest和SHA256SUMS回下载均与Actions归档一致。首次回下载连接EOF，重试通过。
+
+本机正常退出后备份646个文件，再将desktop五包由候选tgz更新为公共npm0.3.16。576个会话文件原样保留；API配置、数据源、服务凭据和profile patch摘要未变。643个文件字节不变；仅package.json、pnpm-lock.yaml、pnpm-workspace.yaml按预期更新。重启原生DSH后，旧工作区与会话可见；插件详情显示v0.3.16及npm来源dsh-limix-tool@0.3.16，截图留在本机。证据保存在本机Coffee/_recon/npm-0316-public，不上传备份和凭据。
 
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md

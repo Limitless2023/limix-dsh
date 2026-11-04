@@ -34,4 +34,4 @@ release.sh - 构建并核验五个插件，输出版本清单与 SHA256；不上
 
 五包 0.3.15 已通过 Actions 可信发布，公共下载与独立 DSH 升级核验通过。提示词未通过项保留，见 reviews/business-acceptance-20261103.md。
 
-0.3.16 本轮改动集中在 tool、preset；五包统一版本。原生客户端验收与保留问题见 reviews/native-validation-0316.md。
+0.3.16 五包已通过可信发布与本机 npm 升级；改动集中在 tool、preset。原生客户端验收与保留问题见 reviews/native-validation-0316.md。

@@ -12,7 +12,7 @@ csv-access.js - 限定 CSV 读取及已登记产物下载；沿用旧登记并�
 
 python-runtime.js - preset 激活时预准备 Python 依赖；安装器固定为包内资源，不跟随外部 CLI；比较共用准备任务。
 
-report-workflow.js - 报告生成与核验指引；仅在已授权交付阶段应用。
+report-workflow.js - 报告与最终总结复用程序计算的日期、分组数量及汇总事实；行动建议受业务验收证据约束。
 
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 

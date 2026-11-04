@@ -4,7 +4,7 @@
 
 ## 插件组成
 
-套件由五个包组成，公共版本为 0.3.15。`data`、`tool`、`agent`、`preset` 共同提供 LimiX Agent；`cover` 负责品牌外观，可选。
+套件由五个包组成，本轮发布版本为 0.3.16。`data`、`tool`、`agent`、`preset` 共同提供 LimiX Agent；`cover` 负责品牌外观，可选。
 
 | 包 | 职责 |
 | --- | --- |
@@ -15,6 +15,8 @@
 | `dsh-limix-cover` | 官方 LimiX 标识与首页品牌；原图来源见包内 `assets/SOURCES.md` |
 
 安装步骤见 [INSTALL.md](INSTALL.md)。下载预构建 tarball 后无需在用户机器编译。
+
+v0.3.16 修复本地输入引用校验和预测轮询，统一报告与最终总结的事实口径；报告仍需人工审阅。
 
 v0.3.15 增加调用前数据说明、精简时序卡片，并提供任务时间摘要；npm 已采用 GitHub Actions 可信发布。
 

@@ -66,12 +66,12 @@ class MetricsTests(unittest.TestCase):
     def test_forecast_truth_stays_local(self):
         self.truth.write_text("date,sales\n2025-01-01,10\n2025-01-02,20\n")
         args = limix.build_parser().parse_args([
-            "forecast", "--train", "history.csv", "--target", "sales", "--date", "date",
+            "forecast", "--train", "history-version", "--target", "sales", "--date", "date",
             "--context", "7", "--horizon", "2", "--truth", str(self.truth)])
         with patch.object(limix, "resolve_data_ref", return_value="history-version") as upload, \
              patch.object(limix, "run_inference") as run:
             limix.cmd_forecast({}, args)
-        upload.assert_called_once_with({}, "history.csv", "训练集")
+        upload.assert_called_once_with({}, "history-version", "训练集")
         self.assertIsNone(run.call_args.args[2]["predict_data_version_id"])
         self.assertNotIn(str(self.truth), json.dumps(run.call_args.args[2]))
         self.assertEqual(run.call_args.args[-1]["predict_path"], str(self.truth))
@@ -79,7 +79,7 @@ class MetricsTests(unittest.TestCase):
     def test_invalid_truth_fails_before_upload(self):
         self.truth.write_text("sales\n10\n")
         args = limix.build_parser().parse_args([
-            "forecast", "--train", "history.csv", "--target", "sales", "--date", "date",
+            "forecast", "--train", "history-version", "--target", "sales", "--date", "date",
             "--context", "7", "--horizon", "2", "--truth", str(self.truth)])
         error = io.StringIO()
         with patch.object(limix, "resolve_data_ref") as upload, contextlib.redirect_stderr(error):
@@ -98,7 +98,7 @@ class MetricsTests(unittest.TestCase):
              patch.object(limix, "download_result", return_value=str(self.result)), \
              patch.object(limix, "seasonal_baseline") as baseline, contextlib.redirect_stdout(output):
             limix.run_inference({}, "timeseries", {}, False, False, str(self.result), 10,
-                                {"train": "history.csv", "predict_path": str(self.truth), "target": "sales", "date": "date"})
+                                {"train": "history-version", "predict_path": str(self.truth), "target": "sales", "date": "date"})
         baseline.assert_not_called()
         result = json.loads(output.getvalue())
         self.assertEqual(result['status'], 'finished')

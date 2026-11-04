@@ -10,9 +10,11 @@ import logging
 import math
 from datetime import datetime, timezone
 from pathlib import Path
+from limix_input import checked_ref
 
 
 def local_rows(ref, label):
+    ref = checked_ref(ref, label)
     path = Path(ref) if ref else None
     if not path or not path.is_file() or path.suffix.lower() != '.csv':
         return None

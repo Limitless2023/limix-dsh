@@ -7,6 +7,7 @@
           config / health / check / upload / classify / regress / forecast /
           task / tasks / cancel / result / download / data / api / docs / doctor / explain / benchmark
 [POS]: dsh-limix-tool 的 CLI；指标计算由同目录 limix_metrics 提供；解释由 limix_explain 编排。
+       所有预测输入先核对本地文件，再上传；轮询等待终态，不采信提前就绪标记；
        本地真值与时序输入校验失败使用统一错误出口；时序上传前由 limix_forecast 预检，下载后提取任务时间证据；无真值不评估基线。
        上传头使用安全 ASCII 文件名，保留原文件路径、扩展名与内容。
        预测与解释零第三方依赖；benchmark 的本地模型依赖独立 Python 环境；docs 子命令读取 Mintlify Markdown，无需凭证。
@@ -14,6 +15,7 @@
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 """
 
+from limix_input import checked_ref
 from limix_forecast import forecast_payload, forecast_summary
 from limix_metrics import compute_metrics, inference_metrics_context, seasonal_baseline
 from limix_explain import add_parser as add_explain_parser
@@ -36,10 +38,7 @@ import importlib.metadata
 import contextlib
 import io
 from pathlib import Path
-
-# ============================================================
 # 配置与常量
-# ============================================================
 
 DEFAULT_BASE_URL = "https://limix-api.stable-ai.cn"
 DOCS_BASE_URL = "https://limix.mintlify.site"
@@ -110,10 +109,7 @@ def emit(data):
     """成功出口：stdout 输出 JSON，exit 0 由调用方决定"""
     print(json.dumps(data, ensure_ascii=False, indent=2))
 
-
-# ============================================================
-# HTTP 层：请求、信封拆包、multipart、下载
-# ============================================================
+# HTTP：请求、信封拆包、multipart、下载
 
 class ApiError(Exception):
     def __init__(self, code, message, http_status=None):
@@ -242,7 +238,6 @@ def save_stream(content, resp_headers, out_path):
         f.write(content)
     return out_path
 
-
 # ============================================================
 # 业务封装：上传、id/文件自动识别、任务轮询、结果下载
 # ============================================================
@@ -263,15 +258,19 @@ def upload_file(cfg, file_path, sheet=None, encoding=None, delimiter=None):
 
 
 def resolve_data_ref(cfg, ref, kind):
-    """--train/--predict 双语义：本地文件路径→自动上传；否则视为已有 data_version_id"""
-    if ref and os.path.exists(ref):
+    """路径须存在且可读；非路径引用保留为 data_version_id。"""
+    try:
+        ref = checked_ref(ref, kind)
+    except ValueError as exc:
+        die(str(exc), exit_code=2)
+    if ref and os.path.isfile(ref):
         return upload_file(cfg, ref)["data_version_id"]
     log(f"{kind}: 使用已有数据版本 {ref}")
     return ref
 
 
 def poll_task(cfg, task_id, wait_seconds):
-    """轮询预测任务直到 is_ready=true（官方推荐判据），返回终态 data"""
+    """等待预测终态；服务端提前返回 is_ready 时继续查询同一任务"""
     deadline = time.time() + wait_seconds
     last_status = None
     while time.time() < deadline:
@@ -280,7 +279,7 @@ def poll_task(cfg, task_id, wait_seconds):
         if status != last_status:
             log(f"任务 {task_id}: {status}")
             last_status = status
-        if data.get("is_ready"):
+        if status in INFER_TERMINAL:
             return data
         time.sleep(POLL_INTERVAL)
     die(f"等待超时（{wait_seconds}s），任务仍未到终态",
@@ -324,6 +323,9 @@ def run_inference(cfg, kind, payload, sync, no_wait, out_path, wait_seconds, met
             payload={"task": data,
                      "hint": "读 error_message 定位；timeout 可调高 --timeout 重提；failed 先核对目标列与数据契约"})
 
+    if not data.get("result_version_id"):
+        die("任务已完成但缺少结果版本，无法下载", exit_code=3,
+            payload={"task": data, "hint": "按原 task_id 查询结果，不重复提交预测"})
     result = dict(data)
     ctxm = metrics_ctx or {}
     metrics = None
@@ -354,10 +356,7 @@ def run_inference(cfg, kind, payload, sync, no_wait, out_path, wait_seconds, met
         result["baseline_evaluation"] = seasonal_baseline(ctxm["train"], ctxm["predict_path"], result["saved_to"], ctxm.get("target"), ctxm.get("date"))
     emit(result)
 
-
-# ============================================================
 # 子命令实现
-# ============================================================
 
 def require_production(base_url):
     """本分发版仅连接生产环境；旧配置显式报错，避免静默切换上传目标。"""
@@ -504,9 +503,11 @@ def cmd_upload(cfg, args):
 
 def local_metrics_context(args):
     try:
+        args.train = checked_ref(args.train, "训练集")
+        args.predict = checked_ref(args.predict, "预测集")
         return inference_metrics_context(args)
     except (OSError, ValueError, csv.Error) as exc:
-        die(f"无法读取评估真实值：{exc}", exit_code=2)
+        die(f"预测输入校验失败：{exc}", exit_code=2)
 
 
 def cmd_classify(cfg, args):
@@ -612,7 +613,6 @@ def cmd_api(cfg, args):
     else:
         emit(api_call(cfg, args.method, args.path, params=params, body=body,
                       timeout=args.timeout, retries=2 if args.method == "GET" else 0))
-
 
 # ============================================================
 # 参数定义

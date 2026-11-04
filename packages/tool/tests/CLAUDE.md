@@ -22,6 +22,8 @@ command-args.test.mjs - 重复命令词容错、位置参数保留与宿主报�
 
 test_explain_graph.py - 模型身份与写入失败清理； 矩阵尺寸、抽样上限、比较详情保留原值但回执省略、两组列重排、失败拒绝与输出保护。
 
+test_inference_lifecycle.py - 验证缺失文件零请求、目录拒绝、远程 ID 保留及提前 ready 不误判失败。
+
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
 
 report.test.mjs 补充双格式一致性与 Markdown 冲突回滚验证。

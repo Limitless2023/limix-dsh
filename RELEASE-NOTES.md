@@ -17,6 +17,10 @@
 
 最低支持 DeepSeek Harness 0.2.1-rc.5。许可保持 PolyForm Noncommercial 1.0.0。标准模式提示词未修改。
 
+## 发布状态
+
+GitHub Actions [41758353807](https://github.com/Limitless2023/limix-dsh/actions/runs/41758353807) 已成功发布。五个 npm 包及 latest 均为 0.3.17，公共包与 Release 附件逐字节一致。本机已升级为五包 npm 正式版，旧对话、API Key 和数据源配置保留，原液压对话已重新打开验收。
+
 ## 已知限制
 
 - 密集双向关系的分数标签仍可能重叠；本次修复裁切，不宣称解决全部标签布局问题。

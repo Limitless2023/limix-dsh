@@ -4,7 +4,7 @@
 
 ## 插件组成
 
-套件由五个包组成，本轮发布版本为 0.3.17。`data`、`tool`、`agent`、`preset` 共同提供 LimiX Agent；`cover` 负责品牌外观，可选。
+套件由五个包组成，本轮发布版本为 0.3.18。`data`、`tool`、`agent`、`preset` 共同提供 LimiX Agent；`cover` 负责品牌外观，可选。
 
 | 包 | 职责 |
 | --- | --- |
@@ -15,6 +15,8 @@
 | `dsh-limix-cover` | 官方 LimiX 标识与首页品牌；原图来源见包内 `assets/SOURCES.md` |
 
 安装步骤见 [INSTALL.md](INSTALL.md)。下载预构建 tarball 后无需在用户机器编译。
+
+v0.3.18 适配 DeepSeek Harness 0.2.2：移除已废弃的 subagent `list-agents` 挂载，恢复 LimiX Agent 模式显示与会话启动；子 agent 模型选择改用新键名。报告仍需人工审阅。
 
 v0.3.17 修复因果关系网络右侧连线与分数标签裁切，同步报告图形导出；报告仍需人工审阅。
 

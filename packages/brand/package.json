@@ -1,6 +1,6 @@
 {
   "name": "dsh-limix-cover",
-  "version": "0.3.17",
+  "version": "0.3.18",
   "description": "LimiX brand cover for the blank-session hero and the sidebar brand row.",
   "type": "module",
   "main": "lib/index.js",

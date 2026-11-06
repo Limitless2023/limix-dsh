@@ -1,30 +1,31 @@
-# LimiX Agent v0.3.17
+# LimiX Agent v0.3.18
 
-五包统一为 0.3.17。功能改动集中在 agent 及复用其图形的 tool；data、preset、cover 同步版本。
+五包统一为 0.3.18。改动集中在 preset；data、tool、agent、cover 同步版本，代码与 0.3.17 一致。
 
 ## 本次变化
 
-- 修复因果关系网络最右列回绕连线、箭头与分数标签被画布裁切的问题。
-- 画布按节点、曲线和分数标签的完整范围计算边界。选择变量时预留空间保持稳定，不改变模型关系与分数。
-- 屏幕和 SVG 导出共用连线几何。新生成的 HTML 报告使用同一修复；已保存报告不会自动重写。
-- 本机已有对话重新加载即可显示修复，不必重新预测。
+- 修复 DeepSeek Harness 0.2.2 下 LimiX Agent 模式从“模式”菜单消失、新建会话空白的问题。
+- 根因：0.2.2 把 `list_agents` 并入 `@deepseek-ai/dsh-tool-subagent-control` 主入口，不再导出 `./list-agents` 子路径。preset 仍单独挂载该行，导致整行 `never started`，整个 preset 被判定不可用并从名册过滤。
+- 移除该行；`list_agents` 与 `interrupt_agent` 由主入口继续提供。
+- `tool-subagent` 的模型选择改用 0.2.2 的 `modelSelection` + `modelDiscovery`，并保留 0.2.1 的 `modelSelectionSettings` 旧键；旧版本读取旧键，0.2.2 忽略它。
+- 其余插件组合、提示词、工具与界面不变。
 
 ## 验证
 
-两路独立交叉 review 完成。代码审查验证真实光学、液压网络的完整视图、逐变量聚焦及四种宽高比，共 144 组布局检查通过。分发审查发现 tool 构建产物需要同步，已纳入本轮全套构建。
+在隔离的 `DSH_HOME` 中按桌面 profile 组合真实安装包复现：修复前 `agentPresets/list` 返回
+`tool-subagent-list-agents (@deepseek-ai/dsh-tool-subagent-control/list-agents): never started`；
+修复后五个预设均无 `broken`，以 `agentPreset: limix` 新建会话成功，权限、沙箱与审批事件正常写入。
 
-本机 DSH 原液压对话已验证普通卡片、全屏、选择最右侧变量，以及点击右侧连线打开散点图。详细检查与发布回验见 [审查记录](reviews/graph-bounds-0317.md)。
-
-最低支持 DeepSeek Harness 0.2.1-rc.5。许可保持 PolyForm Noncommercial 1.0.0。标准模式提示词未修改。
+本机 desktop profile 已用同一份修改热修并验证；正式版发布后按 npm 0.3.18 覆盖。
 
 ## 发布状态
 
-GitHub Actions [41758353807](https://github.com/Limitless2023/limix-dsh/actions/runs/41758353807) 已成功发布。五个 npm 包及 latest 均为 0.3.17，公共包与 Release 附件逐字节一致。本机已升级为五包 npm 正式版，旧对话、API Key 和数据源配置保留，原液压对话已重新打开验收。
+待 GitHub Actions 手动触发 0.3.18；结果、npm 核验与本机升级回验回填于 [审查记录](reviews/preset-dsh-022-0318.md)。
+
+最低支持 DeepSeek Harness 0.2.1-rc.5。许可保持 PolyForm Noncommercial 1.0.0。标准模式提示词未修改。
 
 ## 已知限制
 
-- 密集双向关系的分数标签仍可能重叠；本次修复裁切，不宣称解决全部标签布局问题。
-- PNG 下载未单独界面复验；未重做 Windows、第二台电脑、首次安装和 tgz 迁移。
+- 0.2.1 仍读取旧键 `modelSelectionSettings`；若后续版本再次调整键名，需同步本节。
+- 本轮只修复模式不可用，未重新验收预测、解释、报告与数据源链路；这些能力沿用 0.3.17 验收结论。
 - 报告与最终自然语言总结仍需人工审阅。
-- 液压文字分类目标局部解释的 EXPLANATION_FAILED 后端错误未修复；数字编码是已验证绕行方式。
-- 光学 20 变量无向解释的旧后端错误保留，本轮未重测。

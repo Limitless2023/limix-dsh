@@ -109,13 +109,16 @@
             config:
               - id: tool-subagent-control
                 name: '@deepseek-ai/dsh-tool-subagent-control'
-              - id: tool-subagent-list-agents
-                name: '@deepseek-ai/dsh-tool-subagent-control/list-agents'
+              # DSH 0.2.2 起 list_agents 并入 tool-subagent-control 主入口，
+              # 旧的 /list-agents 子路径不再导出；多挂一行会让整个 preset 启动失败。
               - id: tool-subagent
                 name: '@deepseek-ai/dsh-tool-subagent'
                 config:
                   provider: spawn
                   toolName: subagent
+                  # 0.2.2 读取 modelSelection/modelDiscovery；旧键保留给 0.2.1，升级后忽略。
+                  modelSelection: true
+                  modelDiscovery: true
                   modelSelectionSettings: true
               - id: tool-subagent-fork
                 name: '@deepseek-ai/dsh-tool-subagent'

@@ -1,14 +1,14 @@
-# 安装 LimiX Agent 0.3.17
+# 安装 LimiX Agent 0.3.18
 
 最低支持 DeepSeek Harness **0.2.1-rc.5**。npm 安装、更新和 tgz 迁移指令见 [npm 分发说明](NPM-DISTRIBUTION.md)。商业用途须事先取得单独书面授权，详见 [许可说明](LICENSING.md)。
 
-从 [GitHub Releases](https://github.com/Limitless2023/limix-dsh/releases) 下载 0.3.17 的插件文件。请保留现有 profile，按顺序安装或更新：
+从 [GitHub Releases](https://github.com/Limitless2023/limix-dsh/releases) 下载 0.3.18 的插件文件。请保留现有 profile，按顺序安装或更新：
 
-1. `dsh-limix-data-0.3.17.tgz`
-2. `dsh-limix-tool-0.3.17.tgz`
-3. `dsh-limix-agent-0.3.17.tgz`
-4. `dsh-limix-preset-0.3.17.tgz`
-5. 可选品牌外观：`dsh-limix-cover-0.3.17.tgz`
+1. `dsh-limix-data-0.3.18.tgz`
+2. `dsh-limix-tool-0.3.18.tgz`
+3. `dsh-limix-agent-0.3.18.tgz`
+4. `dsh-limix-preset-0.3.18.tgz`
+5. 可选品牌外观：`dsh-limix-cover-0.3.18.tgz`
 
 在 DeepSeek Harness 的“插件 → 添加插件”中选择文件；也可让 DSH Agent 使用 `plugin_manager` 的 `install_bundle`，`target` 传 tarball 的绝对路径。升级时使用同名包的新版，无需手动删配置。
 

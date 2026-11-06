@@ -1,16 +1,16 @@
 # LimiX 五插件 npm 分发
 
-当前公开版本：**0.3.17**。五包统一更新，咨询推断的已知问题见 [提示词验收记录](docs/PROMPT-EVALUATION.md)。GitHub Release tgz 分发继续保留。
+当前公开版本：**0.3.18**。五包统一更新，咨询推断的已知问题见 [提示词验收记录](docs/PROMPT-EVALUATION.md)。GitHub Release tgz 分发继续保留。
 
 ## 发布方案
 
 保留五个包名：`dsh-limix-data`、`dsh-limix-tool`、`dsh-limix-agent`、`dsh-limix-preset`、`dsh-limix-cover`。五包统一版本；npm 与 GitHub Release 使用同一批 tgz，SHA256SUMS 校验这些文件。
 
-0.3.10 的 npm 首装与 tgz 迁移验证保留为历史记录；后续发布须使用高于 0.3.17 的新版本，避免同一版本存在不同包内容。发布前从干净提交打包，并核对源码提交与包清单。
+0.3.10 的 npm 首装与 tgz 迁移验证保留为历史记录；后续发布须使用高于 0.3.18 的新版本，避免同一版本存在不同包内容。发布前从干净提交打包，并核对源码提交与包清单。
 
 五包没有互相声明 npm 依赖，需一次安装全部五包。preset 在 LimiX 模式中加载 tool；tool 的空 bundle patch 是有意设计，不额外挂载全局工具。data 保留 mysql2、pg 运行依赖；其余包随包提供构建产物，使用者无需编译。不会打包另一份 Harness。
 
-0.3.17 沿用 GitHub Actions 的 OIDC 发布，本轮安装指令使用0.3.17。自有代码采用 PolyForm Noncommercial 1.0.0；商业授权与第三方权利见 [许可说明](LICENSING.md)。
+0.3.18 沿用 GitHub Actions 的 OIDC 发布，本轮安装指令使用0.3.18。自有代码采用 PolyForm Noncommercial 1.0.0；商业授权与第三方权利见 [许可说明](LICENSING.md)。
 
 ## 支持条件
 
@@ -34,7 +34,7 @@ DSH='/Applications/DeepSeek Harness.app/Contents/Resources/runtime/cli/bin/dsh'
 先完全退出 DeepSeek Harness。在终端执行以下**一条命令**，安装五个同版本插件：
 
 ```sh
-dsh plugin --profile desktop add --save-exact --registry=https://registry.npmjs.org/ dsh-limix-data@0.3.17 dsh-limix-tool@0.3.17 dsh-limix-agent@0.3.17 dsh-limix-preset@0.3.17 dsh-limix-cover@0.3.17
+dsh plugin --profile desktop add --save-exact --registry=https://registry.npmjs.org/ dsh-limix-data@0.3.18 dsh-limix-tool@0.3.18 dsh-limix-agent@0.3.18 dsh-limix-preset@0.3.18 dsh-limix-cover@0.3.18
 ```
 
 macOS 若使用上方 `DSH` 变量，把命令开头 `dsh` 换成 `"$DSH"`。Web 用户将 `desktop` 换成实际使用的 profile，例如 `web`。不要新建 profile 代替原 profile，否则会看不到原来的插件与配置选择。
@@ -43,7 +43,7 @@ macOS 若使用上方 `DSH` 变量，把命令开头 `dsh` 换成 `"$DSH"`。Web
 
 升级前备份自己的 DSH_HOME 和 `~/.limix/config.json`，备份仅留本机。默认 DSH_HOME 为 `~/.dsh`；自定义环境应使用原路径。数据源存于 `DSH_HOME/limix-datasource.json`；API Key 使用 `LIMIX_API_KEY` 或 `~/.limix/config.json`。环境变量必须对实际启动 DSH 的进程可见。
 
-重启后，在“插件”确认五包均为 0.3.17；进入“设置 → 数据源”检查已有连接；新建会话选择 LimiX Agent，执行服务连接检查。标准模式默认选择会保留。历史会话仍沿用自己的预设。
+重启后，在“插件”确认五包均为 0.3.18；进入“设置 → 数据源”检查已有连接；新建会话选择 LimiX Agent，执行服务连接检查。标准模式默认选择会保留。历史会话仍沿用自己的预设。
 
 命令行核对：
 

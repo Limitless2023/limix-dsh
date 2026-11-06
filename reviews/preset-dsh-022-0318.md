@@ -27,7 +27,11 @@ tool-subagent-list-agents (@deepseek-ai/dsh-tool-subagent-control/list-agents): 
 
 ## 正式发布回验
 
-待 0.3.18 Actions 发布后回填：run 链接、五包 latest、npm 逐包校验与本机升级结果。
+- GitHub Actions run [42219306179](https://github.com/Limitless2023/limix-dsh/actions/runs/42219306179) 成功，发布源码为 cf67216；构建、离线回归、npm 预检与 OIDC 发布全部通过。
+- 五个 npm 包的 `0.3.18` 与 latest 已可读；逐包从 registry 重新下载，SHA-256 与 Actions 归档一致。
+- `dsh-limix-preset-0.3.18.tgz` 已确认不含 `tool-subagent-list-agents`，并含 `modelSelection`、`modelDiscovery` 与保留的旧键。
+- GitHub Release v0.3.18 保留同一批五个 tgz、manifest.json 和 SHA256SUMS。
+- 本机 desktop profile 仍为 0.3.17 加同内容热修；切换到 npm 0.3.18 需先退出应用，留待下次重启时执行。
 
 ## 保留边界
 

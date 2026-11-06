@@ -20,7 +20,9 @@
 
 ## 发布状态
 
-待 GitHub Actions 手动触发 0.3.18；结果、npm 核验与本机升级回验回填于 [审查记录](reviews/preset-dsh-022-0318.md)。
+GitHub Actions [42219306179](https://github.com/Limitless2023/limix-dsh/actions/runs/42219306179) 已成功发布，发布源码为 cf67216。五个 npm 包的版本与 latest 均为 0.3.18；逐包重新下载的 SHA-256 与 Actions 归档一致。GitHub Release v0.3.18 保留同一批五个 tgz、manifest.json 和 SHA256SUMS。
+
+本机 desktop profile 仍为 0.3.17 加同内容热修；切换 npm 0.3.18 需先退出应用，未在本轮声称完成。
 
 最低支持 DeepSeek Harness 0.2.1-rc.5。许可保持 PolyForm Noncommercial 1.0.0。标准模式提示词未修改。
 
